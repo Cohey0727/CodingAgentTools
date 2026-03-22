@@ -45,8 +45,8 @@ git remote -v
    - フォーマット: `<type>/<短い説明>`
    - type: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`
    - 説明は英語・ケバブケース・簡潔に（例: `feat/add-user-auth`, `fix/null-response-handling`）
-3. ユーザーにブランチ名を提示して確認を求める
-4. 確認後、新規ブランチを作成してチェックアウトする:
+3. 基本的に確認不要でそのままブランチを作成する。ただし、変更が大きく複数の機能や不具合にまたがる場合のみ確認を求めてよい
+4. ブランチを作成してチェックアウトする:
 
 ```bash
 git checkout -b <branch-name>
@@ -137,23 +137,25 @@ git diff origin/${BASE_BRANCH}...HEAD --stat
 - conventional commit形式: `<type>: <description>`
 - 英語で記述
 
-### Step 8: Confirm and Create PR
+### Step 8: Create PR
 
-PRタイトルと本文をユーザーに提示し、**確認を得てから** PRを作成する。
+基本的に確認不要で自動的にPRを作成する。ただし、変更が大きく複数の機能や不具合にまたがる場合のみ、PRタイトル・本文の確認を求めてよい。
 
-ユーザーにドラフトPRか通常PRかも確認する。
+**ドラフト判定:**
+- デフォルトはドラフトPR（`--draft`）
+- ユーザーがコマンド引数や会話の中で明示的に通常PRを指定した場合のみ通常PRにする
+  - 例: `/git-workflow --no-draft`, 「ドラフトじゃなくていい」「レビュー依頼したい」等
 
 ```bash
 gh pr create \
   --base "${BASE_BRANCH}" \
   --title "<PR title>" \
+  --draft \
   --body "$(cat <<'EOF'
 <PR body>
 EOF
 )"
 ```
-
-ドラフトの場合は `--draft` フラグを追加する。
 
 作成後、PR URLをユーザーに表示する。
 
@@ -168,9 +170,9 @@ PRタイトル・本文・コミットメッセージの記述言語は、明示
 ## Rules
 
 - 汎用ブランチへの直接プッシュは行わない。必ず新規ブランチを作成する
-- ブランチ名はユーザー確認なしに作成しない
+- ブランチ名・PR内容は基本的に自動決定する。変更が大きく複数の機能や不具合にまたがる場合のみ確認を求めてよい
 - PRテンプレートが存在する場合は必ずそれに従う
-- PR内容はユーザー確認なしに作成しない
+- ドラフトPRをデフォルトとし、ユーザーが明示的に指定した場合のみ通常PRにする
 - `git push --force` は絶対に使用しない
 - PRのベースブランチはリモートのデフォルトブランチを自動検出する
 - シークレットを含むファイルはコミットしない
@@ -183,16 +185,14 @@ PRタイトル・本文・コミットメッセージの記述言語は、明示
 
 ```
 1. Branch: main (generic branch)
-2. Diff analysis → suggest branch: feat/add-password-reset
-3. User confirms → git checkout -b feat/add-password-reset
-4. /commit → "feat: パスワードリセット機能を追加 @feat/add-password-reset"
-5. Verify branch is not generic → push
-6. PR template found → .github/pull_request_template.md
-7. No existing PR → proceed
-8. Collect diff and commits against base
-9. Show PR draft to user → user confirms
-10. gh pr create --title "feat: add password reset functionality" ...
-11. → https://github.com/user/repo/pull/42
+2. Diff analysis → auto create branch: feat/add-password-reset
+3. /commit → "feat: パスワードリセット機能を追加 @feat/add-password-reset"
+4. Verify branch is not generic → push
+5. PR template found → .github/pull_request_template.md
+6. No existing PR → proceed
+7. Collect diff and commits against base
+8. gh pr create --draft --title "feat: add password reset functionality" ...
+9. → https://github.com/user/repo/pull/42
 ```
 
 ### On feature branch with additional changes
@@ -202,9 +202,8 @@ PRタイトル・本文・コミットメッセージの記述言語は、明示
 2. Continue as-is
 3. /commit → "fix: トークン検証のエッジケースを修正 @feat/user-auth"
 4. Verify branch → push
-5. No PR template
-6. PR already exists → notify user, skip PR creation
-7. Done
+5. PR already exists → notify user, skip PR creation
+6. Done
 ```
 
 ### On feature branch, first PR
@@ -217,7 +216,14 @@ PRタイトル・本文・コミットメッセージの記述言語は、明示
 5. No PR template → use default format
 6. No existing PR → proceed
 7. Collect diff and commits
-8. Show PR draft → user requests draft PR
-9. gh pr create --draft --title "feat: implement user authentication" ...
-10. → https://github.com/user/repo/pull/43
+8. gh pr create --draft --title "feat: implement user authentication" ...
+9. → https://github.com/user/repo/pull/43
+```
+
+### Explicit non-draft PR
+
+```
+User: /git-workflow --no-draft
+1. ... (same workflow)
+8. gh pr create --title "feat: ..." ...  (no --draft flag)
 ```
