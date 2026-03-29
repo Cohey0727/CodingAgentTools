@@ -94,6 +94,15 @@ gh api repos/{owner}/{repo}/pulls/{number}/reviews --paginate
 2. **自分自身のコメントをスキップする**: `user.login` が自分のユーザー名と一致するコメントは対象外。
 3. **既に返信済みのスレッドをスキップする**: コメントスレッド（`in_reply_to_id` で連結）の最後の返信が自分のユーザー名の場合、そのスレッドは対応済みとみなしスキップする。
 
+**レビュワーの分類:**
+
+各コメントの投稿者がAI（ボット）か人間かを判定する:
+
+- **AIレビュワー**: `user.type` が `"Bot"` のユーザー（例: `github-actions[bot]`, `copilot-pull-request-reviewer[bot]`, `coderabbitai[bot]` 等）
+- **人間レビュワー**: `user.type` が `"User"` のユーザー
+
+この分類は Step 9 でスレッドをresolveするかどうかの判定に使用する。
+
 各コメントについて以下の情報を抽出する:
 
 - `id`: コメントID（返信時に使用）
@@ -142,19 +151,27 @@ PR #<number>: <title>
 
 --- 修正対応するコメント (<count>件) ---
 
-[1] @<reviewer> - <file>:<line>
+[1] @<reviewer> [Bot] - <file>:<line>
   コメント: <comment body (abbreviated)>
   対応方針: <what will be changed>
+  → resolve: Yes（AIレビュワー）
 
-[2] ...
+[2] @<reviewer> - <file>:<line>
+  コメント: <comment body (abbreviated)>
+  対応方針: <what will be changed>
+  → resolve: No（人間レビュワー）
 
 --- 返信のみ行うコメント (<count>件) ---
 
-[3] @<reviewer> - <file>:<line>
+[3] @<reviewer> [Bot] - <file>:<line>
   コメント: <comment body (abbreviated)>
   返信内容: <draft reply>
+  → resolve: Yes（AIレビュワー）
 
-[4] ...
+[4] @<reviewer> - <file>:<line>
+  コメント: <comment body (abbreviated)>
+  返信内容: <draft reply>
+  → resolve: No（人間レビュワー）
 ```
 
 **ユーザーの確認を得てから次のステップに進む。**
@@ -209,7 +226,7 @@ git push origin <branch-name>
 - リファクタリング → `refactor`
 - 複合的 → `chore`
 
-### Step 9: Post Reply Comments
+### Step 9: Post Reply Comments and Resolve Threads
 
 各レビューコメントに対して返信を投稿する:
 
@@ -233,7 +250,55 @@ gh api repos/{owner}/{repo}/pulls/comments/{comment_id}/replies \
 
 返信は丁寧で建設的な表現を使う。決して攻撃的にしない。
 
-**注意:** レビューコメントが多数ある場合（10件以上）、GitHub APIのレート制限に注意する。必要に応じてリクエスト間に間隔を空ける。
+**AIレビュワーのスレッドをresolveする:**
+
+レビュワーがAI（`user.type == "Bot"`）の場合、返信後にスレッドをresolveする。
+人間レビュワーのスレッドはresolveしない（人間自身が確認してresolveすべきため）。
+
+resolveにはGraphQL APIを使用する。まず対象スレッドの `threadId` を取得し、`resolveReviewThread` ミューテーションを実行する:
+
+```bash
+# PR のレビュースレッド一覧を取得（threadId とコメントの対応を得る）
+gh api graphql -f query='
+  query($owner: String!, $repo: String!, $number: Int!) {
+    repository(owner: $owner, name: $repo) {
+      pullRequest(number: $number) {
+        reviewThreads(first: 100) {
+          nodes {
+            id
+            isResolved
+            comments(first: 1) {
+              nodes {
+                databaseId
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+' -f owner="{owner}" -f repo="{repo}" -F number={number}
+```
+
+取得した `reviewThreads` から、AIレビュワーのコメントID（`databaseId`）に一致するスレッドの `id`（GraphQLのノードID）を特定する。
+
+```bash
+# スレッドをresolveする
+gh api graphql -f query='
+  mutation($threadId: ID!) {
+    resolveReviewThread(input: {threadId: $threadId}) {
+      thread {
+        isResolved
+      }
+    }
+  }
+' -f threadId="{thread_node_id}"
+```
+
+**注意:**
+- 人間レビュワーのスレッドは絶対にresolveしない
+- 既にresolve済み（`isResolved: true`）のスレッドはスキップする
+- レビューコメントが多数ある場合（10件以上）、GitHub APIのレート制限に注意する。必要に応じてリクエスト間に間隔を空ける。
 
 ### Step 10: Summary
 
@@ -245,6 +310,8 @@ PR: #<number> <title>
 修正コミット: <commit hash>
 対応済み: <count>件
 返信のみ: <count>件
+Resolved: <count>件（AIレビュワーのスレッド）
+未Resolve: <count>件（人間レビュワーのスレッド）
 PR URL: <url>
 ```
 
@@ -270,6 +337,8 @@ PR URL: <url>
 - PRがマージ済み・クローズ済みの場合は操作を行わない
 - セキュリティに関する指摘は常に妥当として扱い、優先的に対応する
 - コミット前にローカルで変更を確認できるようにする
+- AIレビュワー（`user.type == "Bot"`）のスレッドは返信後にresolveする
+- 人間レビュワーのスレッドは絶対にresolveしない（人間自身が確認してresolveする）
 
 ## Examples
 
