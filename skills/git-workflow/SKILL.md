@@ -142,15 +142,14 @@ git diff origin/${BASE_BRANCH}...HEAD --stat
 基本的に確認不要で自動的にPRを作成する。ただし、変更が大きく複数の機能や不具合にまたがる場合のみ、PRタイトル・本文の確認を求めてよい。
 
 **ドラフト判定:**
-- デフォルトはドラフトPR（`--draft`）
-- ユーザーがコマンド引数や会話の中で明示的に通常PRを指定した場合のみ通常PRにする
-  - 例: `/git-workflow --no-draft`, 「ドラフトじゃなくていい」「レビュー依頼したい」等
+- デフォルトは通常PR（ドラフトではない）
+- ユーザーがコマンド引数や会話の中で明示的にドラフトPRを指定した場合のみドラフトにする
+  - 例: `/git-workflow --draft`, 「ドラフトで」「WIPで出して」等
 
 ```bash
 gh pr create \
   --base "${BASE_BRANCH}" \
   --title "<PR title>" \
-  --draft \
   --body "$(cat <<'EOF'
 <PR body>
 EOF
