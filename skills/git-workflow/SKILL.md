@@ -40,7 +40,8 @@ git remote -v
 
 **汎用ブランチにいる場合:**
 
-1. 変更内容を `git diff` と `git diff --cached` で分析する
+1. 変更内容
+   db/artifact-status-migrationを `git diff` と `git diff --cached` で分析する
 2. 変更内容に基づいて適切なブランチ名を自動生成する:
    - フォーマット: `<type>/<短い説明>`
    - type: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`
@@ -48,8 +49,14 @@ git remote -v
 3. 基本的に確認不要でそのままブランチを作成する。ただし、変更が大きく複数の機能や不具合にまたがる場合のみ確認を求めてよい
 4. ブランチを作成してチェックアウトする:
 
-```bash
-git checkout -b <branch-name>
+※ 独自のブランチtypeを絶対に使用しないこと。必ず上記のtypeを使用すること。
+
+```
+# ❌ NG: custom branch type
+git checkout -b db/my-feature
+
+# ✅ OK: standardized branch type
+git checkout -b feat/add-user-auth
 ```
 
 **汎用ブランチでない場合:** そのまま続行する。
@@ -123,16 +130,20 @@ git diff origin/${BASE_BRANCH}...HEAD --stat
 
 ```markdown
 ## Summary
+
 <変更の要約を1〜3個の箇条書きで>
 
 ## Changes
+
 <変更ファイルと内容の概要>
 
 ## Test Plan
+
 - [ ] <テストの手順やチェック項目>
 ```
 
 **PRタイトルのルール:**
+
 - 70文字以内
 - conventional commit形式: `<type>: <description>`
 - 英語で記述
@@ -142,6 +153,7 @@ git diff origin/${BASE_BRANCH}...HEAD --stat
 基本的に確認不要で自動的にPRを作成する。ただし、変更が大きく複数の機能や不具合にまたがる場合のみ、PRタイトル・本文の確認を求めてよい。
 
 **ドラフト判定:**
+
 - デフォルトは通常PR（ドラフトではない）
 - ユーザーがコマンド引数や会話の中で明示的にドラフトPRを指定した場合のみドラフトにする
   - 例: `/git-workflow --draft`, 「ドラフトで」「WIPで出して」等

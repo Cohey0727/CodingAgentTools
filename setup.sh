@@ -30,4 +30,26 @@ if [ -d "$SCRIPT_DIR/skills" ]; then
   done
 fi
 
+# Link agents
+if [ -d "$SCRIPT_DIR/agents" ]; then
+  mkdir -p "$CLAUDE_DIR/agents"
+  for agent_file in "$SCRIPT_DIR/agents"/*.md; do
+    [ -e "$agent_file" ] || continue
+    agent_name="$(basename "$agent_file")"
+    target="$CLAUDE_DIR/agents/$agent_name"
+
+    if [ -L "$target" ]; then
+      echo "  Updating symlink: agents/$agent_name"
+      rm "$target"
+    elif [ -e "$target" ]; then
+      echo "  Skipping agents/$agent_name (file already exists, not a symlink)"
+      continue
+    else
+      echo "  Linking: agents/$agent_name"
+    fi
+
+    ln -s "$agent_file" "$target"
+  done
+fi
+
 echo "Done."
