@@ -22,7 +22,8 @@ gh pr list --state open --json number,title,labels,isDraft,createdAt \
 ```
 
 - 最も古い1件を選ぶ。対象がない場合は「レビュー待ちのPRはない」と報告して終了
-- 二重レビューを防ぐため、着手時に必ず `in-review` ラベルをつける:
+
+**対象が決まったら、他のどの作業よりも先に（PR情報取得・worktree作成より前に）`in-review` ラベルをつける。** 引数でPRが指定された場合も同様に、これを最初のアクションとする（二重レビュー防止）:
 
 ```bash
 gh label create in-review --color 1D76DB --description "レビュー作業中" 2>/dev/null || true
@@ -135,7 +136,7 @@ git worktree remove ../<repo>-pr-<number> --force
 
 ## Rules
 
-- 着手時に必ず `in-review` ラベルをつける（二重レビュー防止）
+- 対象PRが決まったら一番最初に `in-review` ラベルをつける。PR情報取得・worktree作成・レビューはすべてその後（二重レビュー防止）
 - **レビューを完了できずに中断・失敗する場合は、必ず `in-review` ラベルを外してから報告する。** `in-review` が残ると次回以降誰にも拾われないPRになる（判定(c)で `pr-reviewed` をつけた場合は正常終了なので外さなくてよい — dev-pr-review-resolve が拾う）
 - PRをcloseする場合は紐づくIssueを必ず後処理する（`WIP` 解除 or Issueもclose）。処理しないとIssueが実装待ちキューから永久に外れる
 - レビューは必ず worktree で実コードを取得して行う。diffだけで判断しない
