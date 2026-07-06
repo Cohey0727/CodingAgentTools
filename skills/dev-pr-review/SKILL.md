@@ -11,7 +11,7 @@ description: in-review ラベルがついていないオープンPRを見つけ�
 
 ### Step 1: 対象PRの特定と in-review 付与
 
-**引数がある場合:** PR番号 / URL を対象にする。
+**引数がある場合:** PR番号 / URL を対象にする。ただし対象PRに既に `in-review` ラベルがついている場合は、別プロセスがレビュー中のためレビューせず、その旨を報告して終了する。
 
 **引数がない場合:**
 
@@ -103,7 +103,7 @@ EOF
 )"
 
 gh label create pr-reviewed --color D93F0B --description "レビュー指摘あり・対応待ち" 2>/dev/null || true
-gh pr edit <number> --add-label pr-reviewed
+gh pr edit <number> --add-label pr-reviewed --remove-label in-review
 ```
 
 指摘は必ずファイルパス・行番号つきで具体的に書き、修正案を添える。
@@ -137,7 +137,9 @@ git worktree remove ../<repo>-pr-<number> --force
 ## Rules
 
 - 対象PRが決まったら一番最初に `in-review` ラベルをつける。PR情報取得・worktree作成・レビューはすべてその後（二重レビュー防止）
-- **レビューを完了できずに中断・失敗する場合は、必ず `in-review` ラベルを外してから報告する。** `in-review` が残ると次回以降誰にも拾われないPRになる（判定(c)で `pr-reviewed` をつけた場合は正常終了なので外さなくてよい — dev-pr-review-resolve が拾う）
+- 既に `in-review` ラベルがついているPRはレビューしない。引数で明示指定された場合も同様（別プロセスがレビュー中）
+- 判定(c)で `pr-reviewed` をつけるときは、必ず `in-review` を外す（レビュー作業は終了しているため）
+- **レビューを完了できずに中断・失敗する場合も、必ず `in-review` ラベルを外してから報告する。** `in-review` が残ると次回以降誰にも拾われないPRになる
 - PRをcloseする場合は紐づくIssueを必ず後処理する（`WIP` 解除 or Issueもclose）。処理しないとIssueが実装待ちキューから永久に外れる
 - レビューは必ず worktree で実コードを取得して行う。diffだけで判断しない
 - 変更箇所の呼び出し元・依存箇所を必ずGrepで確認する（変更箇所以外との整合性チェック）
