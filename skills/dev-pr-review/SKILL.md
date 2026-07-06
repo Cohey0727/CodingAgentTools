@@ -1,9 +1,9 @@
 ---
 name: dev-pr-review
-description: in-review ラベルがついていないオープンPRを見つけてレビューする。git worktree でPRのコードをローカルに取得し、変更箇所以外との整合性・紐づくIssue通りの実装かを確認する。問題なければmerge、軽微な指摘なら修正してmerge、問題が多い場合はレビューを記述して pr-reviewed ラベルをつけ、見当違い・修正済みのPRは理由を記述してcloseする。PR番号・URLを引数に取るか、レビュー待ちのPRを自動で探す。ユーザーが「PRレビューして回して」「レビュー待ちPRを処理して」と言ったとき、または /dev-pr-review を実行したときに使用。
+description: in-review ラベルがついていないオープンPRを見つけてレビューする。git worktree でPRのコードをローカルに取得し、変更箇所以外との整合性・紐づくIssue通りの実装かを確認する。問題なければmerge、軽微な指摘なら修正してmerge、問題が多い場合はレビューを記述して reviewed ラベルをつけ、見当違い・修正済みのPRは理由を記述してcloseする。PR番号・URLを引数に取るか、レビュー待ちのPRを自動で探す。ユーザーが「PRレビューして回して」「レビュー待ちPRを処理して」と言ったとき、または /dev-pr-review を実行したときに使用。
 ---
 
-# Dev PR Review: PR選択 → worktree取得 → レビュー → merge / 修正merge / pr-reviewed / close
+# Dev PR Review: PR選択 → worktree取得 → レビュー → merge / 修正merge / reviewed / close
 
 `in-review` ラベルのないPRを worktree 上でレビューし、状態に応じて merge・修正merge・レビュー記述・close のいずれかを行う。
 
@@ -16,9 +16,9 @@ description: in-review ラベルがついていないオープンPRを見つけ�
 **引数がない場合:**
 
 ```bash
-# in-review も pr-reviewed もないオープンPR（ドラフト除く・古い順）
+# in-review も reviewed もないオープンPR（ドラフト除く・古い順）
 gh pr list --state open --json number,title,labels,isDraft,createdAt \
-  --jq '[.[] | select(.isDraft | not) | select((.labels | map(.name) | any(. == "in-review" or . == "pr-reviewed")) | not)] | sort_by(.createdAt)'
+  --jq '[.[] | select(.isDraft | not) | select((.labels | map(.name) | any(. == "in-review" or . == "reviewed")) | not)] | sort_by(.createdAt)'
 ```
 
 - 最も古い1件を選ぶ。対象がない場合は「レビュー待ちのPRはない」と報告して終了
@@ -85,7 +85,7 @@ typo・命名・小さなエッジケース・テスト不足など、設計に�
 3. `git push` してCIを確認
 4. 修正内容をPRコメントに記載してから merge（(a)と同じ手順）
 
-#### (c) 問題が多い → レビュー記述 + pr-reviewed
+#### (c) 問題が多い → レビュー記述 + reviewed
 
 設計上の問題・複数のバグ・Issueとの乖離など、修正判断が必要な場合:
 
@@ -102,8 +102,8 @@ gh pr review <number> --request-changes --body "$(cat <<'EOF'
 EOF
 )"
 
-gh label create pr-reviewed --color D93F0B --description "レビュー指摘あり・対応待ち" 2>/dev/null || true
-gh pr edit <number> --add-label pr-reviewed --remove-label in-review
+gh label create reviewed --color 0E8A16 --description "レビュー済み" 2>/dev/null || true
+gh pr edit <number> --add-label reviewed --remove-label in-review
 ```
 
 指摘は必ずファイルパス・行番号つきで具体的に書き、修正案を添える。
@@ -132,13 +132,13 @@ gh issue comment <issue-number> --body "PR #<number> は<理由>のためclose�
 git worktree remove ../<repo>-pr-<number> --force
 ```
 
-対象PR・判定（merged / fixed+merged / pr-reviewed / closed）・指摘概要をユーザーに報告する。
+対象PR・判定（merged / fixed+merged / reviewed / closed）・指摘概要をユーザーに報告する。
 
 ## Rules
 
 - 対象PRが決まったら一番最初に `in-review` ラベルをつける。PR情報取得・worktree作成・レビューはすべてその後（二重レビュー防止）
 - 既に `in-review` ラベルがついているPRはレビューしない。引数で明示指定された場合も同様（別プロセスがレビュー中）
-- 判定(c)で `pr-reviewed` をつけるときは、必ず `in-review` を外す（レビュー作業は終了しているため）
+- 判定(c)で `reviewed` をつけるときは、必ず `in-review` を外す（レビュー作業は終了しているため。以降は dev-pr-review-resolve が拾う）
 - **レビューを完了できずに中断・失敗する場合も、必ず `in-review` ラベルを外してから報告する。** `in-review` が残ると次回以降誰にも拾われないPRになる
 - PRをcloseする場合は紐づくIssueを必ず後処理する（`WIP` 解除 or Issueもclose）。処理しないとIssueが実装待ちキューから永久に外れる
 - レビューは必ず worktree で実コードを取得して行う。diffだけで判断しない

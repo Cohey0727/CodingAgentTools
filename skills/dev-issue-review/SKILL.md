@@ -1,29 +1,36 @@
 ---
 name: dev-issue-review
-description: 現在のリポジトリの開発Issueが妥当かどうかをレビューする。リポジトリの目的に沿っているか、調査内容・設計に問題がないかをチェックし、WebSearch や Parallel Search MCP で裏取りして本文を追記・修正する。問題なければ issue-reviewed ラベルをつけ、あまりに見当違いな場合は理由を記述してcloseする。Issue番号・URLを引数に取るか、未レビューのIssueを自動で探す。ユーザーが「Issueレビュー」「Issueの妥当性チェック」と言ったとき、または /dev-issue-review を実行したときに使用。
+description: 現在のリポジトリの開発Issueが妥当かどうかをレビューする。リポジトリの目的に沿っているか、調査内容・設計に問題がないかをチェックし、WebSearch や Parallel Search MCP で裏取りして本文を追記・修正する。レビュー着手時に in-review ラベルで排他し、問題なければ reviewed ラベルをつけ、あまりに見当違いな場合は理由を記述してcloseする。Issue番号・URLを引数に取るか、未レビューのIssueを自動で探す。ユーザーが「Issueレビュー」「Issueの妥当性チェック」と言ったとき、または /dev-issue-review を実行したときに使用。
 ---
 
 # Dev Issue Review: 妥当性チェック → 裏取り調査 → 追記修正 → ラベル付与
 
-Issueの内容がリポジトリの目的・現行コードベースに照らして妥当かをレビューし、調査で裏取りした上で `issue-reviewed` ラベルをつける。
+Issueの内容がリポジトリの目的・現行コードベースに照らして妥当かをレビューし、調査で裏取りした上で `reviewed` ラベルをつける。
 
 ## Workflow
 
 ### Step 1: 対象Issueの特定
 
-**引数がある場合:** Issue番号 / URL をそのまま対象にする。
+**引数がある場合:** Issue番号 / URL をそのまま対象にする。ただし既に `in-review`（別プロセスがレビュー中）または `WIP`（実装中）がついている場合はレビューせず、その旨を報告して終了する。
 
 **引数がない場合:** 未レビューのオープンIssueを探す:
 
 ```bash
-# issue-reviewed / WIP / needs-info のいずれもついていないオープンIssue（古い順）
+# reviewed / in-review / WIP / needs-info のいずれもついていないオープンIssue（古い順）
 gh issue list --state open --json number,title,labels,createdAt \
-  --jq '[.[] | select((.labels | map(.name) | any(. == "issue-reviewed" or . == "WIP" or . == "needs-info")) | not)] | sort_by(.createdAt)'
+  --jq '[.[] | select((.labels | map(.name) | any(. == "reviewed" or . == "in-review" or . == "WIP" or . == "needs-info")) | not)] | sort_by(.createdAt)'
 ```
 
 - 対象が複数ある場合は最も古いものから1件を選ぶ（ユーザーが「全部」と言った場合は順に処理）
 - 対象がない場合は「未レビューのIssueはない」と報告して終了
 - `needs-info` はユーザー確認待ちの保留マーカー。自動選択からは除外するが、**引数で明示指定された場合はレビューする**（ユーザーが疑問に回答した後の再レビュー経路）。疑問が解消していれば `needs-info` を外して通常の判定に進む
+
+**対象が決まったら、他のどの作業よりも先に `in-review` ラベルをつける**（二重レビュー防止）:
+
+```bash
+gh label create in-review --color 1D76DB --description "レビュー作業中" 2>/dev/null || true
+gh issue edit <number> --add-label in-review
+```
 
 ### Step 2: リポジトリの目的とIssue内容の把握
 
@@ -55,7 +62,7 @@ gh issue view <number> --json title,body,labels,comments
 
 ### Step 5: 判定と対応
 
-#### (a) 妥当（軽微な補足含む）→ 追記・修正して issue-reviewed
+#### (a) 妥当（軽微な補足含む）→ 追記・修正して reviewed
 
 - 誤りや不足があれば `gh issue edit <number> --body ...` で本文を修正する。元の本文の構造は保ち、変更点はコメントで要約する
 - 追加の調査結果・補足はコメントとして残す:
@@ -73,24 +80,24 @@ EOF
 )"
 ```
 
-- ラベルを付与する（なければ作成）:
+- ラベルを付与し、`in-review` を外す（なければ作成）:
 
 ```bash
-gh label create issue-reviewed --color 0E8A16 --description "レビュー済みで実装可能なIssue" 2>/dev/null || true
-gh issue edit <number> --add-label issue-reviewed
+gh label create reviewed --color 0E8A16 --description "レビュー済み" 2>/dev/null || true
+gh issue edit <number> --add-label reviewed --remove-label in-review
 ```
 
-#### (b) 問題が大きい → 修正してから issue-reviewed、または needs-info で保留
+#### (b) 問題が大きい → 修正してから reviewed、または needs-info で保留
 
-- 設計の方向性は正しいが調査・設計に大きな誤りがある場合: 本文を修正・再設計してコメントで変更理由を説明し、issue-reviewed をつける
+- 設計の方向性は正しいが調査・設計に大きな誤りがある場合: 本文を修正・再設計してコメントで変更理由を説明し、reviewed をつけて `in-review` を外す
 - 判断にユーザーの意思決定が必要な場合（スコープの選択・仕様の曖昧さ）: 確認事項をコメントに記載し、`needs-info` ラベルをつけてユーザーに報告する（ラベルなしで放置すると次回の自動選択で同じIssueを再レビューし続けるため）:
 
 ```bash
 gh label create needs-info --color D4C5F9 --description "ユーザーの回答待ち" 2>/dev/null || true
-gh issue edit <number> --add-label needs-info
+gh issue edit <number> --add-label needs-info --remove-label in-review
 ```
 
-ユーザーが回答したら `/dev-issue-review <number>` で明示的に再レビューし、解消していれば `needs-info` を外して `issue-reviewed` をつける。
+ユーザーが回答したら `/dev-issue-review <number>` で明示的に再レビューし、解消していれば `needs-info` を外して `reviewed` をつける。
 
 #### (c) あまりに見当違い → close
 
@@ -110,10 +117,12 @@ gh issue close <number> --comment "<closeの理由と根拠>"
 
 ## Rules
 
+- 対象Issueが決まったら一番最初に `in-review` ラベルをつける（二重レビュー防止）。既に `in-review` / `WIP` がついているIssueはレビューしない（引数で明示指定された場合も同様）
+- 判定確定時（reviewed / needs-info / close）は必ず `in-review` を外す。**レビューを完了できずに中断・失敗する場合も、必ず `in-review` を外してから報告する**
 - 本文の修正は最小限にし、元の作成者の意図を消さない。大きく書き換える場合はコメントに変更理由を残す
 - コードベースの事実確認は必ず最新main（`git fetch origin` 後の `origin/main`）を基準にする
 - 外部調査の結果を反映する場合は出典URLを必ず記載する
 - closeは「見当違い」が明確な場合のみ。迷う場合はcloseせず `needs-info` で保留してユーザーに確認する
-- `issue-reviewed` / `needs-info` ラベルが存在しない場合は自動作成する
+- `reviewed` / `in-review` / `needs-info` ラベルが存在しない場合は自動作成する
 - 工数・所要時間の見積もりは追記しない
 - レビュー中のIssueに `WIP` ラベルがついている場合は実装中なのでスキップする

@@ -1,23 +1,23 @@
 ---
 name: dev-issue-implement
-description: issue-reviewed ラベルがついたIssueを見つけて実装する。対象Issueに WIP ラベルをつけ、git worktree で main を汚さずに開発し、テストがPASSすることを確認した上でIssueに紐づくPR（Closes #N）を作成する。Issue番号・URLを引数に取るか、実装待ちのIssueを自動で探す。ユーザーが「Issue実装して」「issue-reviewedのIssueを開発して」と言ったとき、または /dev-issue-implement を実行したときに使用。
+description: reviewed ラベルがついたIssueを見つけて実装する。対象Issueに WIP ラベルをつけ、git worktree で main を汚さずに開発し、テストがPASSすることを確認した上でIssueに紐づくPR（Closes #N）を作成する。Issue番号・URLを引数に取るか、実装待ちのIssueを自動で探す。ユーザーが「Issue実装して」「reviewedのIssueを開発して」と言ったとき、または /dev-issue-implement を実行したときに使用。
 ---
 
 # Dev Issue Implement: Issue選択 → WIP → worktree開発 → テスト → PR作成
 
-`issue-reviewed` ラベルのついたIssueを worktree 上で実装し、テストPASSを確認してIssue紐づけPRを作成する。
+`reviewed` ラベルのついたIssueを worktree 上で実装し、テストPASSを確認してIssue紐づけPRを作成する。
 
 ## Workflow
 
 ### Step 1: 対象Issueの特定
 
-**引数がある場合:** Issue番号 / URL を対象にする。`issue-reviewed` がついていない場合はその旨を伝え、続行するかユーザーに確認する。
+**引数がある場合:** Issue番号 / URL を対象にする。ただし既に `WIP` がついている場合は別プロセスが実装中のため着手せず、その旨を報告して終了する。`reviewed` がついていない場合はその旨を伝え、続行するかユーザーに確認する。
 
 **引数がない場合:**
 
 ```bash
-# issue-reviewed 付き・WIP なしのオープンIssue（古い順）
-gh issue list --state open --label issue-reviewed --json number,title,labels,body,createdAt \
+# reviewed 付き・WIP なしのオープンIssue（古い順）
+gh issue list --state open --label reviewed --json number,title,labels,body,createdAt \
   --jq '[.[] | select((.labels | map(.name) | contains(["WIP"])) | not)] | sort_by(.createdAt)'
 ```
 
@@ -114,7 +114,7 @@ git worktree remove ../<repo>-issue-<number>
 ## Rules
 
 - 必ず worktree で作業し、元の作業ディレクトリ・mainブランチを一切変更しない
-- 着手時に必ず WIP ラベルをつける。中断・失敗時は WIP ラベルを外してからユーザーに報告する
+- 着手時に必ず WIP ラベルをつける。既に `WIP` がついているIssueには着手しない（引数で明示指定された場合も同様）。中断・失敗時は WIP ラベルを外してからユーザーに報告する
 - テストが全てPASSするまでPRを作成しない。テストを削除・スキップして通すことは絶対にしない
 - PR本文に必ず `Closes #<issue-number>` を含める
 - `git push --force` は使用しない
