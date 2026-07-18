@@ -84,7 +84,7 @@ worktree (とユーザー環境) から、レビュー基準になるドキュ�
 
 ### 5. プロンプトを作る
 
-共通プロンプトを scratchpad に1ファイル書く (例: `prompt.md`)。worktree の中には置かない:
+共通プロンプトを tmp (セッションの scratchpad、なければ `/tmp`) に `prompt.md` として書く。worktree の中には置かない:
 
 ```markdown
 あなたは別AI (Claude) からレビューを依頼された独立レビュアーです。
@@ -117,27 +117,29 @@ worktree (とユーザー環境) から、レビュー基準になるドキュ�
 
 **外部LLM** (`schema: claude-code` / `stdin`) は、**1つの Bash 呼び出しにまとめず個別に** `run_in_background: true` で起動する:
 
+各レビュアーの回答は**中間成果物**として tmp に `review-<name>.md` で1ファイルずつ吐き出す (これがホストLLMの総括の入力になる):
+
 ```bash
 # schema: claude-code の場合 — worktree を cwd にして起動 (リポジトリ探索を可能にする)
-cd <tmp>/funsion-wt && cat <scratchpad>/prompt.md | <command> -p > <scratchpad>/out-<name>.md 2> <scratchpad>/err-<name>.log
+cd <tmp>/funsion-wt && cat <tmp>/prompt.md | <command> -p > <tmp>/review-<name>.md 2> <tmp>/err-<name>.log
 
 # schema: stdin の場合
-cd <tmp>/funsion-wt && cat <scratchpad>/prompt.md | <command> > <scratchpad>/out-<name>.md 2> <scratchpad>/err-<name>.log
+cd <tmp>/funsion-wt && cat <tmp>/prompt.md | <command> > <tmp>/review-<name>.md 2> <tmp>/err-<name>.log
 ```
 
 - `timeout` には llms.json の `timeout_ms` を渡す
 - 全LLMの起動を済ませてから完了を待つ (逐次実行しない)
 - cwd を worktree にするのは、レビュアーにコード全体を探索させるためと、万一書き込まれても使い捨ての worktree で済ませるため
 
-**`schema: self` (Claude 自身)** は、外部LLMを起動した直後・回答を読む**前**に、同じ prompt.md に対する自分のレビューを `<scratchpad>/out-claude.md` に書き切る。自分も worktree 内の類似コードとの比較・既存ユーティリティの検索まで行うこと。先に他モデルの回答を読むと引きずられて独立性が失われるため、順序を守ること。
+**`schema: self` (Claude 自身)** は、外部LLMを起動した直後・回答を読む**前**に、同じ prompt.md に対する自分のレビューを `<tmp>/review-claude.md` に書き切る。自分も worktree 内の類似コードとの比較・既存ユーティリティの検索まで行うこと。先に他モデルの回答を読むと引きずられて独立性が失われるため、順序を守ること。
 
 ### 7. 回収
 
-完了通知を受けて `out-<name>.md` を読む。失敗・タイムアウト・空出力のLLMは**リトライせずスキップ**し、最終レポートに「N/M モデルが回答」と明記する。全滅した場合は `err-*.log` の内容を添えて報告する。
+完了通知を受けて、tmp に揃った中間成果物 `review-<name>.md` をホストLLMがすべて読む。失敗・タイムアウト・空出力のLLMは**リトライせずスキップ**し、最終レポートに「N/M モデルが回答」と明記する。全滅した場合は `err-*.log` の内容を添えて報告する。
 
 ### 8. 統合 (fusion) と総括 — ホストLLMが「レビューをレビューする」
 
-全レビューの回収後、**ホストLLM (このセッションの Claude、オーケストレーター)** の役割はメタレビューである。つまりコードを直接レビューし直すのではなく、**各レビュアーの指摘そのものをレビューする**: 指摘は根拠があるか、コード上の事実と合っているか、誤検知・的外れ・重複ではないか、を1件ずつ検証して採用/棄却を裁定し、生き残った指摘だけを統合して総括する。レビュアーの1人としての `schema: self` の役割とは別:
+tmp の中間成果物 `review-<name>.md` 一式を入力として、**ホストLLM (このセッションの Claude、オーケストレーター)** がメタレビューを行う。つまりコードを直接レビューし直すのではなく、**各レビュアーの指摘そのものをレビューする**: 指摘は根拠があるか、コード上の事実と合っているか、誤検知・的外れ・重複ではないか、を1件ずつ検証して採用/棄却を裁定し、生き残った指摘だけを統合して総括する。レビュアーの1人としての `schema: self` の役割とは別:
 
 ```markdown
 # Fusion Review 結果 (回答: N/M モデル)
@@ -161,7 +163,7 @@ cd <tmp>/funsion-wt && cat <scratchpad>/prompt.md | <command> > <scratchpad>/out
 
 ### 9. 出力と後片付け
 
-**ローカルモード**: 統合結果を tmp (セッションの scratchpad ディレクトリ、なければ `/tmp`) に `review.md` として書き出し、パスをユーザーに報告する。リポジトリ内には書かない。
+**ローカルモード**: 統合結果を tmp に `review.md` として書き出し、パスをユーザーに報告する。中間成果物の `review-<name>.md` も消さずに残し、パスを併記する (個別レビューを読み返せるように)。リポジトリ内には書かない。
 
 **PRモード**: 統合結果を PR に**1つのレビュー**として投稿する。行を特定できる指摘は該当行へのインラインコメント、行を特定できない指摘と全体サマリー (回答モデル数・合意状況) はレビュー本文に入れる:
 
