@@ -35,7 +35,7 @@
       "provider": "Moonshot AI (Kimi)",
       "enabled": true,
       "schema": "claude-code",
-      "command": "kimi",
+      "command": "claudekimi",
       "timeout_ms": 300000,
       "notes": "Claude Code 互換 CLI (Kimi / Moonshot バックエンド)"
     },
