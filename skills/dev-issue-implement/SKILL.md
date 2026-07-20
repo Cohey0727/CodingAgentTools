@@ -59,18 +59,27 @@ Issueの「設計・実装方針」「必要な修正箇所」に従って実装
 
 **実装中に設計の根本的な問題が判明した場合:** 実装を中断し、Issueにコメントで問題点を記載して WIP ラベルを外し、ユーザーに報告する。
 
-### Step 5: テスト実行
+### Step 5: ビルド・リント・テスト実行（必須）
 
-リポジトリのテストコマンドを検出して実行する（package.json の scripts、Makefile、CI設定 `.github/workflows/` から判定）:
+**PR作成前に、ビルド・リント・テストの3つを必ず実行して通す。1つでもスキップしたままPRを作成することは絶対に禁止。**
+
+リポジトリの各コマンドを検出して実行する（package.json の scripts、Makefile、CI設定 `.github/workflows/` から判定）:
 
 ```bash
-# 例: プロジェクトに応じて
+# 1. ビルド（例: プロジェクトに応じて）
+npm run build / pnpm build / tsc --noEmit / cargo build / go build ./...
+
+# 2. リント・typecheck（例）
+npm run lint / eslint . / cargo clippy / ruff check
+
+# 3. テスト（例）
 npm test / pnpm test / cargo test / pytest / go test ./...
 ```
 
+- **ビルドが成功するまでPRを作成しない。** ビルドコマンドが見つからない場合も、コンパイル・型チェック相当（`tsc --noEmit` 等）を探して実行する。本当に存在しない場合のみスキップし、PR本文にその旨を明記する
+- **lint / typecheck / format が設定されているなら必ず実行して通す**
 - **全テストがPASSするまでPRを作成しない**
-- lint / typecheck / format のCIチェックがある場合はそれも実行して通す
-- 既存テストが実装前から失敗している場合は、その失敗が自分の変更と無関係であることを確認し、PR本文に明記する
+- 既存のビルドエラー・テスト失敗が実装前から存在する場合は、自分の変更と無関係であることを確認し、PR本文に明記する
 
 ### Step 6: Push と PR作成
 
@@ -93,7 +102,9 @@ Closes #<issue-number>
 
 ## Test Plan
 
-- [x] <実行したテストと結果>
+- [x] build: <実行したビルドコマンドと結果>
+- [x] lint: <実行したリントコマンドと結果>
+- [x] test: <実行したテストと結果>
 EOF
 )"
 ```
@@ -115,7 +126,7 @@ git worktree remove ../<repo>-issue-<number>
 
 - 必ず worktree で作業し、元の作業ディレクトリ・mainブランチを一切変更しない
 - 着手時に必ず WIP ラベルをつける。既に `WIP` がついているIssueには着手しない（引数で明示指定された場合も同様）。中断・失敗時は WIP ラベルを外してからユーザーに報告する
-- テストが全てPASSするまでPRを作成しない。テストを削除・スキップして通すことは絶対にしない
+- **ビルド・リント・テストの実行はPR作成の必須条件。** ビルドが通り、lintがクリーンで、全テストがPASSするまでPRを作成しない。テストを削除・スキップして通すことは絶対にしない
 - PR本文に必ず `Closes #<issue-number>` を含める
 - `git push --force` は使用しない
 - 依存Issue（Depends on）が未クローズのIssueには着手しない
