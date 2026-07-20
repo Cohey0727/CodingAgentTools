@@ -37,7 +37,13 @@ gh pr view <number> --json title,body,commits,files,baseRefName,headRefName,stat
 ```
 
 - `Closes #N` で紐づくIssueがあれば `gh issue view` で本文（設計・受け入れ条件・テスト観点）を取得する
-- CI（statusCheckRollup）が失敗している場合はレビュー観点に含める
+- **CIが実行済みの場合は必ず結果を確認する:**
+
+```bash
+gh pr checks <number>
+```
+
+- 失敗しているチェックがあれば `gh run view <run-id> --log-failed` でログを確認し、失敗原因をレビュー観点に含める（PR側の問題か、flaky・環境起因かを切り分ける）
 
 ### Step 3: worktree でコードを取得
 
@@ -147,6 +153,7 @@ git branch -D <headRefName> 2>/dev/null || true
 - PRをcloseする場合は紐づくIssueを必ず後処理する（`WIP` 解除 or Issueもclose）。処理しないとIssueが実装待ちキューから永久に外れる
 - レビューは必ず worktree で実コードを取得して行う。diffだけで判断しない
 - 変更箇所の呼び出し元・依存箇所を必ずGrepで確認する（変更箇所以外との整合性チェック）
+- CIが実行済みの場合は必ず `gh pr checks` で結果を確認する。失敗があればログまで確認してレビューに反映する
 - merge前に必ずテスト実行とCIのPASSを確認する。テストが失敗しているPRはmergeしない
 - (b)の「軽微な修正」で設計変更・大きなリファクタリングを行わない。迷ったら(c)にする
 - closeは見当違い・修正済みが明確な場合のみ。迷う場合はcloseせず(c)でレビューを残す

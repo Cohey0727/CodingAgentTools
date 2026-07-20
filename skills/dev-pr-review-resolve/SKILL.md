@@ -59,6 +59,14 @@ query($owner: String!, $repo: String!, $pr: Int!) {
 
 指摘を一覧化し、それぞれを「修正する / 反論する」に分類する準備をする。
 
+**CIが実行済みの場合は必ず結果を確認する:**
+
+```bash
+gh pr checks <number>
+```
+
+失敗しているチェックがあれば `gh run view <run-id> --log-failed` でログを確認し、レビュー指摘と合わせて対応対象に含める。
+
 ### Step 3: worktree でコードを取得
 
 ```bash
@@ -159,6 +167,7 @@ git branch -D <headRefName> 2>/dev/null || true
 - **対応を完了できずに中断・失敗する場合は、`reviewed` は維持したまま `in-review` だけ外してから報告する**（`in-review` が残ると誰にも拾われないPRになる）
 - すべての指摘に対応（修正 or 根拠付き反論）してからresolveする。無言resolve・一括resolveはしない
 - 反論には必ず具体的な根拠（コード・仕様・既存パターン）を示す。示せなければ修正する
+- CIが実行済みの場合は必ず `gh pr checks` で結果を確認する。失敗があればログまで確認して対応対象に含める
 - 修正後は必ずテストを実行し、PASSとCIグリーンを確認してからmergeする
 - すべてのスレッドをresolveしたら必ずmergeする。branch protection等でmerge不能な場合のみユーザーに報告して終了
 - `reviewed` ラベルを外すのはmerge成功後のみ。merge失敗時は `reviewed` を維持して再実行可能な状態を保つ
