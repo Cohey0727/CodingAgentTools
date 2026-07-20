@@ -31,15 +31,6 @@
       "notes": "Claude Code 互換 CLI (DeepSeek バックエンド)"
     },
     {
-      "name": "kimi",
-      "provider": "Moonshot AI (Kimi)",
-      "enabled": false,
-      "schema": "claude-code",
-      "command": "claudekimi",
-      "timeout_ms": 1200000,
-      "notes": "Claude Code 互換 CLI (Kimi / Moonshot バックエンド)"
-    },
-    {
       "name": "codex",
       "provider": "OpenAI (GPT)",
       "enabled": false,
