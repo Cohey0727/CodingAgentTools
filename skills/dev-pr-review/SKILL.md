@@ -130,6 +130,10 @@ gh issue comment <issue-number> --body "PR #<number> は<理由>のためclose�
 
 ```bash
 git worktree remove ../<repo>-pr-<number> --force
+
+# mergeした場合（(a)(b)）: worktree用に作られたローカルブランチが残っていれば削除する
+# <headRefName> は Step 2 で取得したPRのブランチ名
+git branch -D <headRefName> 2>/dev/null || true
 ```
 
 対象PR・判定（merged / fixed+merged / reviewed / closed）・指摘概要をユーザーに報告する。
@@ -148,3 +152,4 @@ git worktree remove ../<repo>-pr-<number> --force
 - closeは見当違い・修正済みが明確な場合のみ。迷う場合はcloseせず(c)でレビューを残す
 - `git push --force` は使用しない
 - 自分（このセッション）で作成した直後のPRをレビューする場合も、必ず worktree で取得し直して客観的に確認する
+- mergeしたPRのローカルブランチ（`gh pr checkout` で作成されたもの）は後片付けで必ず削除する。リモートは `--delete-branch` で消えるがローカルには残るため

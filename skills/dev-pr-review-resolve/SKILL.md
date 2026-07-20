@@ -145,6 +145,10 @@ gh pr edit <number> --remove-label reviewed --remove-label in-review 2>/dev/null
 
 ```bash
 git worktree remove ../<repo>-pr-<number> --force
+
+# mergeした場合: worktree用に作られたローカルブランチが残っていれば削除する
+# <headRefName> はPRのブランチ名（gh pr view <number> --json headRefName で取得できる）
+git branch -D <headRefName> 2>/dev/null || true
 ```
 
 対応した指摘の一覧（修正 / 反論の内訳）・merge結果をユーザーに報告する。
@@ -160,3 +164,4 @@ git worktree remove ../<repo>-pr-<number> --force
 - `reviewed` ラベルを外すのはmerge成功後のみ。merge失敗時は `reviewed` を維持して再実行可能な状態を保つ
 - `git push --force` は使用しない
 - 指摘対応の範囲を超えるスコープ外の変更を混ぜない
+- mergeしたPRのローカルブランチ（`gh pr checkout` で作成されたもの）は後片付けで必ず削除する。リモートは `--delete-branch` で消えるがローカルには残るため
