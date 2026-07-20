@@ -23,7 +23,7 @@ description: 複数のLLM (このセッションの Claude 自身 + mmxcode/deep
 | `enabled` | `true` のものだけ実行する。無効化はここを `false` にするだけ |
 | `schema` | 実行方式 (下表)。これを見て起動方法を決める |
 | `command` | 起動コマンド。`schema: self` では不要 |
-| `timeout_ms` | Bash 実行時の timeout に使う値 |
+| `timeout_ms` | 実行時のタイムアウト。shell の `timeout` コマンドに秒換算で渡す |
 | `notes` | モデルの特性・注意点 |
 
 ### schema の種類
@@ -121,13 +121,13 @@ worktree (とユーザー環境) から、レビュー基準になるドキュ�
 
 ```bash
 # schema: claude-code の場合 — worktree を cwd にして起動 (リポジトリ探索を可能にする)
-cd <tmp>/funsion-wt && cat <tmp>/prompt.md | <command> -p > <tmp>/review-<name>.md 2> <tmp>/err-<name>.log
+cd <tmp>/funsion-wt && cat <tmp>/prompt.md | timeout <timeout_ms/1000>s <command> -p > <tmp>/review-<name>.md 2> <tmp>/err-<name>.log
 
 # schema: stdin の場合
-cd <tmp>/funsion-wt && cat <tmp>/prompt.md | <command> > <tmp>/review-<name>.md 2> <tmp>/err-<name>.log
+cd <tmp>/funsion-wt && cat <tmp>/prompt.md | timeout <timeout_ms/1000>s <command> > <tmp>/review-<name>.md 2> <tmp>/err-<name>.log
 ```
 
-- `timeout` には llms.json の `timeout_ms` を渡す
+- タイムアウトは llms.json の `timeout_ms` を shell の `timeout` コマンド (秒に換算) で強制する。Bash ツールの `timeout` パラメータは上限 10 分で `timeout_ms` がそれを超えうるため、ツール側ではなく shell 側で制御する
 - 全LLMの起動を済ませてから完了を待つ (逐次実行しない)
 - cwd を worktree にするのは、レビュアーにコード全体を探索させるためと、万一書き込まれても使い捨ての worktree で済ませるため
 
