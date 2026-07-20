@@ -33,7 +33,7 @@
     {
       "name": "kimi",
       "provider": "Moonshot AI (Kimi)",
-      "enabled": true,
+      "enabled": false,
       "schema": "claude-code",
       "command": "claudekimi",
       "timeout_ms": 1200000,
