@@ -1,9 +1,9 @@
 ---
-name: funsion-review
-description: 複数のLLM (このセッションの Claude 自身 + mmxcode/deepseek などの外部CLI) に同じレビュー依頼を並列で投げ、回答を統合 (fusion) して1つのレビュー結果にまとめる。有効なLLMはスキルディレクトリの llms.json で schema 指定付きで管理する。ユーザーが「フュージョンレビュー」「複数LLMでレビュー」「全モデルの意見を聞いて」と言ったとき、または /funsion-review を実行したときに使用。
+name: fusion-review
+description: 複数のLLM (このセッションの Claude 自身 + mmxcode/deepseek などの外部CLI) に同じレビュー依頼を並列で投げ、回答を統合 (fusion) して1つのレビュー結果にまとめる。有効なLLMはスキルディレクトリの llms.json で schema 指定付きで管理する。ユーザーが「フュージョンレビュー」「複数LLMでレビュー」「全モデルの意見を聞いて」と言ったとき、または /fusion-review を実行したときに使用。
 ---
 
-# funsion-review — 複数LLM統合レビュー
+# fusion-review — 複数LLM統合レビュー
 
 同じレビュー依頼を複数のLLM (このセッションの Claude 自身を含む) に**並列**で投げ、回答を突き合わせて1つのレビュー結果に統合する。単一モデルのバイアス・見落としを、モデル間の合意/相違で補正するのが目的。
 
@@ -11,8 +11,8 @@ description: 複数のLLM (このセッションの Claude 自身 + mmxcode/deep
 
 有効なLLMの一覧は**このスキルディレクトリの `llms.json`** で管理する:
 
-- 原本: `<repo>/skills/funsion-review/llms.json` (claude-code-settings レポ、Git管理)
-- 実行時パス: `~/.claude/skills/funsion-review/llms.json` (setup.sh のシンボリックリンク経由で同一実体)
+- 原本: `<repo>/skills/fusion-review/llms.json` (claude-code-settings レポ、Git管理)
+- 実行時パス: `~/.claude/skills/fusion-review/llms.json` (setup.sh のシンボリックリンク経由で同一実体)
 
 各エントリのフィールド:
 
@@ -40,7 +40,7 @@ LLM の追加は llms.json にエントリを1つ足すだけ (Claude Code 互�
 
 ### 1. 設定を読む
 
-`~/.claude/skills/funsion-review/llms.json` を Read し、`enabled: true` のLLMだけを対象にする。有効なLLMが0個ならその旨を伝えて終了する。
+`~/.claude/skills/fusion-review/llms.json` を Read し、`enabled: true` のLLMだけを対象にする。有効なLLMが0個ならその旨を伝えて終了する。
 
 ### 2. レビュー対象と出力先を決める
 
@@ -60,13 +60,13 @@ LLM の追加は llms.json にエントリを1つ足すだけ (Claude Code 互�
 ```bash
 # PRモード: PR head を worktree に取り出す
 git fetch origin pull/<N>/head
-git worktree add --detach <tmp>/funsion-wt FETCH_HEAD
+git worktree add --detach <tmp>/fusion-wt FETCH_HEAD
 
 # ローカルモード: HEAD の worktree に未コミット差分を適用する
-git worktree add --detach <tmp>/funsion-wt HEAD
-git diff HEAD | git -C <tmp>/funsion-wt apply
+git worktree add --detach <tmp>/fusion-wt HEAD
+git diff HEAD | git -C <tmp>/fusion-wt apply
 git ls-files --others --exclude-standard | while read -r f; do
-  mkdir -p "<tmp>/funsion-wt/$(dirname "$f")" && cp "$f" "<tmp>/funsion-wt/$f"
+  mkdir -p "<tmp>/fusion-wt/$(dirname "$f")" && cp "$f" "<tmp>/fusion-wt/$f"
 done
 ```
 
@@ -121,10 +121,10 @@ worktree (とユーザー環境) から、レビュー基準になるドキュ�
 
 ```bash
 # schema: claude-code の場合 — worktree を cwd にして起動 (リポジトリ探索を可能にする)
-cd <tmp>/funsion-wt && cat <tmp>/prompt.md | timeout <timeout_ms/1000>s <command> -p > <tmp>/review-<name>.md 2> <tmp>/err-<name>.log
+cd <tmp>/fusion-wt && cat <tmp>/prompt.md | timeout <timeout_ms/1000>s <command> -p > <tmp>/review-<name>.md 2> <tmp>/err-<name>.log
 
 # schema: stdin の場合
-cd <tmp>/funsion-wt && cat <tmp>/prompt.md | timeout <timeout_ms/1000>s <command> > <tmp>/review-<name>.md 2> <tmp>/err-<name>.log
+cd <tmp>/fusion-wt && cat <tmp>/prompt.md | timeout <timeout_ms/1000>s <command> > <tmp>/review-<name>.md 2> <tmp>/err-<name>.log
 ```
 
 - タイムアウトは llms.json の `timeout_ms` を shell の `timeout` コマンド (秒に換算) で強制する。Bash ツールの `timeout` パラメータは上限 10 分で `timeout_ms` がそれを超えうるため、ツール側ではなく shell 側で制御する
@@ -190,7 +190,7 @@ gh api repos/{owner}/{repo}/pulls/{number}/reviews --input review.json
 最後に worktree を片付ける:
 
 ```bash
-git worktree remove --force <tmp>/funsion-wt
+git worktree remove --force <tmp>/fusion-wt
 ```
 
 ## 注意
