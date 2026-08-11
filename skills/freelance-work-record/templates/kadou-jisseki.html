@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>稼働実績 {{YEAR}}年{{MONTH}}月</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif;
+    font-size: 9pt;
+    color: #333;
+    width: 210mm;
+    min-height: 297mm;
+    padding: 10mm 14mm;
+  }
+  .meta { text-align: right; font-size: 9pt; color: #555; }
+  h1 { text-align: center; font-size: 15pt; font-weight: 600; letter-spacing: 0.3em; margin: 2mm 0 2mm; text-indent: 0.3em; }
+  .subject { text-align: center; font-size: 10pt; margin-bottom: 4mm; }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    background: #7d7d7d; color: #fff; font-weight: 500;
+    padding: 1.5mm 2.5mm; border: 1px solid #7d7d7d; font-size: 9pt;
+  }
+  td { border: 1px solid #bbb; padding: 0.8mm 2.5mm; height: 5.4mm; }
+  .date { width: 14%; text-align: center; white-space: nowrap; }
+  .times { width: 31%; }
+  .hours { width: 11%; text-align: right; white-space: nowrap; }
+  .work { width: 46%; font-size: 8.5pt; }
+  tr.sat td.date { background: #eef3fa; }
+  tr.sun td.date { background: #faeeee; }
+  tr.total td { font-weight: 600; background: #f2f2f2; border-color: #999; }
+</style>
+</head>
+<body>
+  <div class="meta">{{ISSUER_NAME}}</div>
+  <h1>稼働実績</h1>
+  <div class="subject">{{YEAR}}年{{MONTH}}月分（{{CLIENT_NAME}}）</div>
+
+  <table>
+    <tr>
+      <th class="date">日付</th>
+      <th class="times">稼働時間帯</th>
+      <th class="hours">稼働時間</th>
+      <th class="work">作業内容</th>
+    </tr>
+{{ROWS}}
+    <tr class="total"><td class="date">合計</td><td class="times"></td><td class="hours">{{TOTAL}}</td><td class="work"></td></tr>
+  </table>
+</body>
+</html>

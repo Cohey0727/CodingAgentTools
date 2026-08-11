@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>請求書 {{INVOICE_NO}}</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif;
+    font-size: 10.5pt;
+    color: #333;
+    width: 210mm;
+    min-height: 297mm;
+    padding: 18mm 20mm;
+  }
+  .meta { text-align: right; font-size: 9pt; color: #555; line-height: 1.6; }
+  h1 { text-align: center; font-size: 20pt; font-weight: 600; letter-spacing: 0.6em; margin: 10mm 0 12mm; text-indent: 0.6em; }
+  .top { display: flex; justify-content: space-between; }
+  .client { width: 55%; }
+  .client .name { font-size: 13pt; margin-bottom: 2mm; }
+  .amount-box { display: flex; justify-content: space-between; align-items: center; background: #f2f2f2; padding: 3.5mm 5mm; margin-top: 5mm; width: 90%; }
+  .amount-box .value { font-size: 14pt; font-weight: 600; }
+  .due { margin-top: 5mm; font-size: 10pt; }
+  .issuer { width: 40%; font-size: 9.5pt; line-height: 1.7; }
+  .issuer .name { font-size: 12pt; margin-bottom: 1mm; }
+  table.items { width: 100%; border-collapse: collapse; margin-top: 12mm; }
+  table.items th {
+    background: #7d7d7d; color: #fff; font-weight: 500;
+    padding: 2.5mm 3mm; border: 1px solid #7d7d7d; font-size: 10pt;
+  }
+  table.items td { border: 1px solid #999; padding: 2.5mm 3mm; height: 9mm; }
+  .col-item { width: 46%; }
+  .col-qty { width: 14%; }
+  .col-price { width: 18%; }
+  .col-amount { width: 22%; }
+  .num { text-align: right; }
+  .ctr { text-align: center; }
+  table.totals { width: 54%; margin-left: 46%; border-collapse: collapse; }
+  table.totals td { border: 1px solid #999; border-top: none; padding: 2.5mm 3mm; }
+  table.totals .label { width: 44%; background: #fff; }
+  table.totals tr.grand td { font-weight: 600; }
+  table.tax { width: 54%; margin-left: 46%; border-collapse: collapse; margin-top: 6mm; font-size: 9.5pt; }
+  table.tax td { border-bottom: 1px solid #999; padding: 2mm 3mm; }
+  .bank { margin-top: 12mm; }
+  .bank .label { font-size: 9.5pt; margin-bottom: 2mm; }
+  .bank .detail { background: #f2f2f2; padding: 3.5mm 5mm; }
+</style>
+</head>
+<body>
+  <div class="meta">
+    {{ISSUE_DATE}}<br>
+    請求書番号: {{INVOICE_NO}}
+  </div>
+
+  <h1>請求書</h1>
+
+  <div class="top">
+    <div class="client">
+      <div class="name">{{CLIENT_NAME}} 御中</div>
+      <div>下記のとおりご請求申し上げます。</div>
+      <div class="amount-box">
+        <span>ご請求金額</span>
+        <span class="value">¥ {{TOTAL_INCL_TAX}}</span>
+      </div>
+      <div class="due">お支払期限：{{DUE_DATE}}</div>
+    </div>
+    <div class="issuer">
+      <div class="name">{{ISSUER_NAME}}</div>
+      <div>登録番号: {{REGISTRATION_NUMBER}}</div>
+      <div style="margin-top:3mm">
+        〒{{POSTAL_CODE}}<br>
+        {{ADDRESS_LINE_1}}<br>
+        {{ADDRESS_LINE_2}}
+      </div>
+      <div style="margin-top:3mm">
+        TEL:{{TEL}}<br>
+        {{EMAIL}}
+      </div>
+    </div>
+  </div>
+
+  <table class="items">
+    <tr>
+      <th class="col-item">品目</th>
+      <th class="col-qty">数量</th>
+      <th class="col-price">単価</th>
+      <th class="col-amount">金額</th>
+    </tr>
+    <tr>
+      <td>{{ITEM_NAME}}</td>
+      <td class="ctr">{{HOURS}}時間</td>
+      <td class="num">{{RATE}}</td>
+      <td class="num">{{SUBTOTAL}}</td>
+    </tr>
+    <tr><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td></tr>
+  </table>
+
+  <table class="totals">
+    <tr>
+      <td class="label">小計</td>
+      <td class="num">{{SUBTOTAL}}</td>
+    </tr>
+    <tr>
+      <td class="label">消費税 (10%)</td>
+      <td class="num">{{TAX}}</td>
+    </tr>
+    <tr class="grand">
+      <td class="label">合計</td>
+      <td class="num">{{TOTAL_INCL_TAX}}</td>
+    </tr>
+  </table>
+
+  <table class="tax">
+    <tr>
+      <td>10%対象</td>
+      <td class="num">{{SUBTOTAL}}</td>
+      <td>消費税</td>
+      <td class="num">{{TAX}}</td>
+    </tr>
+    <tr>
+      <td>8%対象</td>
+      <td class="num">0</td>
+      <td>消費税</td>
+      <td class="num">0</td>
+    </tr>
+  </table>
+
+  <div class="bank">
+    <div class="label">振込先</div>
+    <div class="detail">{{BANK_TRANSFER}}</div>
+  </div>
+</body>
+</html>
