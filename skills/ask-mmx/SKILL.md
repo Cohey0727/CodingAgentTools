@@ -1,11 +1,11 @@
 ---
 name: ask-mmx
-description: ローカルにインストール済みの mmxcode (MiniMax バックエンドの Claude Code 互換 CLI) を使って、別 LLM (MiniMax) からのセカンドオピニオン・コードレビュー・意見交換を取得する。Claude が出した結論に別系統の目を入れたいとき、設計判断で複数モデルの見解を突き合わせたいとき、`ask-mmx` / `/ask-mmx` と言われたときに使用。
+description: ローカルにインストール済みの claudemmx (MiniMax バックエンドの Claude Code 互換 CLI) を使って、別 LLM (MiniMax) からのセカンドオピニオン・コードレビュー・意見交換を取得する。Claude が出した結論に別系統の目を入れたいとき、設計判断で複数モデルの見解を突き合わせたいとき、`ask-mmx` / `/ask-mmx` と言われたときに使用。
 ---
 
 # ask-mmx — MiniMax への問い合わせ
 
-このマシンには `mmxcode` (`/Users/kohei/.local/bin/mmxcode`) が入っている。これは MiniMax をバックエンドにした Claude Code 互換 CLI で、`-p/--print` で非対話の一発質問ができる。Claude Code (このセッション) から別 LLM (MiniMax) の意見を取るための「セカンドオピニオン」ツールとして使う。
+このマシンには `claudemmx` (`/Users/kohei/.local/bin/claudemmx`) が入っている。これは MiniMax をバックエンドにした Claude Code 互換 CLI で、`-p/--print` で非対話の一発質問ができる。Claude Code (このセッション) から別 LLM (MiniMax) の意見を取るための「セカンドオピニオン」ツールとして使う。
 
 ## MiniMax の特徴
 
@@ -27,14 +27,14 @@ description: ローカルにインストール済みの mmxcode (MiniMax バッ�
 ### 非対話で一発質問する (主用途)
 
 ```bash
-mmxcode -p "ここに質問やレビュー依頼を書く"
+claudemmx -p "ここに質問やレビュー依頼を書く"
 ```
 
 - `-p` / `--print` = 非対話のワンショット実行。stdout に最終回答が出る
 - 複雑なプロンプトはヒアドキュメントで安全に渡す:
 
 ```bash
-mmxcode -p "$(cat <<'EOF'
+claudemmx -p "$(cat <<'EOF'
 <質問本文>
 EOF
 )"
@@ -43,13 +43,13 @@ EOF
 - 標準入力からプロンプトを渡す場合:
 
 ```bash
-cat prompt.md | mmxcode -p
+cat prompt.md | claudemmx -p
 ```
 
 回答をファイルに残したいときはリダイレクトする:
 
 ```bash
-mmxcode -p "..." > /tmp/mmx-answer.md
+claudemmx -p "..." > /tmp/mmx-answer.md
 ```
 
 ## Claude Code から呼ぶときの定型パターン
@@ -57,7 +57,7 @@ mmxcode -p "..." > /tmp/mmx-answer.md
 ### パターン A: セカンドオピニオン (反対意見を求める)
 
 ```bash
-mmxcode -p "$(cat <<'EOF'
+claudemmx -p "$(cat <<'EOF'
 私 (別 AI) は以下の方針で実装しようとしている。これに反対する立場で論点を出してほしい。
 盲点・見落とし・代替案を遠慮なく指摘してほしい。
 
@@ -80,7 +80,7 @@ EOF
 ### パターン B: diff レビュー
 
 ```bash
-mmxcode -p "$(cat <<EOF
+claudemmx -p "$(cat <<EOF
 以下の diff を 1) ロジックバグ 2) エッジケース漏れ 3) テスト不足 4) 命名 の観点でレビューして。
 
 \`\`\`diff
@@ -95,7 +95,7 @@ EOF
 ### パターン C: 設計判断の突き合わせ
 
 ```bash
-mmxcode -p "$(cat <<'EOF'
+claudemmx -p "$(cat <<'EOF'
 以下の 2 案で迷っている。トレードオフを整理し、推奨案とその理由を述べてほしい。
 
 ## 案 A

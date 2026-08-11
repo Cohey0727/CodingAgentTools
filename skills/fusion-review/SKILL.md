@@ -1,6 +1,6 @@
 ---
 name: fusion-review
-description: 複数のLLM (このセッションの Claude 自身 + mmxcode/deepseek などの外部CLI) に同じレビュー依頼を並列で投げ、回答を統合 (fusion) して1つのレビュー結果にまとめる。有効なLLMはスキルディレクトリの llms.json で schema 指定付きで管理する。ユーザーが「フュージョンレビュー」「複数LLMでレビュー」「全モデルの意見を聞いて」と言ったとき、または /fusion-review を実行したときに使用。
+description: 複数のLLM (このセッションの Claude 自身 + claudemimo/claudedeepseek などの外部CLI) に同じレビュー依頼を並列で投げ、回答を統合 (fusion) して1つのレビュー結果にまとめる。有効なLLMはスキルディレクトリの llms.json で schema 指定付きで管理する。ユーザーが「フュージョンレビュー」「複数LLMでレビュー」「全モデルの意見を聞いて」と言ったとき、または /fusion-review を実行したときに使用。
 ---
 
 # fusion-review — 複数LLM統合レビュー
@@ -31,7 +31,7 @@ description: 複数のLLM (このセッションの Claude 自身 + mmxcode/deep
 | schema | 実行方法 |
 |--------|---------|
 | `self` | **このセッションの Claude 自身**がレビュアーの1人として直接レビューを書く。外部プロセスは起動しない |
-| `claude-code` | Claude Code 互換 CLI (mmxcode / deepseek など)。`cat prompt.md \| <command> -p` で非対話実行し、stdout に回答が出る |
+| `claude-code` | Claude Code 互換 CLI (claudemimo / claudedeepseek など)。`cat prompt.md \| <command> -p` で非対話実行し、stdout に回答が出る |
 | `stdin` | 任意コマンド。`command` をそのまま実行し、stdin にプロンプト・stdout に回答 |
 
 LLM の追加は llms.json にエントリを1つ足すだけ (Claude Code 互換 CLI なら `schema: "claude-code"` + コマンド名のみ)。編集はレポ側のファイルに対して行い、コミットする (シンボリックリンクなのでどちらのパスを編集しても実体は同じ)。
@@ -157,7 +157,7 @@ tmp の中間成果物 `review-<name>.md` 一式を入力として、**ホスト
 **出力へのメタ情報混入は禁止。以下を最終出力 (review.md / PRレビュー / ユーザーへの報告文) に一切含めてはならない:**
 
 - **スキル名・手法名** — 「Fusion Review」「fusion-review」「フュージョンレビュー」「統合レビュー」「マルチモデルレビュー」等の文字列。見出し・タイトル・本文・脚注のいずれにも書かない
-- モデル名 (claude, deepseek, mmx など) — 指摘の出元を示す表記
+- モデル名 (claude, deepseek, mimo など) — 指摘の出元を示す表記
 - 回答モデル数 (「N/M モデルが回答」「3モデル中2モデルが指摘」など)
 - 投票・合意状況 (「1対2で可決」「全会一致」「単独指摘」など)
 - レビュアーの回答品質評価 (「Xの指摘が的確だった」「Yは見落としが多かった」など)
