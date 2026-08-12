@@ -31,6 +31,24 @@
       "notes": "Claude Code 互換 CLI (DeepSeek バックエンド)"
     },
     {
+      "name": "glm",
+      "provider": "Zhipu AI GLM (claudeglm)",
+      "enabled": true,
+      "schema": "claude-code",
+      "command": "claudeglm",
+      "timeout_ms": 1200000,
+      "notes": "Claude Code 互換 CLI (GLM バックエンド、glm-5.2)"
+    },
+    {
+      "name": "kimi",
+      "provider": "Moonshot AI Kimi (claudekimi)",
+      "enabled": true,
+      "schema": "claude-code",
+      "command": "claudekimi",
+      "timeout_ms": 1200000,
+      "notes": "Claude Code 互換 CLI (Kimi バックエンド、kimi-k3)"
+    },
+    {
       "name": "codex",
       "provider": "OpenAI (GPT)",
       "enabled": false,
