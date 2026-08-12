@@ -32,12 +32,12 @@
     },
     {
       "name": "glm",
-      "provider": "Zhipu AI GLM (claudeglm)",
+      "provider": "Zhipu AI GLM (openglm)",
       "enabled": true,
-      "schema": "claude-code",
-      "command": "claudeglm",
+      "schema": "stdin",
+      "command": "openglm run --agent plan",
       "timeout_ms": 1200000,
-      "notes": "Claude Code 互換 CLI (GLM バックエンド、glm-5.2)"
+      "notes": "OpenCode CLI (GLM バックエンド、glm-5.2)。--agent plan で read-only"
     },
     {
       "name": "kimi",
