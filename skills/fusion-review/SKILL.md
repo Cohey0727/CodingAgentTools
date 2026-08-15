@@ -12,7 +12,7 @@ description: 複数のLLM (このセッションの Claude 自身 + claudemimo/c
 有効なLLMの一覧は**このスキルディレクトリの `llms.json`** で管理する:
 
 - 原本: `<repo>/skills/fusion-review/llms.json` (claude-code-settings レポ、Git管理)
-- 実行時パス: `~/.claude/skills/fusion-review/llms.json` (setup.sh のシンボリックリンク経由で同一実体)
+- 実行時パス: `~/.claude/skills/fusion-review/llms.json` (make setup のシンボリックリンク経由で同一実体)
 
 各エントリのフィールド:
 
