@@ -1,6 +1,6 @@
 ---
 name: resolve-ci
-description: PRのCIが失敗している原因を調査し、報告・修正する。PR番号・URLを受け取るか、現在のブランチのPRを対象とする。ユーザーが「CI修正」「CI直して」「ビルド失敗」と言ったとき、または /resolve-ci を実行したときに使用。
+description: PR の CI 失敗の原因を調査し、報告・修正する。「CI修正」「CI直して」「ビルド失敗」と言われたときに使用。
 ---
 
 # Resolve Failed CI

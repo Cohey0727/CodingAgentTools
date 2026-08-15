@@ -1,6 +1,6 @@
 ---
 name: resolve-reviews
-description: PRのレビューコメントを取得し、修正対応またはコメント返信を行う。PR番号・URLを受け取るか、直前に作成したPRを対象とする。ユーザーが「レビュー対応」「レビュー修正」と言ったとき、または /resolve-reviews を実行したときに使用。
+description: PR のレビューコメントに修正または返信で対応する。「レビュー対応」「レビュー修正」と言われたときに使用。
 ---
 
 # Resolve PR Review Comments

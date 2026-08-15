@@ -1,6 +1,6 @@
 ---
 name: fanout
-description: Fan out a single instruction across many files by splitting them among N parallel agents. Use when a task is mechanical and embarrassingly parallel — apply a coding rule, replace a pattern, migrate an API, scan for violations grep can't catch — across an entire directory tree. Each worker owns a disjoint file slice and reports back a structured summary.
+description: Split many files among N parallel agents to apply one mechanical instruction - a coding rule, a pattern replacement, an API migration, a scan grep cannot do. Use for embarrassingly parallel work across a directory tree.
 origin: user
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: codex
-description: ローカルにインストール済みの Codex CLI (OpenAI) を使って、別 LLM からのコードレビュー・セカンドオピニオン・意見交換を取得する。Claude が書いたコードに対して「別モデルの目」を入れたいとき、設計判断で複数モデルの見解を突き合わせたいとき、`codex` / `/codex` と言われたときに使用。
+description: Codex CLI (OpenAI) に投げて別 LLM のコードレビュー・セカンドオピニオンを取得する。設計判断で複数モデルの見解を突き合わせたいとき、codex と言われたときに使用。
 ---
 
 # Codex CLI Usage

@@ -1,6 +1,6 @@
 ---
 name: fusion-review
-description: 複数のLLM (このセッションの Claude 自身 + claudemimo/claudedeepseek などの外部CLI) に同じレビュー依頼を並列で投げ、回答を統合 (fusion) して1つのレビュー結果にまとめる。有効なLLMはスキルディレクトリの llms.json で schema 指定付きで管理する。ユーザーが「フュージョンレビュー」「複数LLMでレビュー」「全モデルの意見を聞いて」と言ったとき、または /fusion-review を実行したときに使用。
+description: 同じレビュー依頼を複数 LLM に並列で投げ、回答を統合して1つの結果にまとめる。「フュージョンレビュー」「複数LLMでレビュー」「全モデルの意見を聞いて」と言われたときに使用。
 ---
 
 # fusion-review — 複数LLM統合レビュー
@@ -77,7 +77,7 @@ done
 worktree (とユーザー環境) から、レビュー基準になるドキュメント・設定を集める:
 
 - リポジトリの `CLAUDE.md`、`.claude/rules/`、`CONTRIBUTING.md`、`docs/` 配下のスタイルガイド
-- ユーザーのグローバルルール `~/.claude/rules/` (コーディングスタイル・セキュリティ基準など)
+- ユーザーのグローバルルール `~/.claude/CLAUDE.md`
 - lint / formatter 設定 (`.eslintrc*`, `biome.json`, `ruff.toml`, `.prettierrc*`, `.editorconfig` など) — ルールとして明文化された慣習
 
 見つかったものは**要点をプロンプトに直接貼る** (長大なら関連セクションのみ抜粋し、全文はファイルパスを示して worktree 内で読ませる)。何も見つからなければ「明文化されたガイドラインなし。既存コードの慣習を基準とする」と明記する。

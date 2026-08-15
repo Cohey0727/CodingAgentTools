@@ -1,6 +1,6 @@
 ---
 name: resolve-conflict
-description: Gitのマージコンフリクトを検出・分析し、安全に解決する。ユーザーが「コンフリクト解決」「マージ競合」と言ったとき、または /resolve-conflict を実行したときに使用。
+description: Git のマージコンフリクトを分析し、安全に解決する。「コンフリクト解決」「マージ競合」と言われたときに使用。
 ---
 
 # Resolve Git Merge Conflicts

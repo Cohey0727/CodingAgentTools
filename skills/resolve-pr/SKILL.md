@@ -1,6 +1,6 @@
 ---
 name: resolve-pr
-description: PRの残タスク（CI失敗とレビューコメント）をまとめて解決する。内部的に resolve-ci と resolve-reviews を順に呼び出す。PR番号・URLを受け取るか、現在のブランチのPRを対象とする。ユーザーが「PR対応」「PR残タスク」「PR解決」と言ったとき、または /resolve-pr を実行したときに使用。
+description: PR の残タスク（CI 失敗とレビューコメント）をまとめて解決する。「PR対応」「PR残タスク」「PR解決」と言われたときに使用。
 ---
 
 # Resolve PR Remaining Tasks

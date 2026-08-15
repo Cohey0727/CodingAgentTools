@@ -1,6 +1,6 @@
 ---
 name: dev-pr-review
-description: in-review ラベルがついていないオープンPRを見つけてレビューする。git worktree でPRのコードをローカルに取得し、変更箇所以外との整合性・紐づくIssue通りの実装かを確認する。問題なければmerge、軽微な指摘なら修正してmerge、問題が多い場合はレビューを記述して reviewed ラベルをつけ、見当違い・修正済みのPRは理由を記述してcloseする。PR番号・URLを引数に取るか、レビュー待ちのPRを自動で探す。ユーザーが「PRレビューして回して」「レビュー待ちPRを処理して」と言ったとき、または /dev-pr-review を実行したときに使用。
+description: レビュー待ちのオープン PR を worktree で確認し、merge / 修正 / reviewed ラベル / close を判断する。「PRレビューして回して」「レビュー待ちPRを処理して」と言われたときに使用。
 ---
 
 # Dev PR Review: PR選択 → worktree取得 → レビュー → merge / 修正merge / reviewed / close

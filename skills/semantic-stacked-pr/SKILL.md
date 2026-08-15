@@ -1,6 +1,6 @@
 ---
 name: semantic-stacked-pr
-description: Split one change into a semantic stack of pull requests — codegen input, generated output, the actual fix, and tests — using GitHub's stacked PR feature (`gh stack`), so each PR carries a single kind of meaning and reviewers only scrutinize the layers that need it. Labels the generated and test PRs so effort is visible from the PR list. Use when the user says "スタックPR", "意味で分けてPR", "PRを分割", "stacked PR", "split this PR", or runs /semantic-stacked-pr.
+description: Split one change into a stack of PRs by meaning - codegen input, generated output, the fix, tests - using `gh stack`, so reviewers scrutinize only the layers that need it. Use for "スタックPR", "PRを分割", "stacked PR", "split this PR".
 ---
 
 # Semantic Stacked PR: Base → Generated → Fix → Tests

@@ -1,6 +1,6 @@
 ---
 name: dev-issue-implement
-description: reviewed ラベルがついたIssueを見つけて実装する。対象Issueに WIP ラベルをつけ、git worktree で main を汚さずに開発し、テストがPASSすることを確認した上でIssueに紐づくPR（Closes #N）を作成する。Issue番号・URLを引数に取るか、実装待ちのIssueを自動で探す。ユーザーが「Issue実装して」「reviewedのIssueを開発して」と言ったとき、または /dev-issue-implement を実行したときに使用。
+description: reviewed ラベルの Issue を worktree で実装し、テストを通して PR を作る。「Issue実装して」「reviewedのIssueを進めて」と言われたときに使用。
 ---
 
 # Dev Issue Implement: Issue選択 → WIP → worktree開発 → テスト → PR作成

@@ -1,6 +1,6 @@
 ---
 name: dev-issue-review
-description: 現在のリポジトリの開発Issueが妥当かどうかをレビューする。リポジトリの目的に沿っているか、調査内容・設計に問題がないかをチェックし、WebSearch や Parallel Search MCP で裏取りして本文を追記・修正する。レビュー着手時に in-review ラベルで排他し、問題なければ reviewed ラベルをつけ、あまりに見当違いな場合は理由を記述してcloseする。Issue番号・URLを引数に取るか、未レビューのIssueを自動で探す。ユーザーが「Issueレビュー」「Issueの妥当性チェック」と言ったとき、または /dev-issue-review を実行したときに使用。
+description: 開発 Issue の妥当性をレビューし、裏取りして本文を補正し、問題なければ reviewed ラベルを付ける。「Issueレビュー」「Issueの妥当性チェック」と言われたときに使用。
 ---
 
 # Dev Issue Review: 妥当性チェック → 裏取り調査 → 追記修正 → ラベル付与

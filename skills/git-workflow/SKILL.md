@@ -1,6 +1,6 @@
 ---
 name: git-workflow
-description: 変更のコミットからPR作成まで一括実行する。汎用ブランチにいる場合は新規ブランチを作成。リポジトリのPRテンプレートがあれば自動適用。ユーザーが「PR作成」「プルリク」と言ったとき、または /git-workflow を実行したときに使用。
+description: 変更のコミットから PR 作成まで一括実行する。「PR作成」「プルリク」と言われたときに使用。
 ---
 
 # Git Workflow: Branch → Commit → Push → PR

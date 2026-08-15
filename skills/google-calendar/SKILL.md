@@ -1,6 +1,6 @@
 ---
 name: google-calendar
-description: 予定・スケジュール・会議・空き時間の確認や、カレンダーへの登録・変更・削除を Google Calendar MCP ツールで処理する。「予定」「スケジュール」「カレンダー」「日程」「会議」「ミーティング」「空き時間」「予約」、schedule / event / meeting / calendar / appointment / free time / availability と言われたときに使用。
+description: 予定・空き時間の確認やカレンダー登録を Google Calendar MCP で処理する。「予定」「スケジュール」「カレンダー」「会議」「空き時間」、schedule / meeting / calendar / availability と言われたときに使用。
 ---
 
 # Google Calendar

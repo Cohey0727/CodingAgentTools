@@ -1,6 +1,6 @@
 ---
 name: ask-mmx
-description: ローカルにインストール済みの claudemmx (MiniMax バックエンドの Claude Code 互換 CLI) を使って、別 LLM (MiniMax) からのセカンドオピニオン・コードレビュー・意見交換を取得する。Claude が出した結論に別系統の目を入れたいとき、設計判断で複数モデルの見解を突き合わせたいとき、`ask-mmx` / `/ask-mmx` と言われたときに使用。
+description: claudemmx (MiniMax) に投げて別 LLM のセカンドオピニオン・コードレビューを取得する。結論に別系統の目を入れたいとき、ask-mmx と言われたときに使用。
 ---
 
 # ask-mmx — MiniMax への問い合わせ

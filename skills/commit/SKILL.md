@@ -1,6 +1,6 @@
 ---
 name: commit
-description: ステージ済み・未ステージの変更を分析し、conventional commit形式のメッセージを自動生成してコミットを実行する。ユーザーが「コミット」「変更を保存」と言ったとき、または /commit を実行したときに使用。
+description: 変更を分析して conventional commit 形式のメッセージを生成しコミットする。「コミット」「変更を保存」と言われたときに使用。
 disable-model-invocation: true
 ---
 

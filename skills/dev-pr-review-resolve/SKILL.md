@@ -1,6 +1,6 @@
 ---
 name: dev-pr-review-resolve
-description: reviewed ラベルがついたPRを見つけて、レビュー指摘事項を検討・修正する。着手時に in-review ラベルで排他する。妥当な指摘は worktree 上で修正し、反論がある場合は根拠をコメントに記述して、各レビュースレッドをresolveしていく。すべてのレビューをresolveしたら必ずmergeする。PR番号・URLを引数に取るか、対応待ちのPRを自動で探す。ユーザーが「レビュー指摘を解消して」「reviewedのPRを片付けて」と言ったとき、または /dev-pr-review-resolve を実行したときに使用。
+description: reviewed ラベルの PR のレビュー指摘を検討・修正し、各スレッドを resolve して merge する。「レビュー指摘を解消して」「reviewedのPRを片付けて」と言われたときに使用。
 ---
 
 # Dev PR Review Resolve: PR選択 → 指摘検討 → 修正 or 反論 → 全resolve → merge

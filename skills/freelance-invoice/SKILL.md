@@ -1,6 +1,6 @@
 ---
 name: freelance-invoice
-description: 適格請求書（インボイス）の PDF を生成する。請求先・対象月・単価・数量（時間）を会話や引数から受け取り、固定デザインのテンプレートに流し込んで Chrome ヘッドレスで PDF 化する。発行者情報・振込先は git 管理外の personal-config.json から読む。ユーザーが「請求書作って」「請求書出して」と言ったとき、または /freelance-invoice を実行したときに使用。
+description: 適格請求書（インボイス）の PDF を生成する。「請求書作って」「請求書出して」と言われたときに使用。
 ---
 
 # 請求書 PDF の生成

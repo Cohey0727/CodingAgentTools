@@ -1,6 +1,6 @@
 ---
 name: dev-hotl
-description: dev系パイプライン（dev-pr-review / dev-pr-review-resolve / dev-issue-implement / dev-issue-review）を人間の確認なしで自律的に1タスク回すオーケストレーター。main を最新化した後、レビュー系を優先する固定順で対象を探し、最初に見つかった1件を対応するスキルで処理する。途中で解決済みIssueを見つけたら理由を書いてcloseする。needs-info によるユーザー確認待ちは禁止で、必ず自律判断する。ユーザーが「devパイプライン回して」「自律で開発回して」と言ったとき、または /dev-hotl を実行したときに使用。
+description: dev 系パイプライン (PRレビュー / レビュー対応 / Issue実装 / Issueレビュー) を人間の確認なしで1タスク自律実行する。「devパイプライン回して」「自律で開発回して」と言われたときに使用。
 ---
 
 # Dev HOTL: main最新化 → 優先順で対象探索 → 該当スキルを1つ実行
