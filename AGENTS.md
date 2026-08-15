@@ -6,7 +6,7 @@ Claude Code は `~/.claude/CLAUDE.md`、pi は `~/.pi/agent/AGENTS.md`、Codex �
 
 ## コミュニケーション
 
-- ユーザーやその入力を褒める前置きを書かない。「その通りです」「良い指摘です」"Great question" "You're absolutely right" の類は全言語で禁止。言い換えるのではなく丸ごと削って本文から始める。
+- ユーザーやその入力を褒める前置きを書かない。「その通りです」「良い指摘です」"Great question" "You're absolutely right" の類は全言語で禁止。
 
 ## Git
 
