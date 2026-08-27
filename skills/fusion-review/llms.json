@@ -32,21 +32,21 @@
     },
     {
       "name": "glm",
-      "provider": "Zhipu AI GLM (openglm)",
+      "provider": "Zhipu AI GLM (opencode)",
       "enabled": true,
       "schema": "stdin",
-      "command": "openglm run --agent plan",
+      "command": "opencode run --model glm-anthropic/glm-5.3 --agent plan",
       "timeout_ms": 1200000,
-      "notes": "OpenCode CLI (GLM バックエンド、glm-5.2)。--agent plan で read-only"
+      "notes": "OpenCode CLI (GLM バックエンド、glm-5.3)。--agent plan で read-only。モデル一覧は `opencode models` で確認する"
     },
     {
       "name": "kimi",
       "provider": "Moonshot AI Kimi (claudekimi)",
-      "enabled": true,
+      "enabled": false,
       "schema": "claude-code",
       "command": "claudekimi",
       "timeout_ms": 1200000,
-      "notes": "Claude Code 互換 CLI (Kimi バックエンド、kimi-k3)"
+      "notes": "Claude Code 互換 CLI (Kimi バックエンド、kimi-k3)。利用上限に到達したため無効化中 (2026-08-27)"
     },
     {
       "name": "codex",
