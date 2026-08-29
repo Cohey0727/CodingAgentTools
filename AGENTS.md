@@ -11,6 +11,7 @@ Claude Code は `~/.claude/CLAUDE.md`、pi は `~/.pi/agent/AGENTS.md`、Codex �
 ## Git
 
 - **commit と push は 1 つの操作**。commit したら同じタスク内で push する。「commit しろ」は常に「commit して push しろ」の意味。
+- **コミットしてよいか聞かない。** 作業が一区切りついたら、指示を待たず自分でコミットして push する。「コミットしますか」「このままコミットしますか」の類を一切書かない。
 - push できない場合は黙って local に残さず、理由を即報告して指示を仰ぐ。
 - コミットメッセージは conventional commits 形式。
 - PR は最新コミットだけでなくブランチ全体の差分を見てから書く。
