@@ -30,3 +30,9 @@ Claude Code は `~/.claude/CLAUDE.md`、pi は `~/.pi/agent/AGENTS.md`、Codex �
 - 秘密情報をコミットしない。
 - `--dangerously-skip-permissions` は使わない。
 - 広い探索・調査はサブエージェントに投げ、メインコンテキストを汚さない。
+- スクリーンショット・一時ファイルをリポジトリ内に作らない。Playwright MCP の `browser_take_screenshot` は `filename` を `.playwright-mcp/<name>.png` の形で渡す（拡張子だけの相対名はリポジトリ直下に書かれる）。検証スクリプト・ログ・export 結果は scratchpad に置く。
+- `git add` の前に `git status --porcelain` を見て、次のいずれかがあれば add しない。除去してから再度 `git status` を確認する。
+  - リポジトリ直下のファイル（プロジェクトのソースディレクトリ配下でないもの）
+  - 画像・バイナリ（png / jpg / webp / gif / pdf / zip / mov 等）
+  - そのタスクで自分が触っていないファイル
+- リポジトリ直下のファイルを `mv` / `rm` するときは絶対パスで書く。Bash の cwd はコマンド間で移動するため、相対パスは別ディレクトリを指して黙って失敗する。
