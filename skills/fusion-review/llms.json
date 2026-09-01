@@ -13,15 +13,6 @@
       "notes": "外部LLMの回答を読む前に、独立したレビューを自分で書き切ること (回答を見た後だと引きずられる)"
     },
     {
-      "name": "mimo",
-      "provider": "Xiaomi MiMo (claudemimo)",
-      "enabled": true,
-      "schema": "claude-code",
-      "command": "claudemimo",
-      "timeout_ms": 1200000,
-      "notes": "Claude Code 互換 CLI (MiMo バックエンド、mimo-v2.5-pro)"
-    },
-    {
       "name": "deepseek",
       "provider": "DeepSeek (claudedeepseek)",
       "enabled": true,
