@@ -31,15 +31,6 @@
       "notes": "OpenCode CLI (GLM バックエンド、glm-5.3)。--agent plan で read-only。モデル一覧は `opencode models` で確認する"
     },
     {
-      "name": "kimi",
-      "provider": "Moonshot AI Kimi (claudekimi)",
-      "enabled": true,
-      "schema": "claude-code",
-      "command": "claudekimi",
-      "timeout_ms": 1200000,
-      "notes": "Claude Code 互換 CLI (Kimi バックエンド、kimi-k3)"
-    },
-    {
       "name": "codex",
       "provider": "OpenAI (GPT)",
       "enabled": false,
