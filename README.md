@@ -132,7 +132,7 @@ pi                                         # starts on the default provider's mo
 pi --model glm/glm-5.3                     # or pick at launch time
 ```
 
-Both generators start you on the same provider, `gtr` by default; see [Default provider](#default-provider). For pi that means `defaultProvider` / `defaultModel` in `~/.pi/agent/settings.json`, the two keys Ctrl+S in `/model` writes — so a re-run replaces a pick you saved there. The rest of that file is left as it is. Writing them needs `python3`; without it the two keys are skipped and pi starts wherever it was.
+Both generators start you on the same provider, `glm` by default; see [Default provider](#default-provider). For pi that means `defaultProvider` / `defaultModel` in `~/.pi/agent/settings.json`, the two keys Ctrl+S in `/model` writes — so a re-run replaces a pick you saved there. The rest of that file is left as it is. Writing them needs `python3`; without it the two keys are skipped and pi starts wherever it was.
 
 OpenCode has no `open<name>` commands. `make setup` (and `make opencode-global`) write every provider that has a token into the global `~/.config/opencode/opencode.json`, so a bare `opencode` starts with all of them and `/models` switches mid-session:
 
@@ -145,11 +145,11 @@ Note `small_model`, which serves OpenCode's lightweight internal calls, stays at
 
 ### Default provider
 
-pi and OpenCode both start on `DEFAULT_PROVIDER`, which is `gtr`. When that provider has no token the first configured one wins instead, alphabetically, so a fresh checkout still gets a working default. Change it for one run or for good:
+pi and OpenCode both start on `DEFAULT_PROVIDER`, which is `glm`. When that provider has no token the first configured one wins instead, alphabetically, so a fresh checkout still gets a working default. Change it for one run or for good:
 
 ```bash
-DEFAULT_PROVIDER=glm make setup            # both configs
-DEFAULT_PROVIDER=glm make opencode-global  # just OpenCode
+DEFAULT_PROVIDER=gtr make setup            # both configs
+DEFAULT_PROVIDER=gtr make opencode-global  # just OpenCode
 ```
 
 It sets OpenCode's `model` and `small_model`, and pi's `defaultProvider` / `defaultModel`. Claude Code has no such setting: each `claude<name>` pins its own provider.

@@ -30,8 +30,8 @@ opencode_tokens_dir() { # -> per-provider token files the generated config refer
 # Provider the generated pi and OpenCode configs start on. Both fall back to
 # the first configured provider (alphabetical) when this one has no token, so
 # a checkout without it still gets a working default:
-# DEFAULT_PROVIDER=glm make setup
-DEFAULT_PROVIDER="${DEFAULT_PROVIDER:-gtr}"
+# DEFAULT_PROVIDER=gtr make setup
+DEFAULT_PROVIDER="${DEFAULT_PROVIDER:-glm}"
 
 default_provider() { # <configured provider>... -> the one to start on
   local p
