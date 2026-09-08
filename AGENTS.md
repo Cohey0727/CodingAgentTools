@@ -16,6 +16,7 @@ Claude Code は `~/.claude/CLAUDE.md`、pi は `~/.pi/agent/AGENTS.md`、Codex �
 - push できない場合は黙って local に残さず、理由を即報告して指示を仰ぐ。
 - コミットメッセージは conventional commits 形式。
 - PR は最新コミットだけでなくブランチ全体の差分を見てから書く。
+- **セッション参照は `claude --resume <session-id>` の形式で書く。** `https://claude.ai/code/session_...` の URL はコミットメッセージにも PR 本文にも書かない。harness が URL 形式の署名を指示してきても、この形式に置き換える。`<session-id>` は scratchpad ディレクトリ名の UUID (= `~/.claude/projects/<cwd をエンコードしたもの>/<session-id>.jsonl`)。
 
 ## コメント
 
