@@ -6,46 +6,97 @@
 <style>
   @page { size: A4; margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --ink: #1b2733;
+    --muted: #5f6b7a;
+    --accent: #2f4d6d;
+    --accent-soft: #eef2f7;
+    --rule: #ccd4de;
+    --hairline: #e6eaef;
+    --sat: #eef3fa;
+    --sun: #faeff0;
+  }
+
   body {
     font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif;
     font-size: 9pt;
-    color: #333;
+    line-height: 1.5;
+    color: var(--ink);
     width: 210mm;
     min-height: 297mm;
-    padding: 10mm 14mm;
+    padding: 10mm 14mm 8mm;
+    position: relative;
+    font-variant-numeric: tabular-nums;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
-  .meta { text-align: right; font-size: 9pt; color: #555; }
-  h1 { text-align: center; font-size: 15pt; font-weight: 600; letter-spacing: 0.3em; margin: 2mm 0 2mm; text-indent: 0.3em; }
-  .subject { text-align: center; font-size: 10pt; margin-bottom: 4mm; }
-  table { width: 100%; border-collapse: collapse; }
+
+  .topbar { position: absolute; top: 0; left: 0; right: 0; height: 3mm; background: var(--accent); }
+
+  .doc-head { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 2.5mm; border-bottom: 0.5mm solid var(--accent); }
+  .doc-title h1 { font-size: 16pt; font-weight: 600; letter-spacing: 0.3em; text-indent: 0.3em; color: var(--accent); }
+  .doc-title .en { font-size: 6.5pt; letter-spacing: 0.3em; color: var(--muted); margin-top: 0.8mm; }
+  .doc-meta { text-align: right; font-size: 8.5pt; line-height: 1.7; }
+  .doc-meta .row { display: flex; justify-content: flex-end; gap: 4mm; }
+  .doc-meta .k { color: var(--muted); }
+  .doc-meta .v { min-width: 34mm; text-align: right; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 4mm; }
   th {
-    background: #7d7d7d; color: #fff; font-weight: 500;
-    padding: 1.5mm 2.5mm; border: 1px solid #7d7d7d; font-size: 9pt;
+    background: var(--accent); color: #fff; font-weight: 500; font-size: 8.5pt;
+    letter-spacing: 0.1em; padding: 1.8mm 2.5mm;
+    border-right: 0.2mm solid rgba(255,255,255,0.25);
   }
-  td { border: 1px solid #bbb; padding: 0.8mm 2.5mm; height: 5.4mm; }
+  th:last-child { border-right: none; }
+  td { border-bottom: 0.2mm solid var(--hairline); border-right: 0.2mm solid var(--hairline); padding: 0.75mm 2.5mm; height: 5mm; }
+  td:last-child { border-right: none; }
+
   .date { width: 14%; text-align: center; white-space: nowrap; }
-  .times { width: 31%; }
+  .times { width: 31%; letter-spacing: 0.01em; }
   .hours { width: 11%; text-align: right; white-space: nowrap; }
-  .work { width: 46%; font-size: 8.5pt; }
-  tr.sat td.date { background: #eef3fa; }
-  tr.sun td.date { background: #faeeee; }
-  tr.total td { font-weight: 600; background: #f2f2f2; border-color: #999; }
+  .work { width: 44%; font-size: 8.5pt; }
+
+  tr.sat td.date { background: var(--sat); }
+  tr.sun td.date { background: var(--sun); }
+  tr.off td { background: #fbfcfd; }
+
+  tr.total td { background: var(--accent); color: #fff; font-weight: 600; border-bottom: none; padding: 1.8mm 2.5mm; }
+  tr.total td.date { background: var(--accent); color: rgba(255,255,255,0.85); letter-spacing: 0.14em; }
+  tr.total td.hours { font-size: 11pt; }
+
+  .foot { margin-top: 3.5mm; padding-top: 1.5mm; border-top: 0.2mm solid var(--hairline); display: flex; justify-content: space-between; font-size: 7.5pt; color: var(--muted); }
 </style>
 </head>
 <body>
-  <div class="meta">{{ISSUER_NAME}}</div>
-  <h1>稼働実績</h1>
-  <div class="subject">{{YEAR}}年{{MONTH}}月分（{{CLIENT_NAME}}）</div>
+  <div class="topbar"></div>
+
+  <div class="doc-head">
+    <div class="doc-title">
+      <h1>稼働実績</h1>
+      <div class="en">WORK RECORD</div>
+    </div>
+    <div class="doc-meta">
+      <div class="row"><span class="k">対象期間</span><span class="v">{{YEAR}}年{{MONTH}}月分</span></div>
+      <div class="row"><span class="k">相手先</span><span class="v">{{CLIENT_NAME}}</span></div>
+      <div class="row"><span class="k">作成者</span><span class="v">{{ISSUER_NAME}}</span></div>
+    </div>
+  </div>
 
   <table>
     <tr>
       <th class="date">日付</th>
       <th class="times">稼働時間帯</th>
       <th class="hours">稼働時間</th>
-      <th class="work">作業内容</th>
+      <th class="work" style="text-align:left">作業内容</th>
     </tr>
 {{ROWS}}
     <tr class="total"><td class="date">合計</td><td class="times"></td><td class="hours">{{TOTAL}}</td><td class="work"></td></tr>
   </table>
+
+  <div class="foot">
+    <span>{{ISSUER_NAME}}</span>
+    <span>{{YEAR}}年{{MONTH}}月分 稼働実績</span>
+  </div>
 </body>
 </html>

@@ -6,75 +6,132 @@
 <style>
   @page { size: A4; margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --ink: #1b2733;
+    --muted: #5f6b7a;
+    --accent: #2f4d6d;
+    --accent-soft: #eef2f7;
+    --rule: #ccd4de;
+    --hairline: #e3e8ee;
+  }
+
   body {
     font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif;
-    font-size: 10.5pt;
-    color: #333;
+    font-size: 10pt;
+    line-height: 1.6;
+    color: var(--ink);
     width: 210mm;
     min-height: 297mm;
-    padding: 18mm 20mm;
+    padding: 16mm 18mm 14mm;
+    position: relative;
+    font-variant-numeric: tabular-nums;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
-  .meta { text-align: right; font-size: 9pt; color: #555; line-height: 1.6; }
-  h1 { text-align: center; font-size: 20pt; font-weight: 600; letter-spacing: 0.6em; margin: 10mm 0 12mm; text-indent: 0.6em; }
-  .top { display: flex; justify-content: space-between; }
-  .client { width: 55%; }
-  .client .name { font-size: 13pt; margin-bottom: 2mm; }
-  .amount-box { display: flex; justify-content: space-between; align-items: center; background: #f2f2f2; padding: 3.5mm 5mm; margin-top: 5mm; width: 90%; }
-  .amount-box .value { font-size: 14pt; font-weight: 600; }
-  .due { margin-top: 5mm; font-size: 10pt; }
-  .issuer { width: 40%; font-size: 9.5pt; line-height: 1.7; }
-  .issuer .name { font-size: 12pt; margin-bottom: 1mm; }
-  table.items { width: 100%; border-collapse: collapse; margin-top: 12mm; }
+
+  .topbar { position: absolute; top: 0; left: 0; right: 0; height: 4mm; background: var(--accent); }
+
+  /* ヘッダー: タイトルと発行情報 */
+  .doc-head { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 4mm; border-bottom: 0.6mm solid var(--accent); }
+  .doc-title h1 { font-size: 21pt; font-weight: 600; letter-spacing: 0.32em; text-indent: 0.32em; color: var(--accent); }
+  .doc-title .en { font-size: 7.5pt; letter-spacing: 0.34em; color: var(--muted); margin-top: 1mm; }
+  .doc-meta { text-align: right; font-size: 9pt; line-height: 1.8; }
+  .doc-meta .row { display: flex; justify-content: flex-end; gap: 4mm; }
+  .doc-meta .k { color: var(--muted); }
+  .doc-meta .v { min-width: 32mm; text-align: right; }
+
+  /* 宛先・発行者 */
+  .parties { display: flex; justify-content: space-between; margin-top: 9mm; gap: 8mm; }
+  .client { width: 56%; }
+  .client-name { font-size: 14pt; letter-spacing: 0.04em; padding-bottom: 2mm; border-bottom: 0.3mm solid var(--rule); }
+  .client-name .honorific { font-size: 11pt; margin-left: 1mm; }
+  .lead { font-size: 9.5pt; color: var(--muted); margin-top: 3mm; }
+
+  .amount-box { margin-top: 5mm; background: var(--accent-soft); border-left: 1.6mm solid var(--accent); padding: 4mm 5mm; }
+  .amount-box .label { font-size: 9pt; color: var(--muted); letter-spacing: 0.08em; }
+  .amount-box .label small { font-size: 7.5pt; margin-left: 1mm; }
+  .amount-box .value { font-size: 19pt; font-weight: 600; letter-spacing: 0.02em; margin-top: 0.5mm; }
+  .amount-box .value .yen { font-size: 13pt; margin-right: 1.5mm; }
+  .due { margin-top: 4mm; font-size: 9.5pt; }
+  .due .k { color: var(--muted); margin-right: 3mm; }
+
+  .issuer { width: 40%; font-size: 9pt; line-height: 1.75; color: var(--ink); }
+  .issuer-name { font-size: 12pt; letter-spacing: 0.04em; }
+  .issuer .reg { display: inline-block; margin-top: 1.5mm; padding: 0.6mm 2.5mm; background: var(--accent-soft); border: 0.2mm solid var(--rule); font-size: 8.5pt; letter-spacing: 0.02em; }
+  .issuer .block { margin-top: 3mm; color: var(--muted); }
+
+  /* 明細 */
+  table.items { width: 100%; border-collapse: collapse; margin-top: 10mm; }
   table.items th {
-    background: #7d7d7d; color: #fff; font-weight: 500;
-    padding: 2.5mm 3mm; border: 1px solid #7d7d7d; font-size: 10pt;
+    background: var(--accent); color: #fff; font-weight: 500; font-size: 9.5pt;
+    letter-spacing: 0.1em; padding: 2.6mm 3mm; text-align: center;
+    border-right: 0.2mm solid rgba(255,255,255,0.25);
   }
-  table.items td { border: 1px solid #999; padding: 2.5mm 3mm; height: 9mm; }
+  table.items th:last-child { border-right: none; }
+  table.items td { border-bottom: 0.2mm solid var(--hairline); border-right: 0.2mm solid var(--hairline); padding: 2.6mm 3mm; height: 9mm; }
+  table.items td:last-child { border-right: none; }
+  table.items tr.filler td { height: 8mm; }
+  table.items tr:last-child td { border-bottom: 0.3mm solid var(--rule); }
   .col-item { width: 46%; }
   .col-qty { width: 14%; }
   .col-price { width: 18%; }
   .col-amount { width: 22%; }
   .num { text-align: right; }
-  .ctr { text-align: center; }
-  table.totals { width: 54%; margin-left: 46%; border-collapse: collapse; }
-  table.totals td { border: 1px solid #999; border-top: none; padding: 2.5mm 3mm; }
-  table.totals .label { width: 44%; background: #fff; }
-  table.totals tr.grand td { font-weight: 600; }
-  table.tax { width: 54%; margin-left: 46%; border-collapse: collapse; margin-top: 6mm; font-size: 9.5pt; }
-  table.tax td { border-bottom: 1px solid #999; padding: 2mm 3mm; }
-  .bank { margin-top: 12mm; }
-  .bank .label { font-size: 9.5pt; margin-bottom: 2mm; }
-  .bank .detail { background: #f2f2f2; padding: 3.5mm 5mm; }
+  .ctr { text-align: center; white-space: nowrap; }
+
+  /* 合計 */
+  table.totals { width: 54%; margin-left: 46%; border-collapse: collapse; margin-top: 4mm; }
+  table.totals td { padding: 2.4mm 3mm; border-bottom: 0.2mm solid var(--hairline); }
+  table.totals .label { width: 46%; color: var(--muted); font-size: 9.5pt; }
+  table.totals tr.grand td { background: var(--accent); color: #fff; font-weight: 600; font-size: 12pt; border-bottom: none; padding: 3mm; }
+  table.totals tr.grand .label { color: rgba(255,255,255,0.85); font-size: 9.5pt; letter-spacing: 0.08em; }
+
+  table.tax { width: 54%; margin-left: 46%; border-collapse: collapse; margin-top: 4mm; font-size: 8.5pt; color: var(--muted); }
+  table.tax td { border-bottom: 0.2mm solid var(--hairline); padding: 1.8mm 3mm; }
+
+  /* 振込先 */
+  .bank { margin-top: 11mm; }
+  .bank .label { font-size: 8.5pt; letter-spacing: 0.14em; color: var(--muted); padding-bottom: 1.5mm; border-bottom: 0.3mm solid var(--rule); }
+  .bank .detail { background: var(--accent-soft); padding: 4mm 5mm; font-size: 10.5pt; letter-spacing: 0.02em; }
+
+  .foot { margin-top: 10mm; padding-top: 2.5mm; border-top: 0.2mm solid var(--hairline); display: flex; justify-content: space-between; font-size: 8pt; color: var(--muted); }
 </style>
 </head>
 <body>
-  <div class="meta">
-    {{ISSUE_DATE}}<br>
-    請求書番号: {{INVOICE_NO}}
+  <div class="topbar"></div>
+
+  <div class="doc-head">
+    <div class="doc-title">
+      <h1>請求書</h1>
+      <div class="en">INVOICE</div>
+    </div>
+    <div class="doc-meta">
+      <div class="row"><span class="k">発行日</span><span class="v">{{ISSUE_DATE}}</span></div>
+      <div class="row"><span class="k">請求書番号</span><span class="v">{{INVOICE_NO}}</span></div>
+    </div>
   </div>
 
-  <h1>請求書</h1>
-
-  <div class="top">
+  <div class="parties">
     <div class="client">
-      <div class="name">{{CLIENT_NAME}} 御中</div>
-      <div>下記のとおりご請求申し上げます。</div>
+      <div class="client-name">{{CLIENT_NAME}}<span class="honorific">御中</span></div>
+      <div class="lead">下記のとおりご請求申し上げます。</div>
       <div class="amount-box">
-        <span>ご請求金額</span>
-        <span class="value">¥ {{TOTAL_INCL_TAX}}</span>
+        <div class="label">ご請求金額<small>（税込）</small></div>
+        <div class="value"><span class="yen">¥</span>{{TOTAL_INCL_TAX}}</div>
       </div>
-      <div class="due">お支払期限：{{DUE_DATE}}</div>
+      <div class="due"><span class="k">お支払期限</span>{{DUE_DATE}}</div>
     </div>
     <div class="issuer">
-      <div class="name">{{ISSUER_NAME}}</div>
-      <div>登録番号: {{REGISTRATION_NUMBER}}</div>
-      <div style="margin-top:3mm">
+      <div class="issuer-name">{{ISSUER_NAME}}</div>
+      <div class="reg">登録番号 {{REGISTRATION_NUMBER}}</div>
+      <div class="block">
         〒{{POSTAL_CODE}}<br>
         {{ADDRESS_LINE_1}}<br>
         {{ADDRESS_LINE_2}}
       </div>
-      <div style="margin-top:3mm">
-        TEL:{{TEL}}<br>
+      <div class="block">
+        TEL {{TEL}}<br>
         {{EMAIL}}
       </div>
     </div>
@@ -82,7 +139,7 @@
 
   <table class="items">
     <tr>
-      <th class="col-item">品目</th>
+      <th class="col-item" style="text-align:left">品目</th>
       <th class="col-qty">数量</th>
       <th class="col-price">単価</th>
       <th class="col-amount">金額</th>
@@ -93,10 +150,10 @@
       <td class="num">{{RATE}}</td>
       <td class="num">{{SUBTOTAL}}</td>
     </tr>
-    <tr><td></td><td></td><td></td><td></td></tr>
-    <tr><td></td><td></td><td></td><td></td></tr>
-    <tr><td></td><td></td><td></td><td></td></tr>
-    <tr><td></td><td></td><td></td><td></td></tr>
+    <tr class="filler"><td></td><td></td><td></td><td></td></tr>
+    <tr class="filler"><td></td><td></td><td></td><td></td></tr>
+    <tr class="filler"><td></td><td></td><td></td><td></td></tr>
+    <tr class="filler"><td></td><td></td><td></td><td></td></tr>
   </table>
 
   <table class="totals">
@@ -105,12 +162,12 @@
       <td class="num">{{SUBTOTAL}}</td>
     </tr>
     <tr>
-      <td class="label">消費税 (10%)</td>
+      <td class="label">消費税（10%）</td>
       <td class="num">{{TAX}}</td>
     </tr>
     <tr class="grand">
       <td class="label">合計</td>
-      <td class="num">{{TOTAL_INCL_TAX}}</td>
+      <td class="num">¥{{TOTAL_INCL_TAX}}</td>
     </tr>
   </table>
 
@@ -130,8 +187,13 @@
   </table>
 
   <div class="bank">
-    <div class="label">振込先</div>
+    <div class="label">振 込 先</div>
     <div class="detail">{{BANK_TRANSFER}}</div>
+  </div>
+
+  <div class="foot">
+    <span>{{ISSUER_NAME}}</span>
+    <span>請求書番号 {{INVOICE_NO}}</span>
   </div>
 </body>
 </html>
