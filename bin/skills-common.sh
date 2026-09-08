@@ -1,14 +1,22 @@
 #!/usr/bin/env bash
-# Shared helpers for the skills half of bin/ — where skills, subagents and
-# AGENTS.md are installed, and what is already linked there. Sourced, never
-# executed directly.
+# Shared helpers for the skills half of bin/ — where skills, subagents,
+# AGENTS.md and OpenCode's commands and plugins are installed, and what is
+# already linked there. Sourced, never executed directly.
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 # shellcheck disable=SC1091
 source "$ROOT/bin/ui.sh"
+# shellcheck disable=SC1091
+source "$ROOT/bin/common.sh"
 
 SKILLS_SRC="$ROOT/skills"
 AGENTS_SRC="$ROOT/agents"
+
+# OpenCode's own extension points: a slash command per opencode/command/*.md,
+# a plugin per opencode/plugin/*.js. Both are global, so they apply whichever
+# provider the session runs on.
+OPENCODE_SRC="$ROOT/opencode"
+OPENCODE_PLUGIN_TEMPLATE="$ROOT/bin/opencode-plugin.template"
 
 # ~/.claude is Claude Code's own config dir. ~/.agents is the vendor-neutral
 # location the other agent CLIs read skills from.
@@ -52,9 +60,39 @@ agent_names() { # every agents/<name>.md file in the repo
   return 0
 }
 
+opencode_command_names() { # every opencode/command/*.md file in the repo
+  local f
+  for f in "$OPENCODE_SRC"/command/*.md; do
+    [ -e "$f" ] && basename "$f"
+  done
+  return 0
+}
+
+opencode_plugin_names() { # every opencode/plugin/*.js file in the repo
+  local f
+  for f in "$OPENCODE_SRC"/plugin/*.js; do
+    [ -e "$f" ] && basename "$f"
+  done
+  return 0
+}
+
+shim_from_repo() { # <path> -> 0 when it is a plugin shim generated from this repo
+  [ -f "$1" ] || return 1
+  [ "$(head -1 "$1")" = "$OPENCODE_PLUGIN_MARKER" ] || return 1
+  grep -q "\"$ROOT/" "$1"
+}
+
 frontmatter_field() { # <file> <field> -> first value, empty when absent
   [ -f "$1" ] || return 0
   sed -n "s/^$2: *//p" "$1" | head -1
+}
+
+opencode_summary() { # <file> -> what it does: frontmatter for a command,
+                     # the first line of the header comment for a plugin
+  case $1 in
+    *.md) frontmatter_field "$1" description ;;
+    *) sed -n 's|^ \* \(..*\)|\1|p' "$1" | head -1 ;;
+  esac
 }
 
 # Trim to a display width, counting CJK as two columns. Width is derived from
@@ -94,9 +132,9 @@ installed_in() { # <root> <kind: skills|agents> <name>
 }
 
 # Dangling symlinks left behind when a skill is renamed or removed upstream.
-dangling_links() { # <root>
+dangling_links() { # <dir>...
   local dir
-  for dir in "$1/skills" "$1/agents"; do
+  for dir in "$@"; do
     [ -d "$dir" ] || continue
     find "$dir" -maxdepth 1 -type l ! -exec test -e {} \; -print 2>/dev/null
   done

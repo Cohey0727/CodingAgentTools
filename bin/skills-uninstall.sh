@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Remove the symlinks `make setup-skills` created (`make uninstall`).
+# Remove what `make setup-skills` installed (`make uninstall`).
 #
-# Only symlinks pointing back into this repo are removed — skills installed
-# from anywhere else are left untouched.
+# Only symlinks pointing back into this repo, and plugin shims generated from
+# it, are removed — anything installed from elsewhere is left untouched.
 
 set -euo pipefail
 
@@ -37,6 +37,17 @@ for root in "${TARGET_ROOTS[@]}"; do
   clean_dir "$root" agents
   [ "$N_REMOVED" -gt "$before" ] || note 'nothing linked from this repo'
 done
+
+section "$(tilde "$(opencode_config_dir)")"
+before=$N_REMOVED
+clean_dir "$(opencode_config_dir)" command
+for target in "$(opencode_plugin_dir)"/*; do
+  shim_from_repo "$target" || continue
+  rm "$target"
+  N_REMOVED=$((N_REMOVED + 1))
+  ok "removed plugin/$(basename "$target")"
+done
+[ "$N_REMOVED" -gt "$before" ] || note 'nothing installed from this repo'
 
 section 'AGENTS.md'
 before=$N_REMOVED

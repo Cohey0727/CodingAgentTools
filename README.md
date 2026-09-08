@@ -41,15 +41,18 @@ The other half of the repo is what those CLIs run *with*: the skills under `skil
 AGENTS.md                        # the one global instruction file, linked into every CLI
 skills/<name>/SKILL.md           # a skill, linked into ~/.claude/skills and ~/.agents/skills
 agents/<name>.md                 # a subagent, linked into ~/.claude/agents and ~/.agents/agents
+opencode/command/<name>.md       # an OpenCode slash command, linked into ~/.config/opencode/command
+opencode/plugin/<name>.js        # an OpenCode plugin, reached from a shim in ~/.config/opencode/plugin
 providers/<name>/.env            # all provider settings: key, endpoint, models (gitignored, chmod 600)
 providers/<name>/.env.example    # same file with an empty API_TOKEN (in git)
 bin/ui.sh                        # banner, colors and the output helpers every script shares
 bin/common.sh                    # shared settings resolution (generic setting <- CLI override)
 bin/launcher.template            # Claude Code launcher; @@PROVIDER_DIR@@ baked in at setup time
+bin/opencode-plugin.template     # OpenCode plugin shim; @@IMPL@@ baked in at setup time
 bin/setup.sh                     # provider wizard: pick providers, paste tokens, install (`make setup-providers`)
 bin/pi-global-models.sh          # registers every provider in pi's global models.json (`make pi-global`)
 bin/opencode-global-config.sh    # registers every provider in OpenCode's global config (`make opencode-global`)
-bin/skills-common.sh             # where skills, subagents and AGENTS.md are installed
+bin/skills-common.sh             # where skills, subagents, AGENTS.md and the OpenCode extensions are installed
 bin/skills-setup.sh              # links them there (`make setup-skills`)
 bin/skills-list.sh               # their install status (part of `make list`)
 bin/skills-uninstall.sh          # removes only the symlinks pointing back here (part of `make uninstall`)
@@ -59,7 +62,7 @@ docs/migrations/                 # upgrade notes for existing checkouts
 Makefile                         # setup / setup-providers / setup-skills / list / uninstall / pi-global / opencode-global / help
 ```
 
-Adding a provider is just a new `providers/<name>/` folder with a `.env.example`; adding a skill is a new `skills/<name>/SKILL.md` and a `make setup-skills`.
+Adding a provider is just a new `providers/<name>/` folder with a `.env.example`; adding a skill is a new `skills/<name>/SKILL.md` and a `make setup-skills`. An OpenCode slash command is a new `opencode/command/<name>.md`, and a plugin a new `opencode/plugin/<name>.js` exporting `plugin({ tool })` — same `make setup-skills`.
 
 ## Requirements
 
@@ -95,7 +98,7 @@ One interactive wizard does everything:
 5. The pi packages that add [`/loop` and `/goal`](#loops-in-pi) are installed once into pi's user settings (`~/.pi/agent/settings.json`)
 6. Every provider with a token is registered in pi's global `~/.pi/agent/models.json` (the token stays in `.env`, read back by a shell command at request time) and in OpenCode's global config (`~/.config/opencode/opencode.json`); both start on [the default provider](#default-provider), and in OpenCode's case its token is copied to `~/.config/opencode/claude-compatibles/` (chmod 600) and only referenced from the config
 7. You get a warning if `~/.local/bin`, `claude`, `opencode` or `pi` is missing from your PATH
-8. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from — [details below](#skills-and-global-instructions)
+8. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode` ([details below](#skills-and-global-instructions))
 
 To rotate a token, pick up new settings or add a provider later, just re-run `make setup`. `make setup-providers` and `make setup-skills` each run one half on its own; only the provider half prompts.
 
@@ -105,19 +108,20 @@ mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/mig
 [2026-08-24 — OpenCode ランチャー廃止とグローバル設定生成](docs/migrations/2026-08-24-opencode-global-config.md),
 [2026-09-03 — pi ランチャー廃止とグローバル models.json 生成](docs/migrations/2026-09-03-pi-global-models.md),
 [2026-09-05 — OpenCode の lean エージェント](docs/migrations/2026-09-05-opencode-lean-agent.md),
-and [2026-09-08 — claude-code-settings の統合](docs/migrations/2026-09-08-merge-claude-code-settings.md).
+[2026-09-08 — claude-code-settings の統合](docs/migrations/2026-09-08-merge-claude-code-settings.md),
+and [2026-09-08 — OpenCode の `/goal`](docs/migrations/2026-09-08-opencode-goal.md).
 
 ### Make targets
 
 | Target | What it does |
 |--------|--------------|
-| `make setup` | Both halves: the provider wizard, then the skill and `AGENTS.md` symlinks |
+| `make setup` | Both halves: the provider wizard, then the skill, `AGENTS.md` and OpenCode extension install |
 | `make setup-providers` | The wizard above only: tokens, `.env` upkeep, launcher install, pi packages, pi and OpenCode global configs |
-| `make setup-skills` | The symlinks only: `skills/`, `agents/` and `AGENTS.md` into every agent CLI |
-| `make list` | Every provider with its command and endpoint, then every skill and subagent with its install status |
+| `make setup-skills` | The shared assets only: `skills/`, `agents/`, `AGENTS.md` and `opencode/` into every agent CLI |
+| `make list` | Every provider with its command and endpoint, then every skill, subagent and OpenCode extension with its install status |
 | `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from the current `.env` files, and set the startup model in `~/.pi/agent/settings.json` — run it after changing a model or endpoint |
 | `make opencode-global` | Re-generate OpenCode's global config from the current `.env` files — run it after editing one |
-| `make uninstall` | Remove the installed launchers (including the `pi<name>` / `open<name>` ones earlier versions installed), the pi packages from `$PI_PACKAGES`, the global `models.json` / OpenCode config / token files this repo wrote, and the symlinks pointing back into this repo. Provider `.env` files are left alone |
+| `make uninstall` | Remove the installed launchers (including the `pi<name>` / `open<name>` ones earlier versions installed), the pi packages from `$PI_PACKAGES`, the global `models.json` / OpenCode config / token files this repo wrote, the symlinks pointing back into this repo and the plugin shims generated from it. Provider `.env` files are left alone |
 | `make help` | The target list above, on the terminal |
 
 ## Usage
@@ -201,6 +205,44 @@ PI_PACKAGES="npm:pi-reactor=/reactor npm:pi-loop-police=" make setup
 > curated. Both packages above are third-party npm packages — read the source
 > before trusting them with an unattended loop, and prefer a container or a
 > throwaway checkout for autopilot runs.
+
+### Goals in OpenCode
+
+OpenCode runs one turn per message and then waits, so `/goal` is this repo's
+own: `opencode/command/goal.md` is the slash command and
+`opencode/plugin/goal.js` the loop behind it, both installed by
+`make setup-skills`. It gives OpenCode what `npm:pi-goal` gives pi — a
+persistent objective the session keeps working on across turns:
+
+```
+/goal port the CLI flags to the new parser, verified by the existing tests
+/goal --tokens 50k finish the migration and verify the suite
+/goal --turns 10 make the flaky checkout test deterministic
+/goal                         show the current goal
+/goal pause | resume | clear  control it
+```
+
+Setting a goal replaces the message OpenCode would have sent with the objective
+and the rules of the loop; every time the session goes idle the plugin sends the
+next continuation, with the objective and the budget spent so far. It stops when
+
+- the model calls the `goal_finish` tool — `complete` with the evidence, or
+  `blocked` with what would unblock it. That tool is the only way the model can
+  end the loop itself
+- you run `/goal pause` or `/goal clear`
+- the budget runs out: `--turns` (40 by default) or `--tokens`
+- the turn was aborted or errored, or opencode was restarted — a goal from an
+  earlier process is paused rather than resumed behind your back, and
+  `/goal resume` picks it up
+
+Goal state is one JSON file per session under
+`~/.local/share/opencode-goal/`, so it survives compaction and a `/goal status`
+in between; files older than 30 days are pruned on startup.
+
+> **Note:** an active goal keeps the model working on its own, and the
+> continuation turns run tools like any other turn. OpenCode still asks for
+> permission unless you started it with `--auto` — the pairing to be careful
+> with is `--auto` plus an open-ended objective.
 
 ## `.env` settings
 
@@ -339,9 +381,10 @@ own there — it is just another entry in the `/model` list.
 ## Skills and global instructions
 
 Providers are only half of the repo. `skills/` holds the skills every agent CLI
-shares and `AGENTS.md` is the one global instruction file behind all of them.
-`make setup-skills` (and `make setup`) install both as symlinks, so an edit here
-applies to the next session with no reinstall.
+shares, `AGENTS.md` is the one global instruction file behind all of them, and
+`opencode/` holds what only OpenCode can read. `make setup-skills` (and
+`make setup`) install them as symlinks, so an edit here applies to the next
+session with no reinstall.
 
 ### `AGENTS.md`
 
@@ -386,6 +429,31 @@ The `checks` section of `make setup-skills` names the readers actually on your
 PATH and reports symlinks left dangling by a skill that was renamed or removed
 upstream. Re-run it after adding, renaming or deleting one; `make list` shows
 what is linked where.
+
+### OpenCode commands and plugins
+
+Skills cover what every CLI can read. OpenCode's own extension points live in
+`opencode/` and go to its global config dir:
+
+| Target | What goes there |
+|--------|-----------------|
+| `~/.config/opencode/command/<name>.md` | a symlink to `opencode/command/<name>.md` — a slash command |
+| `~/.config/opencode/plugin/<name>.js` | a generated shim importing `opencode/plugin/<name>.js` — a plugin |
+
+Commands are plain markdown and are linked like everything else. Plugins are
+not: OpenCode resolves a plugin's npm imports from where the file really lives,
+and a symlinked plugin resolves them inside this repo, where
+`@opencode-ai/plugin` is not installed. So `make setup-skills` writes a small
+shim from `bin/opencode-plugin.template` into the config dir — OpenCode installs
+the package there itself — and the shim passes `tool` into the implementation,
+which stays here and stays editable:
+
+```js
+export const plugin = ({ tool }) => async ({ client }) => ({ /* hooks */ })
+```
+
+A file in either directory that this repo did not put there is left alone —
+shims are recognised by their first line, commands by pointing back here.
 
 The two `freelance-*` skills read a `personal-config.json` next to their
 `SKILL.md` — issuer name, address, registration number, output directory. Those
