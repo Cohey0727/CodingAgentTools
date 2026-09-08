@@ -22,28 +22,8 @@ BIN_DIR="${BIN_DIR:-${PREFIX:-$HOME/.local}/bin}"
 
 # shellcheck disable=SC1090
 source "$COMMON"
-
-# Pretty output: colors only on a TTY, and never when NO_COLOR is set.
-if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
-  B=$'\033[1m'; DIM=$'\033[2m'; GRN=$'\033[32m'; YLW=$'\033[33m'; CYN=$'\033[36m'; RST=$'\033[0m'
-else
-  B=''; DIM=''; GRN=''; YLW=''; CYN=''; RST=''
-fi
-
-# ------------------------------------------------------------------ banner
-
-banner() {
-  printf '%s\n' \
-    "  ${CYN} ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗${RST}" \
-    "  ${CYN}██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝${RST}" \
-    "  ${CYN}██║     ██║     ███████║██║   ██║██║  ██║█████╗${RST}" \
-    "  ${CYN}██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝${RST}" \
-    "  ${CYN}╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗${RST}" \
-    "  ${CYN} ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝${RST}" \
-    "          ${B}C O M P A T I B L E S${RST}" \
-    "  ${DIM}run Claude Code on Anthropic-compatible backends${RST}"
-  echo
-}
+# shellcheck disable=SC1091
+source "$ROOT/bin/ui.sh"
 
 # ------------------------------------------------------------------ helpers
 
@@ -252,8 +232,7 @@ prompt_token() { # <provider>
   env="$PROVIDERS_DIR/$p/.env"
   tok=$(current_token "$env")
   url=$(api_key_url "$p")
-  echo
-  printf '%s▸ %s%s\n' "$B$CYN" "$p" "$RST"
+  section "$p"
   if [ -n "$url" ]; then printf '  %sget an API key at %s%s\n' "$DIM" "$url" "$RST"; fi
   if [ -n "$tok" ]; then
     if [ "${#tok}" -gt 4 ]; then hint="****${tok: -4}"; else hint='****'; fi
@@ -285,8 +264,7 @@ install_one() { # <provider> <command> <template>
     -e 's|@@COMMON@@|'"$COMMON"'|g' \
     "$template" > "$BIN_DIR/$cmd"
   chmod +x "$BIN_DIR/$cmd"
-  bin="$BIN_DIR/$cmd"
-  if [ -n "${HOME:-}" ]; then case $bin in "$HOME"/*) bin="~/${bin#"$HOME"/}";; esac; fi
+  bin=$(tilde "$BIN_DIR/$cmd")
   if grep -Eq '^(API_TOKEN|ANTHROPIC_AUTH_TOKEN)=.+' "$env"; then
     printf '  %s✔%s %s%s%-10s%s %s%-29s%s %stoken: set%s\n' \
       "$GRN" "$RST" "$B" "$CYN" "$p" "$RST" "$DIM" "$bin" "$RST" "$GRN" "$RST"
@@ -314,8 +292,7 @@ install_launcher() { # <provider> — the claude<NAME> command. Commands earlier
 # provider.
 install_pi_packages() {
   local spec src cmd
-  echo
-  printf '%s▸ installing pi packages%s\n' "$B$CYN" "$RST"
+  section 'installing pi packages'
   if ! command -v pi >/dev/null 2>&1; then
     printf '  %s⚠%s %s\n' "$YLW" "$RST" \
       "skipped — 'pi' is not on your PATH. Install it (https://pi.dev), then re-run."
@@ -338,13 +315,13 @@ install_pi_packages() {
 check_environment() {
   echo
   if ! command -v claude >/dev/null 2>&1; then
-    printf '  %s⚠%s %s\n' "$YLW" "$RST" "'claude' is not on your PATH — install Claude Code first."
+    warn "'claude' is not on your PATH — install Claude Code first."
   fi
   if ! command -v opencode >/dev/null 2>&1; then
-    printf '  %s⚠%s %s\n' "$YLW" "$RST" "'opencode' is not on your PATH — the generated global config needs OpenCode (https://opencode.ai)."
+    warn "'opencode' is not on your PATH — the generated global config needs OpenCode (https://opencode.ai)."
   fi
   if ! command -v pi >/dev/null 2>&1; then
-    printf '  %s⚠%s %s\n' "$YLW" "$RST" "'pi' is not on your PATH — the generated models.json needs the pi coding agent (https://pi.dev)."
+    warn "'pi' is not on your PATH — the generated models.json needs the pi coding agent (https://pi.dev)."
   fi
   case ":$PATH:" in
     *":$BIN_DIR:"*) ;;
@@ -401,8 +378,7 @@ main() {
     prompt_token "$p"
   done
 
-  echo
-  printf '%s▸ installing launchers%s\n' "$B$CYN" "$RST"
+  section 'installing launchers'
   mkdir -p "$BIN_DIR"
   for p in "${providers[@]}"; do
     install_launcher "$p"
@@ -410,14 +386,12 @@ main() {
 
   install_pi_packages
 
-  echo
-  printf '%s▸ generating global pi models.json%s\n' "$B$CYN" "$RST"
+  section 'generating global pi models.json'
   if ! "$ROOT/bin/pi-global-models.sh"; then
     printf '  %s⚠ skipped — set a token and re-run%s\n' "$YLW" "$RST"
   fi
 
-  echo
-  printf '%s▸ generating global OpenCode config%s\n' "$B$CYN" "$RST"
+  section 'generating global OpenCode config'
   if ! "$ROOT/bin/opencode-global-config.sh"; then
     printf '  %s⚠ skipped — set a token and re-run%s\n' "$YLW" "$RST"
   fi

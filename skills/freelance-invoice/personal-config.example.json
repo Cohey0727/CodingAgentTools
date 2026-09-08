@@ -1,0 +1,16 @@
+{
+  "issuer": {
+    "name": "山田 太郎",
+    "name_kana": "ヤマダ　タロウ",
+    "registration_number": "T0000000000000",
+    "postal_code": "1000001",
+    "address_lines": [
+      "東京都千代田区千代田1-1",
+      "サンプルマンション 101号室"
+    ],
+    "tel": "09000000000",
+    "email": "your-email@example.com"
+  },
+  "bank_transfer": "○○銀行 ○○支店 普通 0000000 ヤマダ　タロウ",
+  "output_dir": "/path/to/output"
+}

@@ -6,16 +6,31 @@ ROOT          := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 PROVIDERS_DIR := $(ROOT)/providers
 COMMON        := $(ROOT)/bin/common.sh
 
-# Every target acts on all directories under providers/.
+# Every provider target acts on all directories under providers/.
 PROVIDER_LIST := $(notdir $(wildcard $(PROVIDERS_DIR)/*))
 
-.PHONY: setup uninstall list pi-global opencode-global
+.PHONY: setup setup-providers setup-skills list uninstall help pi-global opencode-global
+
+# Both halves of the repo: the provider wizard first (it prompts), then the
+# skill symlinks. SKIP_BANNER keeps it to a single banner.
+setup: setup-providers
+	@SKIP_BANNER=1 "$(ROOT)/bin/skills-setup.sh"
 
 # Interactive wizard: checkbox provider picker, per-provider API token
 # prompts (Enter keeps the current token), launcher install, pi package
 # install, pi / OpenCode global configs, PATH checks.
-setup:
+setup-providers:
 	@BIN_DIR="$(BIN_DIR)" "$(ROOT)/bin/setup.sh"
+
+# Symlink every skill under skills/ and every subagent under agents/ into
+# ~/.claude (Claude Code) and ~/.agents (Codex and other agent CLIs), and
+# AGENTS.md into whatever name each CLI reads it under.
+setup-skills:
+	@"$(ROOT)/bin/skills-setup.sh"
+
+# Show what this repo manages, with install status.
+list:
+	@"$(ROOT)/bin/list.sh"
 
 uninstall:
 	@for p in $(PROVIDER_LIST); do \
@@ -46,15 +61,7 @@ uninstall:
 		done; \
 	fi
 	@echo "  Note: provider .env files are left in place. Delete them manually if no longer needed."
-
-list:
-	@for p in $(PROVIDER_LIST); do \
-		dir="$(PROVIDERS_DIR)/$$p"; \
-		[ -f "$$dir/.env.example" ] || continue; \
-		cmds=$$(. "$(COMMON)"; load_settings "$$dir/.env.example"; launcher_name "$$p"); \
-		url=$$(. "$(COMMON)"; load_settings "$$dir/.env.example"; printf '%s' "$$CFG_BASE_URL"); \
-		printf '  %-10s -> %-44s %s\n' "$$p" "$$cmds" "$$url"; \
-	done
+	@"$(ROOT)/bin/skills-uninstall.sh"
 
 # Re-generate pi's global models.json from the current .env files (there are
 # no pi<name> launchers); `make setup` does this too.
@@ -65,3 +72,6 @@ pi-global:
 # (there are no open<name> launchers) lists them all under /models.
 opencode-global:
 	@"$(ROOT)/bin/opencode-global-config.sh"
+
+help:
+	@"$(ROOT)/bin/help.sh"

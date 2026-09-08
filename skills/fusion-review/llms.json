@@ -1,0 +1,52 @@
+{
+  "schemas": {
+    "self": "このセッションの Claude 自身がレビュアーの1人として直接レビューを書く。外部プロセスは起動しない",
+    "claude-code": "Claude Code 互換 CLI。`cat prompt.md | <command> -p` で非対話実行し、stdout に回答が出る",
+    "stdin": "任意コマンド。`command` をそのまま実行し、stdin にプロンプト・stdout に回答"
+  },
+  "llms": [
+    {
+      "name": "claude",
+      "provider": "Anthropic Claude (このセッション自身)",
+      "enabled": true,
+      "schema": "self",
+      "notes": "外部LLMの回答を読む前に、独立したレビューを自分で書き切ること (回答を見た後だと引きずられる)"
+    },
+    {
+      "name": "deepseek",
+      "provider": "DeepSeek (claudedeepseek)",
+      "enabled": true,
+      "schema": "claude-code",
+      "command": "claudedeepseek",
+      "timeout_ms": 1200000,
+      "notes": "Claude Code 互換 CLI (DeepSeek バックエンド)"
+    },
+    {
+      "name": "glm",
+      "provider": "Zhipu AI GLM (opencode)",
+      "enabled": true,
+      "schema": "stdin",
+      "command": "opencode run --model glm-anthropic/glm-5.3 --agent plan",
+      "timeout_ms": 1200000,
+      "notes": "OpenCode CLI (GLM バックエンド、glm-5.3)。--agent plan で read-only。モデル一覧は `opencode models` で確認する"
+    },
+    {
+      "name": "codex",
+      "provider": "OpenAI (GPT)",
+      "enabled": false,
+      "schema": "stdin",
+      "command": "codex exec -s read-only -",
+      "timeout_ms": 1200000,
+      "notes": "~/.codex/config.toml で gpt-5.5 / reasoning xhigh。深いレビュー向きだが1〜3分かかる"
+    },
+    {
+      "name": "gemini",
+      "provider": "Google (Gemini CLI)",
+      "enabled": false,
+      "schema": "stdin",
+      "command": "gemini --approval-mode plan -p \"\"",
+      "timeout_ms": 1200000,
+      "notes": "-p はstdin入力の後ろに追記される仕様のため空文字を渡す。--approval-mode plan でread-only"
+    }
+  ]
+}

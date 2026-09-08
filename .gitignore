@@ -2,6 +2,10 @@
 providers/*/.env
 providers/*/.env.bak
 
+# Personal data the freelance skills fill their templates with
+skills/freelance-invoice/personal-config.json
+skills/freelance-work-record/personal-config.json
+
 # Claude Code local state (per-developer, not shared)
 .claude/settings.local.json
 .claude/.credentials.json
