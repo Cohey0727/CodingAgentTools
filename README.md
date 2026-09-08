@@ -1,4 +1,4 @@
-# ClaudeCode-Compatibles
+# CodingAgentTools
 
 > Run Claude Code, OpenCode and pi on Anthropic-compatible LLM backends (DeepSeek · MiniMax · GLM · Kimi · MiMo · OpenRouter · your own llama.cpp) — one repo, one `make setup`, one `.env` per provider driving all three CLIs.
 
