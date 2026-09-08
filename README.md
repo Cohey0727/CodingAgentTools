@@ -242,7 +242,9 @@ in between; files older than 30 days are pruned on startup.
 > **Note:** an active goal keeps the model working on its own, and the
 > continuation turns run tools like any other turn. OpenCode still asks for
 > permission unless you started it with `--auto` — the pairing to be careful
-> with is `--auto` plus an open-ended objective.
+> with is `--auto` plus an open-ended objective. `opencode --pure` starts
+> without any external plugin, this one included, if a session ever needs to
+> run with the loop out of the picture entirely.
 
 ## `.env` settings
 
