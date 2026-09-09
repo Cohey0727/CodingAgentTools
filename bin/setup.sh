@@ -142,8 +142,14 @@ raw_headers() { # <old provider .env> -> its HEADERS value, one "Name: Value" pe
 }
 
 migrate_provider_envs() {
-  local dir provider file token headers name value target moved=0
+  local dir provider file token headers name value target moved=0 agent pattern
   [ -d "$ROOT/providers" ] || return 0
+  # The names a key may be written under are the launch token variable and its
+  # aliases, both from configs.jsonc.
+  agent=$(launcher_agents | head -1)
+  [ -n "$agent" ] || return 0
+  settings_resolve "$agent"
+  pattern="^($(printf '%s' "$S_TOKEN_VARS" | tr ' ' '|'))=.+"
   for dir in "$ROOT"/providers/*/; do
     provider=$(basename "$dir")
     file="$dir.env"
@@ -151,7 +157,7 @@ migrate_provider_envs() {
     provider_names | grep -qx "$provider" || continue
     models_resolve "$provider" "$(any_agent)" || continue
 
-    token=$(grep -E '^(API_TOKEN|ANTHROPIC_AUTH_TOKEN)=.+' "$file" | head -1 | cut -d= -f2- || true)
+    token=$(grep -E "$pattern" "$file" | head -1 | cut -d= -f2- || true)
     if [ -n "$M_API_KEY_VAR" ] && [ -n "$token" ] && [ -z "$(env_value "$M_API_KEY_VAR")" ]; then
       set_env_var "$M_API_KEY_VAR" "$token"
       moved=$((moved + 1))

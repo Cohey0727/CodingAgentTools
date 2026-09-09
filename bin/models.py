@@ -51,7 +51,8 @@ SCHEMA_ENTRY_KEYS = {"id", "npm", "base_url", "declare_models"}
 MODEL_ENTRY_KEYS = {"keyed_by", "indent", "inline", "value"}
 LEAN_KEYS = {"prompt", "disabled_tools"}
 LAUNCH_KEYS = {
-    "exec", "token_var", "base_url_var", "headers_var", "auto_compact_window_var", "unset_vars",
+    "exec", "token_var", "base_url_var", "headers_var", "auto_compact_window_var",
+    "unset_vars", "token_var_aliases",
 }
 MODEL_KEYS = {"id", "claude_id", "tags", "context_window", "max_tokens", "reasoning", "input"}
 PROVIDER_FIXED_KEYS = {"API_KEY", "BASE_URL", "REQUEST_HEADERS", "schema", "defaults", "models"}
@@ -198,6 +199,7 @@ def document():
             _check_keys(at, _object(at, agent["launch"]), LAUNCH_KEYS)
             _string(f"{at}.exec", agent["launch"].get("exec"))
             _string_list(f"{at}.unset_vars", agent["launch"].get("unset_vars") or [])
+            _string_list(f"{at}.token_var_aliases", agent["launch"].get("token_var_aliases") or [])
         if "model_entry" in agent:
             at = f"{where}.model_entry"
             _check_keys(at, _object(at, agent["model_entry"]), MODEL_ENTRY_KEYS)
@@ -520,6 +522,10 @@ def settings(doc, agent_name):
         "S_HEADERS_VAR": launch.get("headers_var", ""),
         "S_AUTO_COMPACT_WINDOW_VAR": launch.get("auto_compact_window_var", ""),
         "S_UNSET_VARS": " ".join(launch.get("unset_vars") or []),
+        "S_TOKEN_VARS": " ".join(
+            ([launch["token_var"]] if launch.get("token_var") else [])
+            + list(launch.get("token_var_aliases") or [])
+        ),
         "S_MODEL_TAG": agent.get("model_tag", ""),
         "S_SMALL_MODEL_TAG": agent.get("small_model_tag", ""),
         "S_API": agent.get("api", ""),

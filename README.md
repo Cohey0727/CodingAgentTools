@@ -46,6 +46,7 @@ configs.jsonc                     # every provider: endpoint, models, tags, and 
 bin/ui.sh                        # banner, colors and the output helpers every script shares
 bin/models.py                    # the only reader of configs.jsonc: validates it, resolves tags to slots
 bin/common.sh                    # shared resolution: configs.jsonc through models.py, values from .env
+bin/model-ref.sh                 # "<provider id>/<model>" for one provider, so nothing else spells a model id
 bin/launcher.template            # Claude Code launcher; @@PROVIDER@@ baked in at setup time
 bin/opencode-plugin.template     # OpenCode plugin shim; @@IMPL@@ baked in at setup time
 bin/setup.sh                     # provider wizard: pick providers, paste tokens, install (`make setup-providers`)

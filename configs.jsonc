@@ -23,7 +23,9 @@
         "headers_var": "ANTHROPIC_CUSTOM_HEADERS",
         "auto_compact_window_var": "CLAUDE_CODE_AUTO_COMPACT_WINDOW",
         // Cleared before exec: set, it would shadow the token variable above.
-        "unset_vars": ["ANTHROPIC_API_KEY"]
+        "unset_vars": ["ANTHROPIC_API_KEY"],
+        // Also accepted as the key when reading a file this repo did not write.
+        "token_var_aliases": ["API_TOKEN"]
       },
 
       // Each of Claude Code's model variables, and the tags it follows, most

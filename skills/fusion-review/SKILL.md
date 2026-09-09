@@ -23,6 +23,7 @@ description: 同じレビュー依頼を複数 LLM に並列で投げ、回答�
 | `enabled` | `true` のものだけ実行する。無効化はここを `false` にするだけ |
 | `schema` | 実行方式 (下表)。これを見て起動方法を決める |
 | `command` | 起動コマンド。`schema: self` では不要 |
+| `model` | `{ provider, agent, role }`。`command` の `{model}` を、`<repo>/bin/model-ref.sh <provider> <agent> <role>` の出力で置換してから実行する。role は `main` / `small` |
 | `timeout_ms` | 実行時のタイムアウト。shell の `timeout` コマンドに秒換算で渡す |
 | `notes` | モデルの特性・注意点 |
 
@@ -33,7 +34,7 @@ description: 同じレビュー依頼を複数 LLM に並列で投げ、回答�
 | `self` | **このセッションの Claude 自身**がレビュアーの1人として直接レビューを書く。外部プロセスは起動しない |
 | `stdin` | 任意コマンド。`command` をそのまま実行し、stdin にプロンプト・stdout に回答 |
 
-外部レビュアーは OpenCode に統一する。追加は llms.json にエントリを1つ足すだけで、`schema: "stdin"` + `command: "opencode run --model <provider>/<id> --agent plan"` を書く (`--agent plan` が read-only を担保する)。使えるモデルは `opencode models` で確認し、無ければ configs.jsonc に足して `make opencode-global` を回す。編集はレポ側のファイルに対して行い、コミットする (シンボリックリンクなのでどちらのパスを編集しても実体は同じ)。
+外部レビュアーは OpenCode に統一する。追加は llms.json にエントリを1つ足すだけで、`schema: "stdin"` + `command: "opencode run --model {model} --agent plan"` と `model` を書く (`--agent plan` が read-only を担保する)。**モデル id をここに書かない**: どのモデルかは configs.jsonc のタグが決め、`bin/model-ref.sh` が解決する。使いたい provider が無ければ configs.jsonc に足して `make opencode-global` を回す。編集はレポ側のファイルに対して行い、コミットする (シンボリックリンクなのでどちらのパスを編集しても実体は同じ)。
 
 ## 実行手順
 

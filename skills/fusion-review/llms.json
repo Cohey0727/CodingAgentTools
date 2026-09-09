@@ -6,28 +6,30 @@
   "llms": [
     {
       "name": "claude",
-      "provider": "Anthropic Claude (このセッション自身)",
+      "label": "Anthropic Claude (このセッション自身)",
       "enabled": true,
       "schema": "self",
       "notes": "外部LLMの回答を読む前に、独立したレビューを自分で書き切ること (回答を見た後だと引きずられる)"
     },
     {
       "name": "deepseek",
-      "provider": "DeepSeek (opencode)",
+      "label": "DeepSeek (opencode)",
       "enabled": true,
       "schema": "stdin",
-      "command": "opencode run --model deepseek-anthropic/deepseek-v4.1-flash-expires-on-0910 --agent plan",
+      "model": { "provider": "deepseek", "agent": "opencode", "role": "small" },
+      "command": "opencode run --model {model} --agent plan",
       "timeout_ms": 1200000,
-      "notes": "--agent plan で read-only。モデル一覧は `opencode models` で確認する。id の通り 09-10 で応答が止まる想定なので、止まったら configs.jsonc の別 id に差し替える"
+      "notes": "--agent plan で read-only"
     },
     {
       "name": "glm",
-      "provider": "Zhipu AI GLM (opencode)",
+      "label": "Zhipu AI GLM (opencode)",
       "enabled": true,
       "schema": "stdin",
-      "command": "opencode run --model glm-anthropic/glm-5.3-flash --agent plan",
+      "model": { "provider": "glm", "agent": "opencode", "role": "small" },
+      "command": "opencode run --model {model} --agent plan",
       "timeout_ms": 1200000,
-      "notes": "--agent plan で read-only。モデル一覧は `opencode models` で確認する"
+      "notes": "--agent plan で read-only"
     }
   ]
 }
