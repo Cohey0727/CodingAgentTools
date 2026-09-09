@@ -1,20 +1,26 @@
 #!/usr/bin/env python3
-"""Resolve configs.jsonc into the values Claude Code, OpenCode and pi need.
+"""Resolve configs.jsonc into the values each agent needs.
 
-configs.jsonc at the repo root holds every provider: its endpoint, the models it
-serves, and the tags that say which slot each model fills. In any string,
-"${NAME}" is read from the environment and "${NAME:-fallback}" falls back to the
-text after ":-" when NAME is unset or empty — the shell's own syntax. The .env
-beside it holds those values, so the file carries references to secrets rather
-than secrets, and an endpoint can ship a default that .env overrides.
+configs.jsonc at the repo root is the whole configuration. "agents" describes
+the CLIs, "providers" the endpoints, and nothing is decided here: this file
+knows the shape of the config, never a provider, a model, an endpoint, a
+package or a variable name. Every one of those is read.
+
+In any string, "${NAME}" is read from the environment and "${NAME:-fallback}"
+falls back to the text after ":-" when NAME is unset or empty — the shell's own
+syntax. The .env beside the file holds those values, so the file carries
+references to secrets rather than secrets. Inside "agents", "{name}",
+"{base_url}" and "{schema_id}" stand for the provider being written.
 
 The file is JSON with // line comments allowed.
 
-  models.py sh <provider>       shell assignments (M_-prefixed) for eval
-  models.py check [<provider>]  validate, print nothing on success
-  models.py tags <provider>     "<id><tab><tag>,<tag>" per model
-  models.py providers           one provider name per line
-  models.py env-vars            every "${NAME}" the file references, with its provider
+  models.py sh <provider> <agent>  shell assignments (M_-prefixed) for eval
+  models.py settings <agent>       config-wide values (S_-prefixed) for eval
+  models.py check                  validate the whole file, print nothing on success
+  models.py tags <provider>        "<id><tab><tag>,<tag>" per model
+  models.py providers              one provider name per line
+  models.py agents                 one agent name per line
+  models.py env-vars               every "${NAME}" the file references, with its provider
 """
 
 import json
@@ -26,40 +32,37 @@ from pathlib import Path
 
 CONFIGS = Path(__file__).resolve().parent.parent / "configs.jsonc"
 
-# "default" and "small" are the two roles, and every slot follows one of them.
-# The rest are the Claude Code variables that can break away from that pair,
-# spelled exactly as Claude Code reads them; there is no tag for a variable
-# whose only meaning would be "the default one" or "the small one".
-ROLE_TAGS = (
-    "default",
-    "small",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL",
-    "ANTHROPIC_DEFAULT_FABLE_MODEL",
-    "CLAUDE_CODE_SUBAGENT_MODEL",
-)
-
-# Claude Code variable -> the tags it follows, most specific first.
-CLAUDE_SLOTS = {
-    "ANTHROPIC_MODEL": ("default",),
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": ("ANTHROPIC_DEFAULT_OPUS_MODEL", "default"),
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": ("ANTHROPIC_DEFAULT_SONNET_MODEL", "default"),
-    "ANTHROPIC_DEFAULT_FABLE_MODEL": ("ANTHROPIC_DEFAULT_FABLE_MODEL", "default"),
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": ("small", "default"),
-    "CLAUDE_CODE_SUBAGENT_MODEL": ("CLAUDE_CODE_SUBAGENT_MODEL", "small", "default"),
+DOCUMENT_KEYS = {"start_provider", "agents", "providers"}
+AGENT_KEYS = {
+    "command",
+    "stale_commands",
+    "launch",
+    "slots",
+    "auto_compact_window_from",
+    "model_tag",
+    "small_model_tag",
+    "schemas",
+    "model_entry",
+    "lean",
+    "api",
+    "packages",
 }
-
+SCHEMA_ENTRY_KEYS = {"id", "npm", "base_url", "declare_models"}
+MODEL_ENTRY_KEYS = {"keyed_by", "indent", "inline", "value"}
+LEAN_KEYS = {"prompt", "disabled_tools"}
+LAUNCH_KEYS = {
+    "exec", "token_var", "base_url_var", "headers_var", "auto_compact_window_var", "unset_vars",
+}
 MODEL_KEYS = {"id", "claude_id", "tags", "context_window", "max_tokens", "reasoning", "input"}
-PROVIDER_KEYS = {"API_KEY", "BASE_URL", "REQUEST_HEADERS", "schema", "defaults", "claude", "opencode", "models"}
-CLAUDE_KEYS = {"command", "args", "env", "auto_compact_window"}
-OPENCODE_KEYS = {"lean", "context_window", "max_tokens"}
-SCHEMA_KEYS = {"resolve", "id"}
-
-# Where OpenCode's catalog for a provider comes from. Claude Code reads no
-# catalog, so its launcher is the same under every value.
-SCHEMA_RESOLVERS = ("local", "models.dev", "none")
+PROVIDER_FIXED_KEYS = {"API_KEY", "BASE_URL", "REQUEST_HEADERS", "schema", "defaults", "models"}
+PROVIDER_SCHEMA_KEYS = {"resolve", "id"}
+PROVIDER_AGENT_KEYS = {
+    "command", "args", "env", "auto_compact_window", "lean", "context_window", "max_tokens",
+}
+INPUT_KINDS = ("text", "image")
 
 REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
+PLACEHOLDER = re.compile(r"\{([a-z_]+)\}")
 
 
 class ConfigError(Exception):
@@ -104,10 +107,22 @@ def expand(value):
     return REFERENCE.sub(lambda m: os.environ.get(m.group(1)) or (m.group(2) or ""), value)
 
 
+def fill(where, template, **fields):
+    """"{name}-x" -> the provider's name plus "-x". Only the fields given are known."""
+    out = template
+    for key, value in fields.items():
+        out = out.replace("{" + key + "}", value)
+    left = PLACEHOLDER.search(out)
+    if left:
+        known = ", ".join("{" + k + "}" for k in fields)
+        raise ConfigError(f"{where}: {left.group(0)} is not one of {known}")
+    return out
+
+
 def sole_reference(value):
     """(variable, fallback) when the value is exactly one reference, else ("", "").
 
-    A value shaped that way can be handed to pi as a command that reads the
+    A value shaped that way can be handed to an agent as a command that reads the
     variable at request time, so nothing resolved from the environment is copied
     into a generated config. A fallback written here is already in git, so it
     travels with the reference.
@@ -122,6 +137,24 @@ def _check_keys(where, obj, allowed):
             raise ConfigError(f"{where}: unknown key {key!r} (allowed: {', '.join(sorted(allowed))})")
 
 
+def _object(where, value):
+    if not isinstance(value, dict):
+        raise ConfigError(f"{where}: must be an object")
+    return value
+
+
+def _string(where, value):
+    if not isinstance(value, str) or not value:
+        raise ConfigError(f"{where}: must be a non-empty string")
+    return value
+
+
+def _string_list(where, value):
+    if not isinstance(value, list) or not all(isinstance(v, str) and v for v in value):
+        raise ConfigError(f"{where}: must be an array of non-empty strings")
+    return value
+
+
 def _int(where, value, key):
     if isinstance(value, bool) or not isinstance(value, int):
         raise ConfigError(f"{where}: {key} must be an integer, got {value!r}")
@@ -130,93 +163,129 @@ def _int(where, value, key):
     return value
 
 
-def load_file():
+def document():
+    """The whole file, parsed and checked down to the shape of each section."""
     try:
         raw = json.loads(strip_comments(CONFIGS.read_text()))
     except FileNotFoundError:
         raise ConfigError(f"{CONFIGS}: not found")
     except json.JSONDecodeError as exc:
         raise ConfigError(f"{CONFIGS}: invalid JSON — {exc}")
-    if not isinstance(raw, dict) or not isinstance(raw.get("providers"), dict):
-        raise ConfigError(f"{CONFIGS}: top level must be an object with a \"providers\" object")
-    if not raw["providers"]:
+    _object(f"{CONFIGS}", raw)
+    _check_keys(f"{CONFIGS}", raw, DOCUMENT_KEYS)
+
+    agents = _object(f"{CONFIGS}: agents", raw.get("agents") or {})
+    if not agents:
+        raise ConfigError(f"{CONFIGS}: agents is empty")
+    for name, agent in agents.items():
+        where = f"{CONFIGS}: agents.{name}"
+        _check_keys(where, _object(where, agent), AGENT_KEYS)
+        for key in ("command", "api", "model_tag", "small_model_tag", "auto_compact_window_from"):
+            if key in agent:
+                _string(f"{where}.{key}", agent[key])
+        if "stale_commands" in agent:
+            _string_list(f"{where}.stale_commands", agent["stale_commands"])
+        for slot, candidates in _object(f"{where}.slots", agent.get("slots") or {}).items():
+            _string_list(f"{where}.slots.{slot}", candidates)
+        for key, entry in _object(f"{where}.schemas", agent.get("schemas") or {}).items():
+            if entry is None:
+                continue
+            at = f"{where}.schemas.{key}"
+            _check_keys(at, _object(at, entry), SCHEMA_ENTRY_KEYS)
+            _string(f"{at}.id", entry.get("id"))
+        if "launch" in agent:
+            at = f"{where}.launch"
+            _check_keys(at, _object(at, agent["launch"]), LAUNCH_KEYS)
+            _string(f"{at}.exec", agent["launch"].get("exec"))
+            _string_list(f"{at}.unset_vars", agent["launch"].get("unset_vars") or [])
+        if "model_entry" in agent:
+            at = f"{where}.model_entry"
+            _check_keys(at, _object(at, agent["model_entry"]), MODEL_ENTRY_KEYS)
+            if agent["model_entry"].get("value") is None:
+                raise ConfigError(f"{at}.value: is required")
+        if "lean" in agent:
+            at = f"{where}.lean"
+            _check_keys(at, _object(at, agent["lean"]), LEAN_KEYS)
+            _string(f"{at}.prompt", agent["lean"].get("prompt"))
+            _string_list(f"{at}.disabled_tools", agent["lean"].get("disabled_tools") or [])
+        if "packages" in agent:
+            _object(f"{where}.packages", agent["packages"])
+
+    providers = _object(f"{CONFIGS}: providers", raw.get("providers") or {})
+    if not providers:
         raise ConfigError(f"{CONFIGS}: providers is empty")
-    return raw["providers"]
 
-
-def load(name):
-    """One provider, validated, with its tags resolved to slots."""
-    providers = load_file()
-    if name not in providers:
-        known = ", ".join(providers)
-        raise ConfigError(f"{CONFIGS}: no provider named {name!r} (known: {known})")
-    where = f"{CONFIGS}: providers.{name}"
-    raw = providers[name]
-    if not isinstance(raw, dict):
-        raise ConfigError(f"{where}: must be an object")
-    _check_keys(where, raw, PROVIDER_KEYS)
-
-    base_url = expand(raw.get("BASE_URL") or "").rstrip("/")
-    if not base_url:
-        raise ConfigError(f"{where}: BASE_URL is required")
-
-    headers_raw = raw.get("REQUEST_HEADERS") or {}
-    if not isinstance(headers_raw, dict):
-        raise ConfigError(f"{where}: REQUEST_HEADERS must be an object")
-    headers = []
-    for key, value in headers_raw.items():
-        var, fallback = sole_reference(value)
-        headers.append({"name": key, "var": var, "fallback": fallback, "value": expand(value)})
-
-    defaults = raw.get("defaults") or {}
-    _check_keys(f"{where}.defaults", defaults, MODEL_KEYS - {"id", "claude_id", "tags"})
-    claude = raw.get("claude") or {}
-    _check_keys(f"{where}.claude", claude, CLAUDE_KEYS)
-    opencode = raw.get("opencode") or {}
-    _check_keys(f"{where}.opencode", opencode, OPENCODE_KEYS)
-
-    schema = raw.get("schema") or {}
-    _check_keys(f"{where}.schema", schema, SCHEMA_KEYS)
-    resolve = schema.get("resolve", "local")
-    if resolve not in SCHEMA_RESOLVERS:
+    start = raw.get("start_provider")
+    if start is not None and start not in providers:
         raise ConfigError(
-            f"{where}.schema: unknown resolve {resolve!r} (known: {', '.join(SCHEMA_RESOLVERS)})"
+            f"{CONFIGS}: start_provider {start!r} is not a provider (known: {', '.join(providers)})"
         )
-    schema_id = schema.get("id") or ""
-    if resolve == "models.dev" and not schema_id:
-        raise ConfigError(
-            f'{where}.schema: resolve "models.dev" needs the id that registry knows the '
-            f'provider by, e.g. "id": "{name}" — it is rarely the name used here '
-            "(glm is \"zai\", kimi is \"kimi-for-coding\")"
-        )
-    if resolve != "models.dev" and schema_id:
-        raise ConfigError(f'{where}.schema: id only applies to resolve "models.dev"')
-    # The id OpenCode files the provider under, and the one every reference to
-    # its models has to spell. Empty means it gets no block at all.
-    opencode_id = {"local": f"{name}-anthropic", "models.dev": schema_id, "none": ""}[resolve]
+    return {
+        "start_provider": start or next(iter(providers)),
+        "agents": agents,
+        "providers": providers,
+    }
 
+
+def agent_of(doc, name):
+    if name not in doc["agents"]:
+        raise ConfigError(f"{CONFIGS}: no agent named {name!r} (known: {', '.join(doc['agents'])})")
+    return doc["agents"][name]
+
+
+def known_tags(doc):
+    """Every tag any agent can ask for — the roles plus the slots that break away."""
+    tags = set()
+    for agent in doc["agents"].values():
+        for candidates in (agent.get("slots") or {}).values():
+            tags.update(candidates)
+        for key in ("model_tag", "small_model_tag"):
+            if agent.get(key):
+                tags.add(agent[key])
+    return tags
+
+
+def _schema(where, raw, agent):
+    """(resolve, id, entry) for the provider, against the agent's "schemas"."""
+    declared = _object(f"{where}.schema", raw.get("schema") or {})
+    _check_keys(f"{where}.schema", declared, PROVIDER_SCHEMA_KEYS)
+    schemas = agent.get("schemas")
+    if not schemas:
+        return "", "", None
+    resolve = declared.get("resolve")
+    if not resolve:
+        raise ConfigError(f"{where}.schema: resolve is required (one of: {', '.join(schemas)})")
+    if resolve not in schemas:
+        raise ConfigError(f"{where}.schema: unknown resolve {resolve!r} (known: {', '.join(schemas)})")
+    entry = schemas[resolve]
+    schema_id = declared.get("id") or ""
+    if entry is None:
+        return resolve, "", None
+    # An id is one provider's value across every agent, so an agent that does not
+    # consume it simply ignores it; only a missing one is an error here.
+    if "{schema_id}" in entry["id"] and not schema_id:
+        raise ConfigError(f"{where}.schema: resolve {resolve!r} needs an id")
+    return resolve, schema_id, entry
+
+
+def _models(where, raw, defaults, tags_allowed):
     entries = raw.get("models")
     if not isinstance(entries, list) or not entries:
         raise ConfigError(f"{where}: models must be a non-empty array")
-
     models = []
     by_tag = {}
     for index, entry in enumerate(entries):
         at = f"{where}.models[{index}]"
-        if not isinstance(entry, dict):
-            raise ConfigError(f"{at}: must be an object")
-        _check_keys(at, entry, MODEL_KEYS)
-        model_id = entry.get("id")
-        if not isinstance(model_id, str) or not model_id:
-            raise ConfigError(f"{at}: id is required")
+        _check_keys(at, _object(at, entry), MODEL_KEYS)
+        model_id = _string(f"{at}.id", entry.get("id"))
         merged = dict(defaults)
         merged.update(entry)
         tags = merged.get("tags") or []
         if not isinstance(tags, list):
             raise ConfigError(f"{at}: tags must be an array")
-        input_kinds = merged.get("input", ["text"])
-        if not isinstance(input_kinds, list) or not all(k in ("text", "image") for k in input_kinds):
-            raise ConfigError(f"{at}: input must be an array of \"text\" / \"image\"")
+        input_kinds = merged.get("input", [INPUT_KINDS[0]])
+        if not isinstance(input_kinds, list) or not all(k in INPUT_KINDS for k in input_kinds):
+            raise ConfigError(f"{at}: input must be an array of {' / '.join(INPUT_KINDS)}")
         model = {
             "id": model_id,
             "claude_id": merged.get("claude_id", model_id),
@@ -227,26 +296,88 @@ def load(name):
             "input": input_kinds,
         }
         for tag in tags:
-            if tag not in ROLE_TAGS:
-                raise ConfigError(f"{at}: unknown tag {tag!r} (known: {', '.join(ROLE_TAGS)})")
+            if tag not in tags_allowed:
+                raise ConfigError(
+                    f"{at}: unknown tag {tag!r} — no agent asks for it "
+                    f"(known: {', '.join(sorted(tags_allowed))})"
+                )
             if tag in by_tag:
                 raise ConfigError(f"{at}: tag {tag!r} is already on {by_tag[tag]['id']!r}")
             by_tag[tag] = model
         models.append(model)
+    return models, by_tag
 
-    if "default" not in by_tag:
-        raise ConfigError(f"{where}: no model is tagged 'default'")
 
-    slots = {
-        slot: next(by_tag[tag] for tag in candidates if tag in by_tag)
-        for slot, candidates in CLAUDE_SLOTS.items()
-    }
+def load(name, agent_name, doc=None):
+    """One provider, validated, resolved the way `agent_name` needs it."""
+    doc = doc or document()
+    providers = doc["providers"]
+    if name not in providers:
+        raise ConfigError(f"{CONFIGS}: no provider named {name!r} (known: {', '.join(providers)})")
+    agent = agent_of(doc, agent_name)
+    where = f"{CONFIGS}: providers.{name}"
+    raw = _object(where, providers[name])
+    _check_keys(where, raw, PROVIDER_FIXED_KEYS | set(doc["agents"]))
 
-    env = claude.get("env") or {}
-    if not isinstance(env, dict):
-        raise ConfigError(f"{where}.claude: env must be an object")
+    base_url = expand(raw.get("BASE_URL") or "").rstrip("/")
+    if not base_url:
+        raise ConfigError(f"{where}: BASE_URL is required")
 
+    headers = []
+    for key, value in _object(f"{where}.REQUEST_HEADERS", raw.get("REQUEST_HEADERS") or {}).items():
+        var, fallback = sole_reference(value)
+        headers.append({"name": key, "var": var, "fallback": fallback, "value": expand(value)})
+
+    defaults = raw.get("defaults") or {}
+    _check_keys(f"{where}.defaults", defaults, MODEL_KEYS - {"id", "claude_id", "tags"})
+
+    # The provider's overrides for this agent, filed under the agent's own name.
+    settings_at = f"{where}.{agent_name}"
+    settings = _object(settings_at, raw.get(agent_name) or {})
+    _check_keys(settings_at, settings, PROVIDER_AGENT_KEYS)
+
+    schema, schema_id, entry = _schema(where, raw, agent)
+    models, by_tag = _models(where, raw, defaults, known_tags(doc))
+
+    slots = {}
+    for slot, candidates in (agent.get("slots") or {}).items():
+        chosen = next((by_tag[tag] for tag in candidates if tag in by_tag), None)
+        if chosen is None:
+            wanted = " or ".join(repr(c) for c in candidates)
+            raise ConfigError(
+                f"{where}: nothing is tagged {wanted}, which agents.{agent_name}.slots.{slot} needs"
+            )
+        slots[slot] = chosen
+
+    model_tag = agent.get("model_tag")
+    main_model = by_tag.get(model_tag) if model_tag else None
+    if model_tag and main_model is None:
+        raise ConfigError(
+            f"{where}: no model is tagged {model_tag!r}, which agents.{agent_name}.model_tag needs"
+        )
+    small_tag = agent.get("small_model_tag")
+    small_model = (by_tag.get(small_tag) if small_tag else None) or main_model
+
+    window_slot = agent.get("auto_compact_window_from")
+    auto_compact = settings.get("auto_compact_window")
+    if not auto_compact and window_slot:
+        if window_slot not in slots:
+            raise ConfigError(
+                f"{CONFIGS}: agents.{agent_name}.auto_compact_window_from names "
+                f"{window_slot!r}, which is not one of its slots"
+            )
+        auto_compact = slots[window_slot]["context_window"]
+
+    env = _object(f"{settings_at}.env", settings.get("env") or {})
     api_key_var, api_key_fallback = sole_reference(raw.get("API_KEY") or "")
+    command = settings.get("command") or (
+        fill(f"{CONFIGS}: agents.{agent_name}.command", agent["command"], name=name)
+        if agent.get("command") else ""
+    )
+    stale = [
+        fill(f"{CONFIGS}: agents.{agent_name}.stale_commands", template, name=name)
+        for template in agent.get("stale_commands") or []
+    ]
     return {
         "name": name,
         "api_key": expand(raw.get("API_KEY") or ""),
@@ -254,60 +385,94 @@ def load(name):
         "api_key_fallback": api_key_fallback,
         "base_url": base_url,
         "headers": headers,
-        "command": claude.get("command") or f"claude{name}",
-        "args": claude.get("args", ""),
+        "command": command,
+        "stale_commands": stale,
+        "args": settings.get("args", ""),
         "env": {k: str(v) for k, v in env.items()},
-        "auto_compact_window": claude.get("auto_compact_window") or slots["ANTHROPIC_MODEL"]["context_window"],
-        "schema_resolve": resolve,
-        "opencode_id": opencode_id,
-        "lean": bool(opencode.get("lean", False)),
-        "opencode_context_window": opencode.get("context_window"),
-        "opencode_max_tokens": opencode.get("max_tokens"),
+        "auto_compact_window": auto_compact,
+        "api": agent.get("api", ""),
+        "schema": schema,
+        "schema_id": schema_id,
+        "schema_entry": entry,
+        "lean": bool(settings.get("lean", False)),
+        "context_window_cap": settings.get("context_window"),
+        "max_tokens_cap": settings.get("max_tokens"),
         "models": models,
         "slots": slots,
-        "default_model": by_tag["default"],
-        "small_model": by_tag.get("small", by_tag["default"]),
+        "main_model": main_model,
+        "small_model": small_model,
     }
 
 
-def pi_models_json(config):
-    """The "models" array body of a pi models.json provider block, indented to fit."""
-    return ",\n".join(
-        "        {\n"
-        f'          "id": "{model["id"]}",\n'
-        f'          "reasoning": {"true" if model["reasoning"] else "false"},\n'
-        f'          "input": {json.dumps(model["input"])},\n'
-        f'          "contextWindow": {model["context_window"]},\n'
-        f'          "maxTokens": {model["max_tokens"]}\n'
-        "        }"
-        for model in config["models"]
+def provider_id(config, agent_name):
+    """The id the agent files this provider under, or "" when it gets no block."""
+    entry = config["schema_entry"]
+    if not entry:
+        return ""
+    return fill(
+        f"{CONFIGS}: agents.{agent_name}.schemas.{config['schema']}.id",
+        entry["id"], name=config["name"], schema_id=config["schema_id"],
     )
 
 
-def opencode_models_json(config):
-    """The "models" object body of an OpenCode provider block, indented to fit.
+def _render(where, template, fields):
+    """The template with its placeholders filled. One whole placeholder keeps its type."""
+    if isinstance(template, str):
+        whole = PLACEHOLDER.fullmatch(template)
+        if whole:
+            if whole.group(1) not in fields:
+                known = ", ".join("{" + k + "}" for k in fields)
+                raise ConfigError(f"{where}: {template} is not one of {known}")
+            return fields[whole.group(1)]
+        return fill(where, template, **{k: str(v) for k, v in fields.items()})
+    if isinstance(template, dict):
+        return {_render(where, k, fields): _render(where, v, fields) for k, v in template.items()}
+    if isinstance(template, list):
+        return [_render(where, v, fields) for v in template]
+    return template
 
-    OpenCode compacts a session once it fills the context, so opencode.context_window
-    caps the window a conversation may grow into — not the endpoint's capacity.
+
+def models_json(config, agent, agent_name):
+    """Every model as the agent's "model_entry" describes it, indented to fit.
+
+    An agent compacts a session once it fills the context, so a provider's cap is
+    the window a conversation may grow into — not the endpoint's capacity.
     """
-    context_cap = config["opencode_context_window"]
-    output_cap = config["opencode_max_tokens"]
-    return ",\n".join(
-        f'        "{model["id"]}": {{ "limit": {{ "context": {context_cap or model["context_window"]},'
-        f' "output": {output_cap or model["max_tokens"]} }} }}'
-        for model in config["models"]
-    )
+    entry = agent.get("model_entry")
+    if not entry:
+        return ""
+    where = f"{CONFIGS}: agents.{agent_name}.model_entry"
+    pad = " " * int(entry.get("indent", 0))
+    inline = bool(entry.get("inline"))
+    keyed_by = entry.get("keyed_by")
+    rendered = []
+    for model in config["models"]:
+        fields = dict(model)
+        fields["context_window"] = config["context_window_cap"] or model["context_window"]
+        fields["max_tokens"] = config["max_tokens_cap"] or model["max_tokens"]
+        value = _render(f"{where}.value", entry["value"], fields)
+        text = json.dumps(value, indent=None if inline else 2, ensure_ascii=False)
+        text = "\n".join(pad + line for line in text.splitlines())
+        if keyed_by:
+            key = json.dumps(_render(f"{where}.keyed_by", keyed_by, fields), ensure_ascii=False)
+            text = f"{pad}{key}: {text.lstrip()}" if inline else f"{pad}{key}: {text.lstrip()}"
+        rendered.append(text)
+    return ",\n".join(rendered)
 
 
-def shell(config):
-    slots = config["slots"]
+def shell(config, agent, agent_name):
+    entry = config["schema_entry"] or {}
+    base_url_template = entry.get("base_url") if entry else ""
     values = {
         "M_NAME": config["name"],
+        "M_AGENT": agent_name,
         "M_COMMAND": config["command"],
+        "M_STALE_COMMANDS": " ".join(config["stale_commands"]),
         "M_API_KEY": config["api_key"],
         "M_API_KEY_VAR": config["api_key_var"],
         "M_API_KEY_FALLBACK": config["api_key_fallback"],
         "M_BASE_URL": config["base_url"],
+        "M_API": config["api"],
         # One header per line: name, the variable it came from (empty when the
         # value is a literal), that variable's fallback, then the value. The
         # fields are separated by US (\x1f), not a tab: bash collapses runs of
@@ -316,32 +481,94 @@ def shell(config):
         "M_HEADERS": "\n".join(
             "\x1f".join((h["name"], h["var"], h["fallback"], h["value"])) for h in config["headers"]
         ),
-        "M_CLAUDE_ARGS": config["args"],
-        "M_CLAUDE_ENV_SH": "\n".join(
+        "M_ARGS": config["args"],
+        "M_ENV_SH": "\n".join(
             f"export {key}={shlex.quote(value)}" for key, value in sorted(config["env"].items())
         ),
-        "M_CLAUDE_CODE_AUTO_COMPACT_WINDOW": str(config["auto_compact_window"]),
-        "M_DEFAULT_MODEL": config["default_model"]["id"],
-        "M_SMALL_MODEL": config["small_model"]["id"],
-        "M_SCHEMA_RESOLVE": config["schema_resolve"],
-        "M_OPENCODE_PROVIDER_ID": config["opencode_id"],
-        "M_OPENCODE_LEAN": "true" if config["lean"] else "false",
-        "M_OPENCODE_MODELS_JSON": opencode_models_json(config),
-        "M_PI_MODELS_JSON": pi_models_json(config),
+        "M_AUTO_COMPACT_WINDOW": str(config["auto_compact_window"] or ""),
+        "M_SCHEMA_RESOLVE": config["schema"],
+        "M_PROVIDER_ID": provider_id(config, agent_name),
+        "M_NPM": entry.get("npm", ""),
+        "M_SDK_BASE_URL": fill(
+            f"{CONFIGS}: agents.{agent_name}.schemas.{config['schema']}.base_url",
+            base_url_template, name=config["name"], base_url=config["base_url"],
+        ) if base_url_template else "",
+        "M_DECLARE_MODELS": "true" if entry.get("declare_models") else "false",
+        "M_LEAN": "true" if config["lean"] else "false",
+        "M_MAIN_MODEL": config["main_model"]["id"] if config["main_model"] else "",
+        "M_SMALL_MODEL": config["small_model"]["id"] if config["small_model"] else "",
+        "M_MODELS_JSON": models_json(config, agent, agent_name),
         "M_MODEL_IDS": " ".join(model["id"] for model in config["models"]),
+        "M_SLOT_NAMES": " ".join(config["slots"]),
     }
-    for slot in CLAUDE_SLOTS:
-        values[f"M_{slot}"] = slots[slot]["claude_id"]
+    for slot, model in config["slots"].items():
+        values[f"M_SLOT_{slot}"] = model["claude_id"]
     return "\n".join(f"{key}={shlex.quote(value)}" for key, value in values.items())
 
 
-def env_vars():
+def settings(doc, agent_name):
+    """The config-wide values a generator needs before it looks at any provider."""
+    agent = agent_of(doc, agent_name)
+    lean = agent.get("lean") or {}
+    launch = agent.get("launch") or {}
+    packages = agent.get("packages") or {}
+    values = {
+        "S_START_PROVIDER": doc["start_provider"],
+        "S_EXEC": launch.get("exec", ""),
+        "S_TOKEN_VAR": launch.get("token_var", ""),
+        "S_BASE_URL_VAR": launch.get("base_url_var", ""),
+        "S_HEADERS_VAR": launch.get("headers_var", ""),
+        "S_AUTO_COMPACT_WINDOW_VAR": launch.get("auto_compact_window_var", ""),
+        "S_UNSET_VARS": " ".join(launch.get("unset_vars") or []),
+        "S_MODEL_TAG": agent.get("model_tag", ""),
+        "S_SMALL_MODEL_TAG": agent.get("small_model_tag", ""),
+        "S_API": agent.get("api", ""),
+        "S_LEAN_PROMPT": lean.get("prompt", ""),
+        "S_LEAN_DISABLED_TOOLS": " ".join(lean.get("disabled_tools") or []),
+        "S_PACKAGES": " ".join(f"{source}={command}" for source, command in packages.items()),
+        "S_SCHEMAS": " ".join(agent.get("schemas") or {}),
+    }
+    return "\n".join(f"{key}={shlex.quote(value)}" for key, value in values.items())
+
+
+def check(doc):
+    """Every provider against every agent, and the ids each agent would file them under."""
+    for name, raw in doc["providers"].items():
+        declared = (raw.get("schema") or {}).get("id")
+        if not declared:
+            continue
+        resolve = raw["schema"].get("resolve")
+        wanted = any(
+            "{schema_id}" in ((agent.get("schemas") or {}).get(resolve) or {}).get("id", "")
+            for agent in doc["agents"].values()
+        )
+        if not wanted:
+            raise ConfigError(
+                f"providers.{name}.schema: id is set, but no agent's "
+                f"schemas.{resolve} uses it"
+            )
+    for agent_name in doc["agents"]:
+        taken = {}
+        for name in doc["providers"]:
+            config = load(name, agent_name, doc)
+            filed = provider_id(config, agent_name)
+            if not filed:
+                continue
+            if filed in taken:
+                raise ConfigError(
+                    f"providers.{name}: {agent_name} id {filed!r} is already "
+                    f"taken by providers.{taken[filed]}"
+                )
+            taken[filed] = name
+
+
+def env_vars(doc):
     """Every reference in the file, as "<provider><tab><var><tab><what><tab><fallback>".
 
     A reference with a fallback is optional: the file already works without it.
     """
     lines = []
-    for name, raw in load_file().items():
+    for name, raw in doc["providers"].items():
         fields = [("API_KEY", raw.get("API_KEY") or ""), ("BASE_URL", raw.get("BASE_URL") or "")]
         fields += [
             (f"REQUEST_HEADERS {header}", value or "")
@@ -355,38 +582,37 @@ def env_vars():
 
 def main(argv):
     action = argv[1] if len(argv) > 1 else ""
-    argument = argv[2] if len(argv) > 2 else ""
-    if action not in ("sh", "check", "tags", "providers", "env-vars"):
+    first = argv[2] if len(argv) > 2 else ""
+    second = argv[3] if len(argv) > 3 else ""
+    if action not in ("sh", "settings", "check", "tags", "providers", "agents", "env-vars"):
         print(__doc__.strip(), file=sys.stderr)
         return 2
     try:
+        doc = document()
         if action == "providers":
-            print("\n".join(load_file()))
+            print("\n".join(doc["providers"]))
+        elif action == "agents":
+            print("\n".join(doc["agents"]))
         elif action == "env-vars":
-            print(env_vars())
-        elif action == "check" and not argument:
-            # Two providers sharing one OpenCode id would silently merge into a
-            # single block, so the whole file is checked at once for that.
-            taken = {}
-            for name in load_file():
-                opencode_id = load(name)["opencode_id"]
-                if not opencode_id:
-                    continue
-                if opencode_id in taken:
-                    raise ConfigError(
-                        f"providers.{name}: OpenCode id {opencode_id!r} is already "
-                        f"taken by providers.{taken[opencode_id]}"
-                    )
-                taken[opencode_id] = name
-        elif not argument:
-            print(f"models.py {action}: a provider name is required", file=sys.stderr)
-            return 2
-        else:
-            config = load(argument)
-            if action == "sh":
-                print(shell(config))
-            elif action == "tags":
-                print("\n".join(f"{m['id']}\t{','.join(m['tags'])}" for m in config["models"]))
+            print(env_vars(doc))
+        elif action == "check":
+            check(doc)
+        elif action == "settings":
+            if not first:
+                print("models.py settings: an agent name is required", file=sys.stderr)
+                return 2
+            print(settings(doc, first))
+        elif action == "tags":
+            if not first:
+                print("models.py tags: a provider name is required", file=sys.stderr)
+                return 2
+            config = load(first, second or next(iter(doc["agents"])), doc)
+            print("\n".join(f"{m['id']}\t{','.join(m['tags'])}" for m in config["models"]))
+        elif action == "sh":
+            if not first or not second:
+                print("models.py sh: a provider and an agent name are required", file=sys.stderr)
+                return 2
+            print(shell(load(first, second, doc), agent_of(doc, second), second))
     except ConfigError as exc:
         print(f"configs.jsonc: {exc}", file=sys.stderr)
         return 1

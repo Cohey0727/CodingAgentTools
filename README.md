@@ -121,7 +121,7 @@ and [2026-09-09 — providers/ 廃止と configs.jsonc への集約](docs/migrat
 | `make list` | Every provider with its command, endpoint and models with their tags, then every skill, subagent and OpenCode extension with its install status |
 | `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from `configs.jsonc`, and set the startup model in `~/.pi/agent/settings.json` — run it after changing a model or endpoint |
 | `make opencode-global` | Re-generate OpenCode's global config from `configs.jsonc` — run it after editing it |
-| `make uninstall` | Remove the installed launchers (including the `pi<name>` / `open<name>` ones earlier versions installed), the pi packages from `$PI_PACKAGES`, the global `models.json` / OpenCode config / token files this repo wrote, the symlinks pointing back into this repo and the plugin shims generated from it. Provider `.env` files are left alone |
+| `make uninstall` | Remove the installed launchers (including the `pi<name>` / `open<name>` ones earlier versions installed), the packages each agent lists, the global `models.json` / OpenCode config / token files this repo wrote, the symlinks pointing back into this repo and the plugin shims generated from it. Provider `.env` files are left alone |
 | `make help` | The target list above, on the terminal |
 
 ## Usage
@@ -171,14 +171,16 @@ Note `small_model` — the model OpenCode names a session with, and its only use
 
 ### Default provider
 
-pi and OpenCode both start on `DEFAULT_PROVIDER`, which is `glm`. When that provider has no token the first configured one wins instead, alphabetically, so a fresh checkout still gets a working default. Change it for one run or for good:
+Every generated global config starts on `start_provider`, at the top of `configs.jsonc`:
 
-```bash
-DEFAULT_PROVIDER=gtr make setup            # both configs
-DEFAULT_PROVIDER=gtr make opencode-global  # just OpenCode
+```jsonc
+{
+  "start_provider": "glm",
+  ...
+}
 ```
 
-It sets OpenCode's `model` and `small_model`, and pi's `defaultProvider` / `defaultModel`. Claude Code has no such setting: each `claude<name>` pins its own provider.
+When that provider has no token the first configured one wins instead, so a fresh checkout still gets a working one. It sets OpenCode's `model` and `small_model`, and pi's `defaultProvider` / `defaultModel`. A launcher has no such setting: each one pins the provider baked into it.
 
 ### Loops in pi
 
@@ -199,11 +201,12 @@ and pi can iterate unattended the way Claude Code's
 ```
 
 They go into pi's user settings (`~/.pi/agent/settings.json`). Install a
-different set by overriding `PI_PACKAGES` with `<source>=<slash command>`
+different set by editing `agents.pi.packages` in `configs.jsonc`, as
+`"<source>": "<slash command>"`
 pairs — an empty command just leaves the label off:
 
-```bash
-PI_PACKAGES="npm:pi-reactor=/reactor npm:pi-loop-police=" make setup
+```jsonc
+"packages": { "npm:pi-reactor": "/reactor" }
 ```
 
 > **Note:** pi packages run with full system access and the registry is not
@@ -374,64 +377,89 @@ set it itself.
 
 ### Provider fields
 
-The key in `providers` is the provider's name: the launcher suffix
-(`claude<name>`), the id pi prints beside a model, and — unless
-[`schema.resolve`](#schema-resolution) says otherwise — the `<name>-anthropic`
-provider id in OpenCode's config.
+The key in `providers` is the provider's name. What it becomes — the launcher
+suffix, the id an agent files it under — is templated in [`agents`](#agents),
+not fixed here.
 
 | Field | Meaning |
 |-------|---------|
 | `API_KEY` | **Required.** A `${VAR}` reference to the key |
 | `BASE_URL` | **Required.** The provider's Anthropic-compatible endpoint, as `${VAR:-default}` so `.env` can route it elsewhere |
 | `REQUEST_HEADERS` | Extra request headers as a `{ "Name": "value" }` object, sent by all three CLIs — e.g. a Cloudflare Access service token in front of a self-hosted server. A value written as `${VAR}` is referenced, never copied into a generated config |
-| `claude.command` | The launcher command, when `claude<name>` is not wanted |
-| `claude.args` | Default options prepended to every `claude<name>` launch (word-split; your arguments come after them). OpenCode and pi have no launcher, so it does not reach them |
-| `claude.env` | Extra environment exported to `claude` as-is — this is where `CLAUDE_CODE_EFFORT_LEVEL` and `ENABLE_TOOL_SEARCH` are set |
-| `claude.auto_compact_window` | Overrides the main model's `context_window` as Claude Code's auto-compact threshold |
-| `schema.resolve` | Where OpenCode gets the provider's catalog: `local` (default) declares it here, `models.dev` takes it from OpenCode's registry, `none` leaves the provider out — see [Schema resolution](#schema-resolution) |
-| `schema.id` | With `resolve: "models.dev"`, the id that registry files the provider under. Required there, refused elsewhere |
-| `opencode.lean` | `true` gives the provider [a lean agent of its own](#lean-agents) |
-| `opencode.context_window`, `opencode.max_tokens` | Cap every model's limits for OpenCode only. These are the window a session may grow into before OpenCode compacts it, so a backend too slow to prefill its full context sets them lower — `gtr` does |
+| `<agent>.command` | The launcher command, when the agent's own `command` template is not wanted |
+| `<agent>.args` | Default options prepended to every launch of that command (word-split; your arguments come after them) |
+| `<agent>.env` | Extra environment exported to the agent as-is |
+| `<agent>.auto_compact_window` | Overrides the model's `context_window` as that agent's compaction threshold |
+| `schema.resolve` | **Required.** Which of the agent's [`schemas`](#schema-resolution) supplies this provider's catalog |
+| `schema.id` | The id an outside registry knows the provider by. Required when the selected schema's `id` template contains `{schema_id}` |
+| `<agent>.lean` | `true` gives the provider [a lean agent of its own](#lean-agents) |
+| `<agent>.context_window`, `<agent>.max_tokens` | Cap every model's limits for that agent. These are the window a session may grow into before it is compacted, so a backend too slow to prefill its full context sets them lower — `gtr` does |
+
+### Agents
+
+`agents` is every CLI this repo writes for. Nothing under `bin/` decides
+anything about one: not the command it execs, not the variables it reads, not
+the package that talks to it, not the shape of its config. All of it is here,
+and a provider block picks from it by the agent's own name.
+
+| Field | Meaning |
+|-------|---------|
+| `command` | Template for the launcher installed per provider, e.g. `claude{name}` |
+| `stale_commands` | Templates earlier versions installed; `make setup` and `make uninstall` remove them |
+| `launch.exec` | What the launcher runs |
+| `launch.token_var`, `launch.base_url_var`, `launch.headers_var` | The variables that carry the key, the endpoint and the extra headers |
+| `launch.auto_compact_window_var` | The variable carrying the compaction threshold |
+| `launch.unset_vars` | Cleared last, so nothing inherited shadows what was exported |
+| `slots` | Each model variable the agent reads, and the tags it follows, most specific first |
+| `auto_compact_window_from` | The slot whose `context_window` becomes the threshold |
+| `model_tag`, `small_model_tag` | The tags naming the model a session starts on, and the small one |
+| `schemas` | Named ways to write a provider — see below |
+| `model_entry` | One model as this agent's config spells it; `{id}` and the other model fields are the placeholders, `keyed_by` makes the collection an object |
+| `lean.prompt`, `lean.disabled_tools` | What [a lean agent](#lean-agents) replaces and drops |
+| `api` | The protocol name the agent's config wants |
+| `packages` | `"<source>": "<slash command>"` pairs installed into that agent's settings |
+
+Inside `agents`, `{name}` is the provider being written, `{base_url}` its
+`BASE_URL` and `{schema_id}` its `schema.id`. `${VAR}` still means the
+environment, so the two never collide.
 
 ### Schema resolution
 
-A provider's *catalog* — the npm package that talks to it, the endpoint it lives
-at, the models it serves and each model's limits — has to come from somewhere.
-`schema.resolve` picks the source, per provider:
-
-| `resolve` | OpenCode gets | pi gets | `claude<name>` |
-|-----------|---------------|---------|----------------|
-| `local` (default) | a `<name>-anthropic` block declaring `@ai-sdk/anthropic`, `<BASE_URL>/v1` and every model below | every model below | unchanged |
-| `models.dev` | a block under `schema.id` carrying only the key — [models.dev](https://models.dev) supplies npm package, endpoint, models, pricing and limits | every model below | unchanged |
-| `none` | nothing | nothing | unchanged |
-
-Claude Code is unchanged in every row because it reads no catalog at all:
-`BASE_URL`, the key and the [tags](#tags) are the whole of what a launcher
-exports. `none` therefore means "this provider is reachable through
-`claude<name>` and nowhere else". pi has no registry to resolve against, so
-`models.dev` leaves its `models.json` exactly as `local` would.
+A provider's *catalog* — the package that talks to it, the endpoint it lives at,
+the models it serves and each model's limits — has to come from somewhere. Each
+agent names the ways it will take one in `schemas`, and every provider picks one
+by name in `schema.resolve`. There is no default: a provider says which.
 
 ```jsonc
-"deepseek": {
-  "schema": { "resolve": "models.dev", "id": "deepseek" },
-  ...
+"opencode": {
+  "schemas": {
+    "local":      { "id": "{name}-anthropic", "npm": "@ai-sdk/anthropic",
+                    "base_url": "{base_url}/v1", "declare_models": true },
+    "models.dev": { "id": "{schema_id}", "declare_models": false },
+    "none":       null
+  }
 }
 ```
 
-`schema.id` is the name that registry files the provider under, and it is often
-not the one used here — GLM is `zai`, Kimi's coding plan is `kimi-for-coding`.
-Two providers may not resolve to the same OpenCode id — they would silently
-merge into one block — so `make setup` and `make opencode-global` refuse the
-file if they do.
+A schema's `id` is what the agent files the provider under, and the prefix every
+reference to its models carries. `declare_models` writes the provider's models
+into the block; without it the agent is left to resolve them, which is what
+[models.dev](https://models.dev) does for OpenCode. `null` writes nothing at all,
+so the provider is reachable only through its launcher — an agent's launcher
+needs no catalog, just the endpoint, the key and the tags.
 
-**What `models.dev` costs.** The registry lists one endpoint per provider, the
-one it considers primary, and for most providers that is the OpenAI-compatible
+Two providers may not resolve to the same id for one agent — they would silently
+merge into a single block — so `make setup` and the generators refuse the file
+if they do.
+
+**What an outside registry costs.** It lists one endpoint per provider, the one
+it considers primary, and for most providers that is their OpenAI-compatible
 route rather than the Anthropic `BASE_URL` above — DeepSeek resolves to
 `@ai-sdk/openai-compatible` at `api.deepseek.com`, Z.AI to `api.z.ai/api/paas/v4`,
 while MiniMax and `kimi-for-coding` are registered as `@ai-sdk/anthropic`. So
-OpenCode and `claude<name>` stop sharing a route, models the registry does not
-carry disappear from `/models`, and a model tagged `default` or `small` that the
-registry lacks leaves the generated `model` pointing at nothing.
+that agent and the launcher stop sharing a route, models the registry does not
+carry disappear, and a model tagged for a slot that the registry lacks leaves the
+generated reference pointing at nothing.
 
 What it does not cost is speed. Against DeepSeek both routes were measured at
 0.017 s per output token (medians over 8 alternating runs of an identical 8.5K
@@ -440,7 +468,7 @@ the Anthropic one, and both hit the same prompt cache — 8,448 cached tokens
 either way, so the Anthropic route is a shim over the same backend. Reasoning
 survives on both. The one genuine difference is accounting: the Anthropic route
 reports cached tokens outside `input_tokens`, the OpenAI route inside
-`prompt_tokens`, which is what OpenCode's cost and context readouts display.
+`prompt_tokens`, which is what an agent's cost and context readouts display.
 
 ### `.env`
 
@@ -673,7 +701,7 @@ are generated, not read live.
 **`configs.jsonc: ... unknown tag` / `... no model is tagged 'default'`** —
 `make setup` validates every provider before it writes anything. The message
 names the provider, the model index and the tags it accepts; `python3
-bin/models.py check` re-runs the whole check, `check <provider>` just one.
+bin/models.py check` re-runs the whole check.
 
 **A checkout still has `providers/<name>/.env` files** — re-run `make setup`. It
 creates the root `.env` and moves each `API_TOKEN` and `HEADERS` value into the

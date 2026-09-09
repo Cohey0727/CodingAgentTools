@@ -18,9 +18,12 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-LEAN_PROMPT="$ROOT/bin/opencode-lean-prompt.md"
 # shellcheck disable=SC1090
 source "$ROOT/bin/common.sh"
+
+AGENT=$(basename "${BASH_SOURCE[0]}" -global-config.sh)
+settings_resolve "$AGENT"
+LEAN_PROMPT="$ROOT/$S_LEAN_PROMPT"
 
 # Two providers resolving to one OpenCode id would silently merge into a single
 # block, and only a whole-file check can see that. `make setup` runs it too, but
@@ -37,8 +40,8 @@ if [ -f "$OUT" ] && ! generated_here "$OUT"; then
   exit 1
 fi
 
-registered_provider() { # <provider> — key resolves, and schema.resolve is not "none"?
-  ( models_resolve "$1" && [ -n "$M_API_KEY" ] && [ -n "$M_OPENCODE_PROVIDER_ID" ] )
+registered_provider() { # <provider> — key resolves, and its schema files it somewhere?
+  ( models_resolve "$1" "$AGENT" && [ -n "$M_API_KEY" ] && [ -n "$M_PROVIDER_ID" ] )
 }
 
 # Every provider whose key resolves and that asks to be registered here.
@@ -51,19 +54,18 @@ done < <(provider_names)
 if [ "${#providers[@]}" -eq 0 ]; then
   echo "opencode-global: no provider to register." >&2
   echo "  run 'make setup' to add a key, or check that some provider in" >&2
-  echo "  configs.jsonc does not set schema.resolve to \"none\"." >&2
+  echo "  configs.jsonc does not set schema.resolve to a blank one." >&2
   exit 1
 fi
 
 # The provider the session's model / small_model start on.
 default_provider=$(default_provider "${providers[@]}")
 
-# The id to prefix a model with is the provider's OpenCode id, which follows
-# schema.resolve — "<name>-anthropic" when declared here, the registry's own id
-# when resolved from models.dev.
+# A model is named "<the id the agent files the provider under>/<model>", and
+# that id follows the provider's schema.
 default_models=$(
-  models_resolve "$default_provider"
-  printf '%s\n%s\n%s' "$M_OPENCODE_PROVIDER_ID" "$M_DEFAULT_MODEL" "$M_SMALL_MODEL"
+  models_resolve "$default_provider" "$AGENT"
+  printf '%s\n%s\n%s' "$M_PROVIDER_ID" "$M_MAIN_MODEL" "$M_SMALL_MODEL"
 )
 default_id=$(sed -n 1p <<<"$default_models")
 model="$default_id/$(sed -n 2p <<<"$default_models")"
@@ -80,14 +82,14 @@ opencode_header_ref() { # <name> -> {file:...} reference for the provider in sco
 }
 
 lean_provider() { # <provider> — does configs.jsonc ask for the lean agent?
-  ( models_resolve "$1"; [ "$M_OPENCODE_LEAN" = true ] )
+  ( models_resolve "$1" "$AGENT"; [ "$M_LEAN" = true ] )
 }
 
 entries=()
 agents=()
 for provider in "${providers[@]}"; do
   entries+=("$(
-    models_resolve "$provider"
+    models_resolve "$provider" "$AGENT"
     printf '%s' "$M_API_KEY" > "$TOKENS_DIR/$provider.token"
     chmod 600 "$TOKENS_DIR/$provider.token"
     while IFS= read -r name; do
@@ -100,7 +102,7 @@ for provider in "${providers[@]}"; do
   if lean_provider "$provider"; then
     cp "$LEAN_PROMPT" "$TOKENS_DIR/$provider.prompt.md"
     agents+=("$(
-      models_resolve "$provider"
+      models_resolve "$provider" "$AGENT"
       opencode_agent_json "$provider" "$TOKENS_DIR/$provider.prompt.md"
     )")
   fi

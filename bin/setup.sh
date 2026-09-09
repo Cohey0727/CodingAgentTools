@@ -2,17 +2,16 @@
 # Interactive setup for claude-compatibles (`make setup`).
 #
 #   bin/setup.sh                  checkbox multi-select, then key prompts
-#   bin/setup.sh deepseek glm     skip the checkbox, still prompt for keys
+#   bin/setup.sh <provider>...    skip the checkbox, still prompt for keys
 #
 # configs.jsonc lists every provider and refers to its secrets as "${NAME}";
 # the .env beside it holds those values and is the only file with a key in it.
 # At a prompt, pressing Enter with no input keeps whatever is already set.
 # Keys still sitting in the old providers/<name>/.env files are carried over
-# first. Then a claude<name> launcher per provider is generated into $BIN_DIR
-# (default ~/.local/bin) from the template in bin/, the pi packages in
-# $PI_PACKAGES are installed into pi's user settings, and every provider whose
-# key resolves is registered in pi's global models.json and OpenCode's global
-# config.
+# first. Then one launcher per provider per agent that names a command is
+# generated into $BIN_DIR (default ~/.local/bin) from the template in bin/, the
+# packages each agent lists are installed into its settings, and every provider
+# whose key resolves is registered in the generated global configs.
 
 set -euo pipefail
 
@@ -30,20 +29,23 @@ source "$ROOT/bin/ui.sh"
 
 discover_providers() { provider_names; }
 
-provider_launcher() { # <provider> -> "claude<x>"
-  provider_command "$1"
+launcher_agents() { # -> every agent whose configs.jsonc block names a command
+  local a
+  while IFS= read -r a; do
+    [ -n "$a" ] || continue
+    ( settings_resolve "$a" && [ -n "$S_EXEC" ] ) && printf '%s\n' "$a"
+  done < <(agent_names)
 }
 
-provider_stale_launchers() { # <provider> -> commands earlier versions installed
-  provider_stale_commands "$1"
-}
+# Any agent resolves the fields below identically, so the first one answers.
+any_agent() { agent_names | head -1; }
 
 api_key_var() { # <provider> -> the .env variable its API_KEY points at
-  ( models_resolve "$1" && printf '%s' "$M_API_KEY_VAR" )
+  ( models_resolve "$1" "$(any_agent)" && printf '%s' "$M_API_KEY_VAR" )
 }
 
 current_token() { # <provider> -> its resolved key, maybe ""
-  ( models_resolve "$1" 2>/dev/null && printf '%s' "$M_API_KEY" )
+  ( models_resolve "$1" "$(any_agent)" 2>/dev/null && printf '%s' "$M_API_KEY" )
 }
 
 api_key_url() { # <provider> -> the signup URL commented above its variable in
@@ -147,7 +149,7 @@ migrate_provider_envs() {
     file="$dir.env"
     [ -f "$file" ] || continue
     provider_names | grep -qx "$provider" || continue
-    models_resolve "$provider" || continue
+    models_resolve "$provider" "$(any_agent)" || continue
 
     token=$(grep -E '^(API_TOKEN|ANTHROPIC_AUTH_TOKEN)=.+' "$file" | head -1 | cut -d= -f2- || true)
     if [ -n "$M_API_KEY_VAR" ] && [ -n "$token" ] && [ -z "$(env_value "$M_API_KEY_VAR")" ]; then
@@ -195,7 +197,7 @@ cleanup_tty() {
 draw_item() { # <index>
   local i=$1 mark cmd tok
   if [ "${CHECKED[$i]}" = 1 ]; then mark="${GRN}x${RST}"; else mark=' '; fi
-  cmd=$(provider_launcher "${ITEMS[$i]}")
+  cmd=$(provider_command "${ITEMS[$i]}" "$(launcher_agents | head -1)")
   tok=$(current_token "${ITEMS[$i]}")
   printf '\033[2K\r'
   if [ "$i" = "$CURSOR" ]; then
@@ -306,7 +308,7 @@ prompt_token() { # <provider>
     printf '  %s⚠ %s is empty — needed for the %s header%s\n' \
       "$YLW" "${hint%%	*}" "${hint#*	}" "$RST"
   done < <(
-    models_resolve "$p"
+    models_resolve "$p" "$(any_agent)"
     while IFS= read -r name; do
       [ -n "$name" ] || continue
       v=$(header_var "$name")
@@ -317,9 +319,10 @@ prompt_token() { # <provider>
 
 # ------------------------------------------------------------- installation
 
-install_one() { # <provider> <command> <template>
-  local p=$1 cmd=$2 template=$3 bin
+install_one() { # <provider> <command> <template> <agent>
+  local p=$1 cmd=$2 template=$3 agent=$4 bin
   sed -e 's|@@PROVIDER@@|'"$p"'|g' \
+    -e 's|@@AGENT@@|'"$agent"'|g' \
     -e 's|@@COMMON@@|'"$COMMON"'|g' \
     "$template" > "$BIN_DIR/$cmd"
   chmod +x "$BIN_DIR/$cmd"
@@ -333,39 +336,47 @@ install_one() { # <provider> <command> <template>
   fi
 }
 
-install_launcher() { # <provider> — the claude<name> command. Commands earlier
-                     # versions generated for the provider go away.
-  local p=$1 cmd
-  install_one "$p" "$(provider_launcher "$p")" "$TEMPLATE"
-  for cmd in $(provider_stale_launchers "$p"); do
-    if [ -f "$BIN_DIR/$cmd" ] && grep -qE '^PROVIDER(_DIR)?="' "$BIN_DIR/$cmd"; then
-      rm -f "$BIN_DIR/$cmd"
-      printf '  %s• removed %s%s\n' "$DIM" "$BIN_DIR/$cmd" "$RST"
-    fi
-  done
+install_launcher() { # <provider> — one command per agent that names one.
+                     # Commands earlier versions generated go away.
+  local p=$1 cmd agent
+  while IFS= read -r agent; do
+    [ -n "$agent" ] || continue
+    install_one "$p" "$(provider_command "$p" "$agent")" "$TEMPLATE" "$agent"
+    for cmd in $(provider_stale_commands "$p" "$agent"); do
+      if [ -f "$BIN_DIR/$cmd" ] && grep -qE '^PROVIDER(_DIR)?="' "$BIN_DIR/$cmd"; then
+        rm -f "$BIN_DIR/$cmd"
+        printf '  %s• removed %s%s\n' "$DIM" "$BIN_DIR/$cmd" "$RST"
+      fi
+    done
+  done < <(launcher_agents)
 }
 # pi resolves packages from its user settings, so one install covers every
 # provider.
-install_pi_packages() {
-  local spec src cmd
-  section 'installing pi packages'
-  if ! command -v pi >/dev/null 2>&1; then
-    printf '  %s⚠%s %s\n' "$YLW" "$RST" \
-      "skipped — 'pi' is not on your PATH. Install it (https://pi.dev), then re-run."
-    return 0
-  fi
-  # shellcheck disable=SC2086  # word-splitting PI_PACKAGES is intended
-  for spec in $PI_PACKAGES; do
-    src=$(pi_package_source "$spec")
-    cmd=$(pi_package_command "$spec")
-    if pi install "$src" >/dev/null 2>&1; then
-      printf '  %s✔%s %s%-26s%s %s%-6s%s\n' \
-        "$GRN" "$RST" "$B" "$src" "$RST" "$CYN" "$cmd" "$RST"
-    else
-      printf '  %s⚠%s %s%-26s%s %sfailed — run '\''pi install %s'\'' by hand%s\n' \
-        "$YLW" "$RST" "$B" "$src" "$RST" "$YLW" "$src" "$RST"
+install_agent_packages() { # every "<source>=<command>" an agent lists in configs.jsonc
+  local agent spec src cmd
+  while IFS= read -r agent; do
+    [ -n "$agent" ] || continue
+    ( settings_resolve "$agent" && [ -n "$S_PACKAGES" ] ) || continue
+    settings_resolve "$agent"
+    section "installing $agent packages"
+    if ! command -v "$agent" >/dev/null 2>&1; then
+      printf '  %s⚠%s %s\n' "$YLW" "$RST" \
+        "skipped — '$agent' is not on your PATH. Install it, then re-run."
+      continue
     fi
-  done
+    # shellcheck disable=SC2086  # word-splitting the package list is intended
+    for spec in $S_PACKAGES; do
+      src=$(pi_package_source "$spec")
+      cmd=$(pi_package_command "$spec")
+      if "$agent" install "$src" >/dev/null 2>&1; then
+        printf '  %s✔%s %s%-26s%s %s%-6s%s\n' \
+          "$GRN" "$RST" "$B" "$src" "$RST" "$CYN" "$cmd" "$RST"
+      else
+        printf '  %s⚠%s %s%-26s%s %sfailed — run '\''%s install %s'\'' by hand%s\n' \
+          "$YLW" "$RST" "$B" "$src" "$RST" "$YLW" "$agent" "$src" "$RST"
+      fi
+    done
+  done < <(agent_names)
 }
 
 check_environment() {
@@ -412,7 +423,7 @@ main() {
   else
     if [ ! -t 0 ]; then
       echo "setup: the checkbox picker needs an interactive terminal." >&2
-      echo "  or name providers directly: bin/setup.sh deepseek glm" >&2
+      echo "  or name providers directly: bin/setup.sh $(provider_names | tr '\n' ' ')" >&2
       exit 1
     fi
     while IFS= read -r p; do all+=("$p"); done < <(discover_providers)
@@ -448,7 +459,7 @@ main() {
     install_launcher "$p"
   done
 
-  install_pi_packages
+  install_agent_packages
 
   section 'generating global pi models.json'
   if ! "$ROOT/bin/pi-global-models.sh"; then

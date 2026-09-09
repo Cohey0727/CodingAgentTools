@@ -33,8 +33,10 @@ list:
 
 uninstall:
 	@for p in $(PROVIDER_LIST); do \
-		for cmd in $$(. "$(COMMON)"; provider_command "$$p"; printf ' '; provider_stale_commands "$$p"); do \
-			rm -f "$(BIN_DIR)/$$cmd" && echo "  Removed $(BIN_DIR)/$$cmd"; \
+		for a in $$(. "$(COMMON)"; agent_names); do \
+			for cmd in $$(. "$(COMMON)"; provider_command "$$p" "$$a"; printf ' '; provider_stale_commands "$$p" "$$a"); do \
+				rm -f "$(BIN_DIR)/$$cmd" && echo "  Removed $(BIN_DIR)/$$cmd"; \
+			done; \
 		done; \
 	done
 	@. "$(COMMON)"; out=$$(pi_global_models_path); \
@@ -46,16 +48,17 @@ uninstall:
 			rm -f "$$out" && echo "  Removed $$out"; \
 		fi; \
 		rm -rf "$$(opencode_tokens_dir)" && echo "  Removed $$(opencode_tokens_dir)"
-	@if command -v pi >/dev/null 2>&1; then \
-		. "$(COMMON)"; \
-		for spec in $$PI_PACKAGES; do \
+	@. "$(COMMON)"; for a in $$(agent_names); do \
+		command -v "$$a" >/dev/null 2>&1 || continue; \
+		settings_resolve "$$a"; \
+		for spec in $$S_PACKAGES; do \
 			src=$$(pi_package_source "$$spec"); \
 			if pi_package_installed "$$src"; then \
-				pi remove "$$src" >/dev/null 2>&1 \
-					&& echo "  Removed pi package $$src"; \
+				"$$a" remove "$$src" >/dev/null 2>&1 \
+					&& echo "  Removed $$a package $$src"; \
 			fi; \
 		done; \
-	fi
+	done
 	@echo "  Note: .env is left in place. Delete it manually if no longer needed."
 	@"$(ROOT)/bin/skills-uninstall.sh"
 

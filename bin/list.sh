@@ -15,10 +15,10 @@ list_providers() {
   section "providers ($count)"
   while IFS= read -r p; do
     [ -n "$p" ] || continue
-    url=$(set +e; . "$COMMON"; models_resolve "$p" && printf '%s' "$M_BASE_URL")
+    url=$(set +e; . "$COMMON"; models_resolve "$p" "$(agent_names | head -1)" && printf '%s' "$M_BASE_URL")
     printf '  %s%-10s%s %s->%s %-24s %s%s%s\n' \
       "$B" "$p" "$RST" "$DIM" "$RST" \
-      "$(set +e; . "$COMMON"; provider_command "$p")" "$DIM" "$url" "$RST"
+      "$(set +e; . "$COMMON"; provider_command "$p" "$(agent_names | head -1)")" "$DIM" "$url" "$RST"
     while IFS=$'\t' read -r id tags; do
       [ -n "$id" ] || continue
       printf '  %s%13s%s %-24s %s%s%s\n' "$DIM" '' "$RST" "$id" "$DIM" "$tags" "$RST"
