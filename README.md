@@ -375,7 +375,8 @@ set it itself.
 ### Provider fields
 
 The key in `providers` is the provider's name: the launcher suffix
-(`claude<name>`), the id pi prints beside a model, and the `<name>-anthropic`
+(`claude<name>`), the id pi prints beside a model, and — unless
+[`schema.resolve`](#schema-resolution) says otherwise — the `<name>-anthropic`
 provider id in OpenCode's config.
 
 | Field | Meaning |
@@ -387,8 +388,59 @@ provider id in OpenCode's config.
 | `claude.args` | Default options prepended to every `claude<name>` launch (word-split; your arguments come after them). OpenCode and pi have no launcher, so it does not reach them |
 | `claude.env` | Extra environment exported to `claude` as-is — this is where `CLAUDE_CODE_EFFORT_LEVEL` and `ENABLE_TOOL_SEARCH` are set |
 | `claude.auto_compact_window` | Overrides the main model's `context_window` as Claude Code's auto-compact threshold |
+| `schema.resolve` | Where OpenCode gets the provider's catalog: `local` (default) declares it here, `models.dev` takes it from OpenCode's registry, `none` leaves the provider out — see [Schema resolution](#schema-resolution) |
+| `schema.id` | With `resolve: "models.dev"`, the id that registry files the provider under. Required there, refused elsewhere |
 | `opencode.lean` | `true` gives the provider [a lean agent of its own](#lean-agents) |
 | `opencode.context_window`, `opencode.max_tokens` | Cap every model's limits for OpenCode only. These are the window a session may grow into before OpenCode compacts it, so a backend too slow to prefill its full context sets them lower — `gtr` does |
+
+### Schema resolution
+
+A provider's *catalog* — the npm package that talks to it, the endpoint it lives
+at, the models it serves and each model's limits — has to come from somewhere.
+`schema.resolve` picks the source, per provider:
+
+| `resolve` | OpenCode gets | pi gets | `claude<name>` |
+|-----------|---------------|---------|----------------|
+| `local` (default) | a `<name>-anthropic` block declaring `@ai-sdk/anthropic`, `<BASE_URL>/v1` and every model below | every model below | unchanged |
+| `models.dev` | a block under `schema.id` carrying only the key — [models.dev](https://models.dev) supplies npm package, endpoint, models, pricing and limits | every model below | unchanged |
+| `none` | nothing | nothing | unchanged |
+
+Claude Code is unchanged in every row because it reads no catalog at all:
+`BASE_URL`, the key and the [tags](#tags) are the whole of what a launcher
+exports. `none` therefore means "this provider is reachable through
+`claude<name>` and nowhere else". pi has no registry to resolve against, so
+`models.dev` leaves its `models.json` exactly as `local` would.
+
+```jsonc
+"deepseek": {
+  "schema": { "resolve": "models.dev", "id": "deepseek" },
+  ...
+}
+```
+
+`schema.id` is the name that registry files the provider under, and it is often
+not the one used here — GLM is `zai`, Kimi's coding plan is `kimi-for-coding`.
+Two providers may not resolve to the same OpenCode id — they would silently
+merge into one block — so `make setup` and `make opencode-global` refuse the
+file if they do.
+
+**What `models.dev` costs.** The registry lists one endpoint per provider, the
+one it considers primary, and for most providers that is the OpenAI-compatible
+route rather than the Anthropic `BASE_URL` above — DeepSeek resolves to
+`@ai-sdk/openai-compatible` at `api.deepseek.com`, Z.AI to `api.z.ai/api/paas/v4`,
+while MiniMax and `kimi-for-coding` are registered as `@ai-sdk/anthropic`. So
+OpenCode and `claude<name>` stop sharing a route, models the registry does not
+carry disappear from `/models`, and a model tagged `default` or `small` that the
+registry lacks leaves the generated `model` pointing at nothing.
+
+What it does not cost is speed. Against DeepSeek both routes were measured at
+0.017 s per output token (medians over 8 alternating runs of an identical 8.5K
+prompt, `deepseek-v4-flash`), TTFT 0.78 s on the OpenAI route against 0.85 s on
+the Anthropic one, and both hit the same prompt cache — 8,448 cached tokens
+either way, so the Anthropic route is a shim over the same backend. Reasoning
+survives on both. The one genuine difference is accounting: the Anthropic route
+reports cached tokens outside `input_tokens`, the OpenAI route inside
+`prompt_tokens`, which is what OpenCode's cost and context readouts display.
 
 ### `.env`
 

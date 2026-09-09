@@ -54,13 +54,19 @@ while IFS= read -r provider; do
   entry=$(
     models_resolve "$provider" || exit 1
     [ -n "$M_API_KEY" ] || exit 0
+    # pi has no registry to resolve a catalog from, so schema.resolve only
+    # decides whether the provider is written here at all: "none" leaves it out
+    # and every other value declares it in full from configs.jsonc.
+    [ "$M_SCHEMA_RESOLVE" != none ] || exit 0
     pi_provider_json "$provider" "$(pi_api_key_ref)" pi_header_ref
   )
   if [ -n "$entry" ]; then providers+=("$provider"); entries+=("$entry"); fi
 done < <(provider_names)
 
 if [ "${#entries[@]}" -eq 0 ]; then
-  echo "pi-global: no provider has a key yet — run 'make setup' first." >&2
+  echo "pi-global: no provider to register." >&2
+  echo "  run 'make setup' to add a key, or check that some provider in" >&2
+  echo "  configs.jsonc does not set schema.resolve to \"none\"." >&2
   exit 1
 fi
 

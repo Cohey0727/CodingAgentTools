@@ -22,6 +22,11 @@ LEAN_PROMPT="$ROOT/bin/opencode-lean-prompt.md"
 # shellcheck disable=SC1090
 source "$ROOT/bin/common.sh"
 
+# Two providers resolving to one OpenCode id would silently merge into a single
+# block, and only a whole-file check can see that. `make setup` runs it too, but
+# this generator is also a target of its own.
+models_check || exit 1
+
 OUT=$(opencode_global_config_path)
 CONFIG_DIR=$(dirname "$OUT")
 TOKENS_DIR=$(opencode_tokens_dir)
@@ -32,27 +37,37 @@ if [ -f "$OUT" ] && ! generated_here "$OUT"; then
   exit 1
 fi
 
-# Every provider whose key resolves to something.
+registered_provider() { # <provider> — key resolves, and schema.resolve is not "none"?
+  ( models_resolve "$1" && [ -n "$M_API_KEY" ] && [ -n "$M_OPENCODE_PROVIDER_ID" ] )
+}
+
+# Every provider whose key resolves and that asks to be registered here.
 providers=()
 while IFS= read -r provider; do
   [ -n "$provider" ] || continue
-  if configured_provider "$provider"; then providers+=("$provider"); fi
+  if registered_provider "$provider"; then providers+=("$provider"); fi
 done < <(provider_names)
 
 if [ "${#providers[@]}" -eq 0 ]; then
-  echo "opencode-global: no provider has a key yet — run 'make setup' first." >&2
+  echo "opencode-global: no provider to register." >&2
+  echo "  run 'make setup' to add a key, or check that some provider in" >&2
+  echo "  configs.jsonc does not set schema.resolve to \"none\"." >&2
   exit 1
 fi
 
 # The provider the session's model / small_model start on.
 default_provider=$(default_provider "${providers[@]}")
 
+# The id to prefix a model with is the provider's OpenCode id, which follows
+# schema.resolve — "<name>-anthropic" when declared here, the registry's own id
+# when resolved from models.dev.
 default_models=$(
   models_resolve "$default_provider"
-  printf '%s\n%s' "$M_DEFAULT_MODEL" "$M_SMALL_MODEL"
+  printf '%s\n%s\n%s' "$M_OPENCODE_PROVIDER_ID" "$M_DEFAULT_MODEL" "$M_SMALL_MODEL"
 )
-model="$default_provider-anthropic/$(head -1 <<<"$default_models")"
-small_model="$default_provider-anthropic/$(tail -n +2 <<<"$default_models")"
+default_id=$(sed -n 1p <<<"$default_models")
+model="$default_id/$(sed -n 2p <<<"$default_models")"
+small_model="$default_id/$(sed -n 3p <<<"$default_models")"
 
 # The secrets dir is fully managed here: wipe it, then write the current set so
 # a provider whose key was emptied leaves no stale copy behind.

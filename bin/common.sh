@@ -151,10 +151,6 @@ provider_stale_commands() { # <provider> -> commands earlier versions installed
   ( models_resolve "$1" && printf 'pi%s open%s' "$M_NAME" "$M_NAME" )
 }
 
-configured_provider() { # <provider> — valid, and its API_KEY resolves to something?
-  ( models_resolve "$1" && [ -n "$M_API_KEY" ] )
-}
-
 require_settings() { # <launcher name> — fail fast on a key that resolved to nothing
   if [ -z "$M_API_KEY" ]; then
     echo "$1: API_KEY for '$M_NAME' is empty" >&2
@@ -276,7 +272,7 @@ opencode_agent_json() { # <provider> <prompt file> — the lean agent for a prov
     "$name": {
       "description": "$name with a short prompt and core tools only",
       "mode": "primary",
-      "model": "$name-anthropic/$M_DEFAULT_MODEL",
+      "model": "$M_OPENCODE_PROVIDER_ID/$M_DEFAULT_MODEL",
       "prompt": "{file:$prompt}",
       "tools": { $tools }
     }
@@ -284,12 +280,10 @@ EOF
 }
 
 opencode_provider_json() { # <provider> <apiKey reference> [<header ref fn>] — one
-                           # provider block, id "<name>-anthropic". The AI SDK
-                           # Anthropic provider appends "/messages" to its
-                           # baseURL, while BASE_URL is the Claude Code form that
-                           # gets "/v1/messages" appended — so baseURL is
-                           # BASE_URL plus "/v1". The key and the header values
-                           # are only ever referenced ({file:...}).
+                           # provider block, filed under M_OPENCODE_PROVIDER_ID.
+                           # schema.resolve decides how much of it is written
+                           # here. The key and the header values are only ever
+                           # referenced ({file:...}) either way.
   local name=$1 api_key=$2 headers=''
   if [ -n "${3:-}" ] && [ -n "$M_HEADERS" ]; then
     headers=",
@@ -297,8 +291,28 @@ opencode_provider_json() { # <provider> <apiKey reference> [<header ref fn>] —
 $(headers_json "$3")
         }"
   fi
+
+  # models.dev already knows this provider: naming its id is enough for OpenCode
+  # to pull the npm package, the endpoint and every model from the registry, so
+  # the only thing missing is the credential. That endpoint is the one the
+  # registry lists, which for most providers is their OpenAI-compatible route
+  # rather than the Anthropic one BASE_URL points at.
+  if [ "$M_SCHEMA_RESOLVE" = "models.dev" ]; then
+    cat <<EOF
+    "$M_OPENCODE_PROVIDER_ID": {
+      "options": {
+        "apiKey": "$api_key"$headers
+      }
+    }
+EOF
+    return 0
+  fi
+
+  # Declared in full from configs.jsonc. The AI SDK Anthropic provider appends
+  # "/messages" to its baseURL, while BASE_URL is the Claude Code form that gets
+  # "/v1/messages" appended — so baseURL is BASE_URL plus "/v1".
   cat <<EOF
-    "$name-anthropic": {
+    "$M_OPENCODE_PROVIDER_ID": {
       "npm": "@ai-sdk/anthropic",
       "name": "$name",
       "options": {

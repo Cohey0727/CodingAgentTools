@@ -50,9 +50,14 @@ CLAUDE_SLOTS = {
 }
 
 MODEL_KEYS = {"id", "claude_id", "tags", "context_window", "max_tokens", "reasoning", "input"}
-PROVIDER_KEYS = {"API_KEY", "BASE_URL", "REQUEST_HEADERS", "defaults", "claude", "opencode", "models"}
+PROVIDER_KEYS = {"API_KEY", "BASE_URL", "REQUEST_HEADERS", "schema", "defaults", "claude", "opencode", "models"}
 CLAUDE_KEYS = {"command", "args", "env", "auto_compact_window"}
 OPENCODE_KEYS = {"lean", "context_window", "max_tokens"}
+SCHEMA_KEYS = {"resolve", "id"}
+
+# Where OpenCode's catalog for a provider comes from. Claude Code reads no
+# catalog, so its launcher is the same under every value.
+SCHEMA_RESOLVERS = ("local", "models.dev", "none")
 
 REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
 
@@ -170,6 +175,26 @@ def load(name):
     opencode = raw.get("opencode") or {}
     _check_keys(f"{where}.opencode", opencode, OPENCODE_KEYS)
 
+    schema = raw.get("schema") or {}
+    _check_keys(f"{where}.schema", schema, SCHEMA_KEYS)
+    resolve = schema.get("resolve", "local")
+    if resolve not in SCHEMA_RESOLVERS:
+        raise ConfigError(
+            f"{where}.schema: unknown resolve {resolve!r} (known: {', '.join(SCHEMA_RESOLVERS)})"
+        )
+    schema_id = schema.get("id") or ""
+    if resolve == "models.dev" and not schema_id:
+        raise ConfigError(
+            f'{where}.schema: resolve "models.dev" needs the id that registry knows the '
+            f'provider by, e.g. "id": "{name}" — it is rarely the name used here '
+            "(glm is \"zai\", kimi is \"kimi-for-coding\")"
+        )
+    if resolve != "models.dev" and schema_id:
+        raise ConfigError(f'{where}.schema: id only applies to resolve "models.dev"')
+    # The id OpenCode files the provider under, and the one every reference to
+    # its models has to spell. Empty means it gets no block at all.
+    opencode_id = {"local": f"{name}-anthropic", "models.dev": schema_id, "none": ""}[resolve]
+
     entries = raw.get("models")
     if not isinstance(entries, list) or not entries:
         raise ConfigError(f"{where}: models must be a non-empty array")
@@ -233,6 +258,8 @@ def load(name):
         "args": claude.get("args", ""),
         "env": {k: str(v) for k, v in env.items()},
         "auto_compact_window": claude.get("auto_compact_window") or slots["ANTHROPIC_MODEL"]["context_window"],
+        "schema_resolve": resolve,
+        "opencode_id": opencode_id,
         "lean": bool(opencode.get("lean", False)),
         "opencode_context_window": opencode.get("context_window"),
         "opencode_max_tokens": opencode.get("max_tokens"),
@@ -296,6 +323,8 @@ def shell(config):
         "M_CLAUDE_CODE_AUTO_COMPACT_WINDOW": str(config["auto_compact_window"]),
         "M_DEFAULT_MODEL": config["default_model"]["id"],
         "M_SMALL_MODEL": config["small_model"]["id"],
+        "M_SCHEMA_RESOLVE": config["schema_resolve"],
+        "M_OPENCODE_PROVIDER_ID": config["opencode_id"],
         "M_OPENCODE_LEAN": "true" if config["lean"] else "false",
         "M_OPENCODE_MODELS_JSON": opencode_models_json(config),
         "M_PI_MODELS_JSON": pi_models_json(config),
@@ -336,8 +365,19 @@ def main(argv):
         elif action == "env-vars":
             print(env_vars())
         elif action == "check" and not argument:
+            # Two providers sharing one OpenCode id would silently merge into a
+            # single block, so the whole file is checked at once for that.
+            taken = {}
             for name in load_file():
-                load(name)
+                opencode_id = load(name)["opencode_id"]
+                if not opencode_id:
+                    continue
+                if opencode_id in taken:
+                    raise ConfigError(
+                        f"providers.{name}: OpenCode id {opencode_id!r} is already "
+                        f"taken by providers.{taken[opencode_id]}"
+                    )
+                taken[opencode_id] = name
         elif not argument:
             print(f"models.py {action}: a provider name is required", file=sys.stderr)
             return 2

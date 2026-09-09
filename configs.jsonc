@@ -9,6 +9,10 @@
 // no secret is ever written here, and an endpoint keeps a working default that
 // .env can override — a different route, a regional host, a proxy in front.
 //
+// "schema" picks where OpenCode gets a provider's catalog: "local" (default) is
+// the "models" array below, "models.dev" is that registry — "id" names the
+// provider there — and "none" leaves it out. README has the trade-offs.
+//
 // // line comments are allowed.
 {
   "providers": {
