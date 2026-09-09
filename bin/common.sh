@@ -109,7 +109,7 @@ unset_provider_settings() { # every name the .env schema defines, generic settin
   unset REASONING INPUT HEADERS
   unset COMMAND CLAUDE_ARGS CLAUDE_MODEL_SUFFIX
   unset OPENCODE_MODEL OPENCODE_SMALL_MODEL PI_MODEL PI_SMALL_MODEL
-  unset OPENCODE_LEAN OPENCODE_CONTEXT_WINDOW OPENCODE_MAX_TOKENS
+  unset OPENCODE_LEAN OPENCODE_CONTEXT_WINDOW OPENCODE_MAX_TOKENS OPENCODE_EXTRA_MODELS
   unset ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL ANTHROPIC_CUSTOM_HEADERS ANTHROPIC_MODEL
   unset ANTHROPIC_DEFAULT_OPUS_MODEL ANTHROPIC_DEFAULT_SONNET_MODEL
   unset ANTHROPIC_DEFAULT_HAIKU_MODEL ANTHROPIC_DEFAULT_FABLE_MODEL
@@ -278,6 +278,11 @@ opencode_resolve() { # after load_settings: OpenCode's view, overrides applied
   OC_CFG_SMALL_MAX_TOKENS=$(pick OPENCODE_MAX_TOKENS CFG_SMALL_MAX_TOKENS)
   OC_CFG_SMALL_MAX_TOKENS="${OC_CFG_SMALL_MAX_TOKENS:-$OC_CFG_MAX_TOKENS}"
 
+  # Model ids to list beyond MODEL and SMALL_MODEL, space-separated. The other
+  # CLIs reach a second model through a flag of their own; OpenCode only ever
+  # sees this generated config, so an id missing from it cannot be picked.
+  OC_CFG_EXTRA_MODELS="${OPENCODE_EXTRA_MODELS:-}"
+
   if [ "${OPENCODE_LEAN:-}" = "true" ]; then OC_CFG_LEAN=true; else OC_CFG_LEAN=false; fi
 }
 
@@ -317,12 +322,20 @@ opencode_provider_json() { # <provider name> <apiKey reference> [<header ref fn>
                            # BASE_URL plus "/v1". The token and the HEADERS
                            # values are only ever referenced ({file:...}),
                            # never written into the config.
-  local name=$1 api_key=$2 models headers=''
+  local name=$1 api_key=$2 models headers='' extra listed
   models=$(opencode_model_json "$OC_CFG_MODEL" "$OC_CFG_CONTEXT_WINDOW" "$OC_CFG_MAX_TOKENS")
+  listed=" $OC_CFG_MODEL "
   if [ "$OC_CFG_SMALL_MODEL" != "$OC_CFG_MODEL" ]; then
     models="$models,
 $(opencode_model_json "$OC_CFG_SMALL_MODEL" "$OC_CFG_SMALL_CONTEXT_WINDOW" "$OC_CFG_SMALL_MAX_TOKENS")"
+    listed="$listed$OC_CFG_SMALL_MODEL "
   fi
+  for extra in $OC_CFG_EXTRA_MODELS; do
+    case "$listed" in *" $extra "*) continue ;; esac
+    models="$models,
+$(opencode_model_json "$extra" "$OC_CFG_CONTEXT_WINDOW" "$OC_CFG_MAX_TOKENS")"
+    listed="$listed$extra "
+  done
   if [ -n "${3:-}" ] && [ -n "$CFG_HEADERS" ]; then
     headers=",
         \"headers\": {
@@ -350,7 +363,7 @@ strip_metadata() { # drop every launcher-only setting from the exported env
   unset REASONING INPUT HEADERS
   unset COMMAND CLAUDE_ARGS CLAUDE_MODEL_SUFFIX
   unset OPENCODE_MODEL OPENCODE_SMALL_MODEL
-  unset OPENCODE_LEAN OPENCODE_CONTEXT_WINDOW OPENCODE_MAX_TOKENS
+  unset OPENCODE_LEAN OPENCODE_CONTEXT_WINDOW OPENCODE_MAX_TOKENS OPENCODE_EXTRA_MODELS
   unset PI_MODEL PI_SMALL_MODEL
 }
 

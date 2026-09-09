@@ -295,6 +295,7 @@ above them — uncomment one only when a CLI has to differ from the rest.
 | `ANTHROPIC_BASE_URL` | `BASE_URL` | all three |
 | `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU,FABLE}_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL` | the model slots Claude Code fills from `MODEL` / `SMALL_MODEL` | Claude Code |
 | `OPENCODE_MODEL`, `OPENCODE_SMALL_MODEL` | `MODEL` / `SMALL_MODEL` for OpenCode | the OpenCode global config |
+| `OPENCODE_EXTRA_MODELS` | nothing — space-separated ids OpenCode lists on top of `MODEL` / `SMALL_MODEL`. Claude Code and pi reach another model with `--model`; OpenCode has no launcher to pass one, so an id missing from the generated config cannot be picked there | the OpenCode global config |
 | `OPENCODE_CONTEXT_WINDOW`, `OPENCODE_MAX_TOKENS` | `CONTEXT_WINDOW` / `MAX_TOKENS` for OpenCode. These are the window a session may grow into before OpenCode compacts it, so a backend too slow to prefill its full context sets them lower — `gtr` does | the OpenCode global config |
 | `OPENCODE_LEAN` | nothing — `true` gives the provider [a lean agent of its own](#lean-agents) | the OpenCode global config |
 | `PI_MODEL`, `PI_SMALL_MODEL` | `MODEL` / `SMALL_MODEL` for pi | the pi global models.json |
