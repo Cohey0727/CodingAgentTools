@@ -23,7 +23,7 @@ description: 同じレビュー依頼を複数 LLM に並列で投げ、回答�
 | `enabled` | `true` のものだけ実行する。無効化はここを `false` にするだけ |
 | `schema` | 実行方式 (下表)。これを見て起動方法を決める |
 | `command` | 起動コマンド。`schema: self` では不要 |
-| `model` | `{ provider, agent, role }`。`command` の `{model}` を、`<repo>/bin/model-ref.sh <provider> <agent> <role>` の出力で置換してから実行する。role は `main` / `small` |
+| `model` | `{ provider, role }`。`command` の `{model}` を、`<repo>/bin/model-ref.sh <provider> <role>` の出力で置換してから実行する。role は `main` / `small` |
 | `timeout_ms` | 実行時のタイムアウト。shell の `timeout` コマンドに秒換算で渡す |
 | `notes` | モデルの特性・注意点 |
 

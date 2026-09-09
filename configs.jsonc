@@ -2,7 +2,6 @@
 // slot each model fills. "${NAME}" and "${NAME:-fallback}" resolve from the
 // .env beside this file, so no secret is written here. Fields: see README.
 {
-  "start_provider": "glm",
   "providers": {
 
     "deepseek": {
@@ -27,6 +26,8 @@
     },
 
     "glm": {
+      // The provider every generated config starts on. At most one may say so.
+      "primary": true,
       "API_KEY": "${GLM_API_KEY}",
       "BASE_URL": "${GLM_BASE_URL:-https://api.z.ai/api/anthropic}",
 

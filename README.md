@@ -175,16 +175,16 @@ Note `small_model` — the model OpenCode names a session with, and its only use
 
 ### Default provider
 
-Every generated global config starts on `start_provider`, at the top of `configs.jsonc`:
+Every generated global config starts on whichever provider is marked `primary` in `configs.jsonc`:
 
 ```jsonc
-{
-  "start_provider": "glm",
+"glm": {
+  "primary": true,
   ...
 }
 ```
 
-When that provider has no token the first configured one wins instead, so a fresh checkout still gets a working one. It sets OpenCode's `model` and `small_model`, and pi's `defaultProvider` / `defaultModel`. A launcher has no such setting: each one pins the provider baked into it.
+At most one provider may say so. When it has no token the first configured one wins instead, so a fresh checkout still gets a working one. It sets OpenCode's `model` and `small_model`, and pi's `defaultProvider` / `defaultModel`. A launcher has no such setting: each one pins the provider baked into it.
 
 ### Loops in pi
 

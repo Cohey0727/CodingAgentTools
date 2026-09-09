@@ -65,9 +65,9 @@ if [ "${#entries[@]}" -eq 0 ]; then
 fi
 
 # The provider pi starts on, and its main model.
-start_provider=$(default_provider "${providers[@]}")
+primary=$(default_provider "${providers[@]}")
 start_model=$(
-  models_resolve "$start_provider"
+  models_resolve "$primary"
   printf '%s' "$M_DEFAULT_MODEL"
 )
 
@@ -91,7 +91,7 @@ echo "  Wrote $OUT (${#entries[@]} providers)"
 # rewritten. Ctrl+S in /model writes the same two keys.
 settings="$AGENT_DIR/settings.json"
 if command -v python3 >/dev/null 2>&1; then
-  python3 - "$settings" "$start_provider" "$start_model" <<'EOF'
+  python3 - "$settings" "$primary" "$start_model" <<'EOF'
 import json, os, sys
 path, provider, model = sys.argv[1:4]
 try:
@@ -107,7 +107,7 @@ with open(tmp, "w") as f:
     f.write("\n")
 os.replace(tmp, path)
 EOF
-  echo "  Set pi's startup model to $start_provider/$start_model"
+  echo "  Set pi's startup model to $primary/$start_model"
 else
   echo "  pi's startup model needs python3 — pick it with /model then Ctrl+S" >&2
 fi

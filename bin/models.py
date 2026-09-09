@@ -14,7 +14,7 @@ The file is JSON with // line comments allowed.
   models.py check [<provider>]  validate, print nothing on success
   models.py tags <provider>     "<id><tab><tag>,<tag>" per model
   models.py providers           one provider name per line
-  models.py start-provider      the provider the generated configs start on
+  models.py primary             the provider marked "primary", if any
   models.py env-vars            every "${NAME}" the file references, with its provider
 """
 
@@ -51,7 +51,7 @@ CLAUDE_SLOTS = {
 }
 
 MODEL_KEYS = {"id", "claude_id", "tags", "context_window", "max_tokens", "reasoning", "input"}
-PROVIDER_KEYS = {"API_KEY", "BASE_URL", "REQUEST_HEADERS", "defaults", "claude", "opencode", "models"}
+PROVIDER_KEYS = {"API_KEY", "BASE_URL", "REQUEST_HEADERS", "primary", "defaults", "claude", "opencode", "models"}
 CLAUDE_KEYS = {"command", "args", "env", "auto_compact_window"}
 OPENCODE_KEYS = {"lean", "context_window", "max_tokens"}
 
@@ -140,13 +140,14 @@ def load_file():
     return raw["providers"]
 
 
-def start_provider():
-    """The provider the generated configs start on. Naming one is the file's job."""
-    raw = json.loads(strip_comments(CONFIGS.read_text()))
-    name = raw.get("start_provider") or ""
-    if name and name not in raw["providers"]:
-        raise ConfigError(f"{CONFIGS}: start_provider {name!r} is not a provider")
-    return name
+def primary_provider():
+    """The provider marked "primary" — the one every generated config starts on."""
+    marked = [name for name, raw in load_file().items() if raw.get("primary")]
+    if len(marked) > 1:
+        raise ConfigError(
+            f"{CONFIGS}: more than one provider is primary ({', '.join(marked)})"
+        )
+    return marked[0] if marked else ""
 
 
 def load(name):
@@ -354,14 +355,14 @@ def env_vars():
 def main(argv):
     action = argv[1] if len(argv) > 1 else ""
     argument = argv[2] if len(argv) > 2 else ""
-    if action not in ("sh", "check", "tags", "providers", "env-vars", "start-provider", "vocabulary"):
+    if action not in ("sh", "check", "tags", "providers", "env-vars", "primary", "vocabulary"):
         print(__doc__.strip(), file=sys.stderr)
         return 2
     try:
         if action == "providers":
             print("\n".join(load_file()))
-        elif action == "start-provider":
-            print(start_provider())
+        elif action == "primary":
+            print(primary_provider())
         elif action == "vocabulary":
             print(vocabulary())
         elif action == "env-vars":
@@ -369,6 +370,7 @@ def main(argv):
         elif action == "check" and not argument:
             for name in load_file():
                 load(name)
+            primary_provider()
         elif not argument:
             print(f"models.py {action}: a provider name is required", file=sys.stderr)
             return 2

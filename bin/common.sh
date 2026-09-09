@@ -55,10 +55,11 @@ opencode_tokens_dir() { # -> per-provider secret files the generated config refe
 }
 
 default_provider() { # <configured provider>... -> the one to start on. The name
-                     # is configs.jsonc's "start_provider"; falling back to the
-                     # first configured one keeps a keyless checkout working.
+                     # is whichever provider configs.jsonc marks "primary";
+                     # falling back to the first configured one keeps a keyless
+                     # checkout working.
   local p want
-  want="${DEFAULT_PROVIDER:-$("$PYTHON" "$MODELS_PY" start-provider)}"
+  want="${DEFAULT_PROVIDER:-$("$PYTHON" "$MODELS_PY" primary)}"
   for p in "$@"; do
     [ "$p" = "$want" ] && { printf '%s' "$p"; return 0; }
   done
