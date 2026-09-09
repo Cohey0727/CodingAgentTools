@@ -21,18 +21,14 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 # shellcheck disable=SC1090
 source "$ROOT/bin/common.sh"
 
-# Everything that runs, tracked or newly staged — a file added in this very
-# commit has to be refused too. Documentation may name providers; it describes
-# them, so it is not scanned.
+# This repo's own machinery, tracked or newly staged — a file added in this very
+# commit has to be refused too. Documentation describes providers, and a skill
+# names the one it wants to run; neither is scanned.
 scanned() {
-  tracked_and_staged 'bin/*' 'Makefile' 'lefthook.yml' 'opencode/*' '.claude/*.json' \
-    'skills/**/*.json' 'skills/**/SKILL.md'
+  tracked_and_staged 'bin/*' 'Makefile' 'lefthook.yml' 'opencode/*' '.claude/*.json'
 }
 
-# This repo's own machinery, where a provider may not even be named.
-machinery() {
-  tracked_and_staged 'bin/*' 'Makefile' 'lefthook.yml' 'opencode/*'
-}
+machinery() { scanned; }
 
 tracked_and_staged() {
   {

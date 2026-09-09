@@ -53,21 +53,16 @@ provider に新しい属性が要るなら、順序は必ずこう:
 その名前が自動的に禁止語になる。3 文字以下の provider 名は、値として使われた
 形（引用符や `=` の右）でのみ検出する。
 
-走査対象は `bin/` `Makefile` `opencode/` `skills/**/*.json` `skills/**/SKILL.md`
-と staged の新規ファイル。`README.md` / `docs/` / `AGENTS.md` は provider を
-説明するのが役割なので対象外。
+走査対象はこのレポの機構 — `bin/` `Makefile` `lefthook.yml` `opencode/`
+`.claude/*.json` — と staged の新規ファイル。`README.md` / `docs/` /
+`AGENTS.md` は provider を説明するのが役割、`skills/` は使いたい provider を
+名指しするのが役割なので、どちらも対象外。
 
 `lefthook` の pre-commit が `make check` を回す。違反があるとコミットできない
 （`make hooks` で導入）。
 
-逃げ道は 2 つだけ:
-
-- 行末に `style-check: allow`
-- `.style-check-allow` に `<path><TAB><語>` を書く。**語単位**なので、その
-  ファイルに別の禁止語（モデル id など）が出れば依然として弾かれる。
-  provider を「選ぶ」ためにその名前を書くファイル（`llms.json`）用
-
-どちらもレビューで理由を説明できないなら使わない。
+逃げ道は行末の `style-check: allow` だけ。レビューで理由を説明できないなら
+使わない。
 
 ## ドキュメント
 
