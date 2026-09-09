@@ -47,12 +47,14 @@ fi
 # The provider the session's model / small_model start on.
 default_provider=$(default_provider "${providers[@]}")
 
+# The prefix is the id the provider is filed under, which follows its schema.
 default_models=$(
   models_resolve "$default_provider"
-  printf '%s\n%s' "$M_DEFAULT_MODEL" "$M_SMALL_MODEL"
+  printf '%s\n%s\n%s' "$(opencode_provider_id)" "$M_DEFAULT_MODEL" "$M_SMALL_MODEL"
 )
-model="$default_provider-anthropic/$(head -1 <<<"$default_models")"
-small_model="$default_provider-anthropic/$(tail -n +2 <<<"$default_models")"
+default_id=$(sed -n 1p <<<"$default_models")
+model="$default_id/$(sed -n 2p <<<"$default_models")"
+small_model="$default_id/$(sed -n 3p <<<"$default_models")"
 
 # The secrets dir is fully managed here: wipe it, then write the current set so
 # a provider whose key was emptied leaves no stale copy behind.

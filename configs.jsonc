@@ -5,6 +5,9 @@
   "providers": {
 
     "deepseek": {
+      // models.dev がこの provider を知っているので、生成する設定はキーだけ。
+      // npm・endpoint・モデル一覧・上限はレジストリが供給する。
+      "schema": "models.dev",
       "API_KEY": "${DEEPSEEK_API_KEY}",
       "BASE_URL": "${DEEPSEEK_BASE_URL:-https://api.deepseek.com/anthropic}",
 
@@ -18,16 +21,21 @@
       "claude": { "env": { "CLAUDE_CODE_EFFORT_LEVEL": "max" } },
 
       "models": [
-        { "id": "deepseek-v4-pro" },
-        { "id": "deepseek-v4-flash" },
+        { "id": "deepseek-v4-pro", "tags": ["default"] },
+        { "id": "deepseek-v4-flash", "tags": ["small"] },
         { "id": "deepseek-v4-flash-vision-exp", "input": ["text", "image"] },
-        { "id": "deepseek-v4.1-flash-expires-on-0910", "tags": ["default","small"] }
+        { "id": "deepseek-v4.1-flash-expires-on-0910" }
       ]
     },
 
     "glm": {
       // The provider every generated config starts on. At most one may say so.
       "primary": true,
+      // models.dev knows this one under a different name. It must be the
+      // coding-plan entry: the plain "zai" one is the metered route, and a
+      // subscription key has no balance there.
+      "schema": "models.dev",
+      "schema_id": "zai-coding-plan",
       "API_KEY": "${GLM_API_KEY}",
       "BASE_URL": "${GLM_BASE_URL:-https://api.z.ai/api/anthropic}",
 
@@ -95,6 +103,8 @@
     },
 
     "minimax": {
+      // models.dev lists the same Anthropic endpoint BASE_URL points at.
+      "schema": "models.dev",
       "API_KEY": "${MINIMAX_API_KEY}",
       "BASE_URL": "${MINIMAX_BASE_URL:-https://api.minimax.io/anthropic}",
 

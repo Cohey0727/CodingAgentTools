@@ -51,7 +51,12 @@ CLAUDE_SLOTS = {
 }
 
 MODEL_KEYS = {"id", "claude_id", "tags", "context_window", "max_tokens", "reasoning", "input"}
-PROVIDER_KEYS = {"API_KEY", "BASE_URL", "REQUEST_HEADERS", "primary", "defaults", "claude", "opencode", "models"}
+PROVIDER_KEYS = {"API_KEY", "BASE_URL", "REQUEST_HEADERS", "primary", "schema", "schema_id", "defaults", "claude", "opencode", "models"}
+
+# How OpenCode is told about a provider. "local" declares the package, the
+# endpoint and every model below; "models.dev" writes only the key and lets
+# that registry supply the rest — against whichever endpoint it lists.
+SCHEMAS = ("local", "models.dev")
 CLAUDE_KEYS = {"command", "args", "env", "auto_compact_window"}
 OPENCODE_KEYS = {"lean", "context_window", "max_tokens"}
 
@@ -162,6 +167,13 @@ def load(name):
         raise ConfigError(f"{where}: must be an object")
     _check_keys(where, raw, PROVIDER_KEYS)
 
+    schema = raw.get("schema") or "local"
+    if schema not in SCHEMAS:
+        raise ConfigError(f"{where}: unknown schema {schema!r} (known: {', '.join(SCHEMAS)})")
+    # The name that registry files the provider under, which is often not this
+    # one: it defaults to the provider's name and is overridden when it differs.
+    schema_id = raw.get("schema_id") or name
+
     base_url = expand(raw.get("BASE_URL") or "").rstrip("/")
     if not base_url:
         raise ConfigError(f"{where}: BASE_URL is required")
@@ -239,6 +251,8 @@ def load(name):
         "api_key_var": api_key_var,
         "api_key_fallback": api_key_fallback,
         "base_url": base_url,
+        "schema": schema,
+        "schema_id": schema_id,
         "headers": headers,
         "command": claude.get("command") or f"claude{name}",
         "args": claude.get("args", ""),
@@ -292,6 +306,8 @@ def shell(config):
         "M_API_KEY_VAR": config["api_key_var"],
         "M_API_KEY_FALLBACK": config["api_key_fallback"],
         "M_BASE_URL": config["base_url"],
+        "M_SCHEMA": config["schema"],
+        "M_SCHEMA_ID": config["schema_id"],
         # One header per line: name, the variable it came from (empty when the
         # value is a literal), that variable's fallback, then the value. The
         # fields are separated by US (\x1f), not a tab: bash collapses runs of
