@@ -27,16 +27,23 @@ if [ -f "$OUT" ] && ! generated_here "$OUT"; then
   exit 1
 fi
 
-# A value configs.json points at a variable for is referenced, never copied; one
-# written literally there is already in git, so it is passed through as-is.
+# A value configs.json points at a variable for is referenced, never copied. One
+# written literally there, or whose fallback cannot be a bare word in the
+# command, is already in git, so it is passed through resolved.
 pi_api_key_ref() {
-  if [ -n "$M_API_KEY_VAR" ]; then pi_secret_ref "$M_API_KEY_VAR"; else printf '%s' "$M_API_KEY"; fi
+  if [ -n "$M_API_KEY_VAR" ] && pi_secret_ref "$M_API_KEY_VAR" "$M_API_KEY_FALLBACK"; then
+    return 0
+  fi
+  printf '%s' "$M_API_KEY"
 }
 
 pi_header_ref() { # <header name>
   local var
   var=$(header_var "$1")
-  if [ -n "$var" ]; then pi_secret_ref "$var"; else header_value "$1"; fi
+  if [ -n "$var" ] && pi_secret_ref "$var" "$(header_fallback "$1")"; then
+    return 0
+  fi
+  header_value "$1"
 }
 
 providers=()

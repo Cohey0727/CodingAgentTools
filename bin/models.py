@@ -2,9 +2,11 @@
 """Resolve configs.json into the values Claude Code, OpenCode and pi need.
 
 configs.json at the repo root holds every provider: its endpoint, the models it
-serves, and the tags that say which slot each model fills. Any "${NAME}" in a
-string is read from the environment, so the file carries references to secrets
-rather than secrets. The .env beside it holds those values.
+serves, and the tags that say which slot each model fills. In any string,
+"${NAME}" is read from the environment and "${NAME:-fallback}" falls back to the
+text after ":-" when NAME is unset or empty — the shell's own syntax. The .env
+beside it holds those values, so the file carries references to secrets rather
+than secrets, and an endpoint can ship a default that .env overrides.
 
 The file is JSON with // line comments allowed.
 
@@ -52,7 +54,7 @@ PROVIDER_KEYS = {"API_KEY", "BASE_URL", "REQUEST_HEADERS", "defaults", "claude",
 CLAUDE_KEYS = {"command", "args", "env", "auto_compact_window"}
 OPENCODE_KEYS = {"lean", "context_window", "max_tokens"}
 
-REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
 
 
 class ConfigError(Exception):
@@ -93,18 +95,20 @@ def strip_comments(text):
 
 
 def expand(value):
-    """"${NAME}" -> the environment's value, empty when it is not set."""
-    return REFERENCE.sub(lambda m: os.environ.get(m.group(1), ""), value)
+    """"${NAME}" -> the environment's value, "${NAME:-x}" -> x when it is unset or empty."""
+    return REFERENCE.sub(lambda m: os.environ.get(m.group(1)) or (m.group(2) or ""), value)
 
 
 def sole_reference(value):
-    """The variable name when the value is exactly one "${NAME}", else empty.
+    """(variable, fallback) when the value is exactly one reference, else ("", "").
 
     A value shaped that way can be handed to pi as a command that reads the
-    variable at request time, instead of being copied anywhere.
+    variable at request time, so nothing resolved from the environment is copied
+    into a generated config. A fallback written here is already in git, so it
+    travels with the reference.
     """
     match = REFERENCE.fullmatch(value or "")
-    return match.group(1) if match else ""
+    return (match.group(1), match.group(2) or "") if match else ("", "")
 
 
 def _check_keys(where, obj, allowed):
@@ -154,10 +158,10 @@ def load(name):
     headers_raw = raw.get("REQUEST_HEADERS") or {}
     if not isinstance(headers_raw, dict):
         raise ConfigError(f"{where}: REQUEST_HEADERS must be an object")
-    headers = [
-        {"name": key, "var": sole_reference(value), "value": expand(value)}
-        for key, value in headers_raw.items()
-    ]
+    headers = []
+    for key, value in headers_raw.items():
+        var, fallback = sole_reference(value)
+        headers.append({"name": key, "var": var, "fallback": fallback, "value": expand(value)})
 
     defaults = raw.get("defaults") or {}
     _check_keys(f"{where}.defaults", defaults, MODEL_KEYS - {"id", "claude_id", "tags"})
@@ -217,10 +221,12 @@ def load(name):
     if not isinstance(env, dict):
         raise ConfigError(f"{where}.claude: env must be an object")
 
+    api_key_var, api_key_fallback = sole_reference(raw.get("API_KEY") or "")
     return {
         "name": name,
         "api_key": expand(raw.get("API_KEY") or ""),
-        "api_key_var": sole_reference(raw.get("API_KEY") or ""),
+        "api_key_var": api_key_var,
+        "api_key_fallback": api_key_fallback,
         "base_url": base_url,
         "headers": headers,
         "command": claude.get("command") or f"claude{name}",
@@ -273,11 +279,15 @@ def shell(config):
         "M_COMMAND": config["command"],
         "M_API_KEY": config["api_key"],
         "M_API_KEY_VAR": config["api_key_var"],
+        "M_API_KEY_FALLBACK": config["api_key_fallback"],
         "M_BASE_URL": config["base_url"],
         # One header per line: name, the variable it came from (empty when the
-        # value is a literal), then the value.
-        "M_HEADERS_TSV": "\n".join(
-            "\t".join((h["name"], h["var"], h["value"])) for h in config["headers"]
+        # value is a literal), that variable's fallback, then the value. The
+        # fields are separated by US (\x1f), not a tab: bash collapses runs of
+        # IFS whitespace into one delimiter, so an empty field between two tabs
+        # would shift every field after it.
+        "M_HEADERS": "\n".join(
+            "\x1f".join((h["name"], h["var"], h["fallback"], h["value"])) for h in config["headers"]
         ),
         "M_CLAUDE_ARGS": config["args"],
         "M_CLAUDE_ENV_SH": "\n".join(
@@ -297,16 +307,20 @@ def shell(config):
 
 
 def env_vars():
-    """Every "${NAME}" the file references, as "<provider><tab><var><tab><what>"."""
+    """Every reference in the file, as "<provider><tab><var><tab><what><tab><fallback>".
+
+    A reference with a fallback is optional: the file already works without it.
+    """
     lines = []
     for name, raw in load_file().items():
-        for var in REFERENCE.findall(raw.get("API_KEY") or ""):
-            lines.append(f"{name}\t{var}\tAPI_KEY")
-        for header, value in (raw.get("REQUEST_HEADERS") or {}).items():
-            for var in REFERENCE.findall(value or ""):
-                lines.append(f"{name}\t{var}\tREQUEST_HEADERS {header}")
-        for var in REFERENCE.findall(raw.get("BASE_URL") or ""):
-            lines.append(f"{name}\t{var}\tBASE_URL")
+        fields = [("API_KEY", raw.get("API_KEY") or ""), ("BASE_URL", raw.get("BASE_URL") or "")]
+        fields += [
+            (f"REQUEST_HEADERS {header}", value or "")
+            for header, value in (raw.get("REQUEST_HEADERS") or {}).items()
+        ]
+        for what, value in fields:
+            for var, fallback in REFERENCE.findall(value):
+                lines.append(f"{name}\t{var}\t{what}\t{fallback}")
     return "\n".join(lines)
 
 

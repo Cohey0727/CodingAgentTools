@@ -259,7 +259,7 @@ Two files at the repo root, and that is the whole configuration:
 
 | File | Holds | In git |
 |------|-------|--------|
-| `configs.json` | Every provider: endpoint, models, limits, the tags that say which slot each one fills, and `${VAR}` references where a secret belongs | yes |
+| `configs.json` | Every provider: endpoint, models, limits, the tags that say which slot each one fills, and a `${VAR}` reference wherever a value may come from outside | yes |
 | `.env` | The values those references point at — nothing else | no — gitignored, `chmod 600` |
 
 A whole provider in `configs.json` is a dozen lines, which Claude Code, OpenCode
@@ -270,7 +270,7 @@ and pi all read through `bin/models.py`:
   "providers": {
     "deepseek": {
       "API_KEY": "${DEEPSEEK_API_KEY}",
-      "BASE_URL": "https://api.deepseek.com/anthropic",
+      "BASE_URL": "${DEEPSEEK_BASE_URL:-https://api.deepseek.com/anthropic}",
       "defaults": { "context_window": 1000000, "max_tokens": 384000, "reasoning": true, "input": ["text"] },
       "claude": { "env": { "CLAUDE_CODE_EFFORT_LEVEL": "max" } },
       "models": [
@@ -288,11 +288,28 @@ and the `.env` beside it is one line per key:
 DEEPSEEK_API_KEY=sk-...
 ```
 
-`${NAME}` works in any string — `API_KEY`, `BASE_URL`, and each value under
-`REQUEST_HEADERS` — and is resolved against the environment when the value is
-needed, so no secret is ever copied into the file. An unset variable reads as
-empty, and a provider whose `API_KEY` comes out empty is left out of the
-generated pi and OpenCode configs rather than breaking them.
+Two reference forms work in any string — `API_KEY`, `BASE_URL`, and each value
+under `REQUEST_HEADERS` — and both resolve against the environment when the value
+is needed, so nothing from `.env` is ever copied into the file:
+
+| Written | Resolves to |
+|---------|-------------|
+| `${NAME}` | the environment's `NAME`, empty when it is unset |
+| `${NAME:-fallback}` | the environment's `NAME`, or `fallback` when it is unset or empty |
+
+Reading the file therefore tells you which values can come from outside and what
+happens when they do not. A secret has no sensible default and is written the
+first way; an endpoint ships the second, so `configs.json` carries a working
+default and `.env` can point the provider somewhere else — a regional host, a
+metered endpoint, a proxy or gateway in front of it — without editing a
+git-tracked file:
+
+```bash
+KIMI_BASE_URL=https://api.moonshot.ai/anthropic
+```
+
+A provider whose `API_KEY` resolves to nothing is left out of the generated pi
+and OpenCode configs rather than breaking them.
 
 `//` line comments are allowed, so the constraints behind a value can sit next
 to it. Every model listed is offered by OpenCode's `/models` and pi's `/model`,
@@ -365,8 +382,8 @@ provider id in OpenCode's config.
 
 | Field | Meaning |
 |-------|---------|
-| `API_KEY` | **Required.** The key, or a `${VAR}` reference to it |
-| `BASE_URL` | **Required.** The provider's Anthropic-compatible endpoint |
+| `API_KEY` | **Required.** A `${VAR}` reference to the key |
+| `BASE_URL` | **Required.** The provider's Anthropic-compatible endpoint, as `${VAR:-default}` so `.env` can route it elsewhere |
 | `REQUEST_HEADERS` | Extra request headers as a `{ "Name": "value" }` object, sent by all three CLIs — e.g. a Cloudflare Access service token in front of a self-hosted server. A value written as `${VAR}` is referenced, never copied into a generated config |
 | `claude.command` | The launcher command, when `claude<name>` is not wanted |
 | `claude.args` | Default options prepended to every `claude<name>` launch (word-split; your arguments come after them). OpenCode and pi have no launcher, so it does not reach them |
@@ -379,8 +396,9 @@ provider id in OpenCode's config.
 
 One variable per line, named by whatever `configs.json` references.
 `.env.example` lists them all with the URL to get each key from, and
-`make setup` prompts for them. The file is sourced by bash, so a value can be
-computed at use time:
+`make setup` prompts for the keys. The variables that already have a default in
+`configs.json` ship commented out there — uncomment one to override it. The file
+is sourced by bash, so a value can be computed at use time:
 
 ```bash
 GTR_CF_ACCESS_TOKEN="$(cloudflared access token --app=https://gtr-llama.example.com)"
@@ -590,6 +608,10 @@ marker): merge it by hand or move it aside.
 
 **`API_KEY for '<name>' is empty`** — the message names the `.env` variable to
 set. Re-run `make setup`, or edit `.env` directly.
+
+**A provider talks to the wrong endpoint** — a `<NAME>_BASE_URL` in `.env`
+overrides the default in `configs.json`. `make list` prints the endpoint each
+provider actually resolves to.
 
 **A CLI starts on the wrong model, or pi reports the wrong context size** —
 `configs.json` is the only source. `make list` prints each model with the tags

@@ -39,9 +39,17 @@
 }
 ```
 
-`${NAME}` は文字列ならどこでも書ける（`API_KEY` / `BASE_URL` /
-`REQUEST_HEADERS` の各値）。未設定の変数は空文字列になり、`API_KEY` が空の
-プロバイダは生成物から外れるだけでエラーにはならない。
+参照の書き方は 2 つあり、`API_KEY` / `BASE_URL` / `REQUEST_HEADERS` の
+どの値でも同じように使える:
+
+| 書き方 | 解決結果 |
+|---|---|
+| `${NAME}` | 環境の `NAME`。未設定なら空文字列 |
+| `${NAME:-fallback}` | 環境の `NAME`。未設定または空なら `fallback` |
+
+ファイルを読めば、どの値が外から来るのか・来なかったらどうなるのかが分かる。
+秘密情報には妥当な既定値がないので前者、エンドポイントは後者で書く。
+`API_KEY` が空になったプロバイダは生成物から外れるだけでエラーにはならない。
 
 `providers` のキーがそのままプロバイダ名で、launcher 名（`claude<name>`）、
 pi のモデル一覧に出る id、OpenCode の `<name>-anthropic` の元になる。
@@ -90,10 +98,16 @@ rm -rf providers/
 
 ## エンドポイントの切り替え
 
-`BASE_URL` が git 管理下に移ったので、kimi の従量課金や mimo の CN
-エンドポイントに切り替えるとローカル差分が出る。差分を出したくない場合は
-`${VAR}` を書いて `.env` 側に置く:
+`BASE_URL` は全プロバイダ `${<NAME>_BASE_URL:-<既定値>}` で書いてある。
+既定値は `configs.json` に残したまま、`.env` の変数で経路を差し替えられる。
+git 管理下のファイルを編集しないので、ローカル差分も出ない:
 
-```jsonc
-"BASE_URL": "${KIMI_BASE_URL}"
+```bash
+# .env
+KIMI_BASE_URL=https://api.moonshot.ai/anthropic
+MIMO_BASE_URL=https://api.xiaomimimo.com/anthropic
 ```
+
+`.env.example` には各プロバイダの上書き行がコメントアウトで並べてある。
+別ホスト・別課金経路・手前に置いたプロキシやゲートウェイ、いずれもここで
+差し替える。

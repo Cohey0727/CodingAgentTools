@@ -3,9 +3,10 @@
 # Makefile and the global-config generators.
 #
 # configs.json at the repo root describes every provider: endpoint, models, and
-# the tags that say which slot each model fills. Secrets are not in it — an
-# API_KEY or a header value is written as "${NAME}" and read from the .env
-# beside it, which is gitignored.
+# the tags that say which slot each model fills. Every value that may come from
+# outside the file is written as "${NAME}", or "${NAME:-fallback}" where the file
+# can carry a working default — so an API_KEY, a BASE_URL and a header value all
+# read the same way, and the .env beside it (gitignored) holds what they resolve to.
 
 COMMON_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT_DIR=$(dirname "$COMMON_DIR")
@@ -100,13 +101,14 @@ pi_package_installed() { # <source> — recorded in pi's user settings?
 # never carries one provider's key into another provider's process. It is
 # sourced rather than parsed: a value may be computed, e.g. a short-lived
 # Cloudflare Access token from $(cloudflared access token ...).
-env_value() { # <variable name> -> its value from the .env, empty when unset
+env_value() { # <variable name> [<fallback>] -> its value from the .env, or the
+              # fallback when the variable is unset or empty
   (
     set -a
     # shellcheck disable=SC1090
     [ -f "$ENV_FILE" ] && . "$ENV_FILE"
     set +a
-    printf '%s' "${!1:-}"
+    printf '%s' "${!1:-${2:-}}"
   )
 }
 
@@ -167,29 +169,37 @@ require_settings() { # <launcher name> — fail fast on a key that resolved to n
 
 # ----------------------------------------------------------------- headers
 
-# REQUEST_HEADERS reaches the shell as one "name<tab>variable<tab>value" line
-# per header. Claude Code takes the pairs as "Name: Value" lines; OpenCode and
-# pi are given references instead, never the values.
+# REQUEST_HEADERS reaches the shell as one "name US variable US fallback US
+# value" line per header, US being \x1f. The separator is not whitespace on
+# purpose: bash collapses runs of IFS whitespace into a single delimiter, so a
+# tab-separated line with an empty field would shift every field after it.
+# Claude Code takes the pairs as "Name: Value" lines; OpenCode and pi are given
+# references instead, never a value resolved from the environment.
 header_names() { # -> one header name per line
   local name rest
-  [ -n "$M_HEADERS_TSV" ] || return 0
-  while IFS=$'\t' read -r name rest; do
+  [ -n "$M_HEADERS" ] || return 0
+  while IFS=$'\x1f' read -r name rest; do
     [ -n "$name" ] && printf '%s\n' "$name"
-  done <<<"$M_HEADERS_TSV"
+  done <<<"$M_HEADERS"
 }
 
-header_field() { # <name> <2 for variable | 3 for value>
-  local n var value
-  [ -n "$M_HEADERS_TSV" ] || return 0
-  while IFS=$'\t' read -r n var value; do
+header_field() { # <name> <field: var | fallback | value>
+  local n var fallback value
+  [ -n "$M_HEADERS" ] || return 0
+  while IFS=$'\x1f' read -r n var fallback value; do
     [ "$n" = "$1" ] || continue
-    if [ "$2" = 2 ]; then printf '%s' "$var"; else printf '%s' "$value"; fi
+    case $2 in
+      var) printf '%s' "$var" ;;
+      fallback) printf '%s' "$fallback" ;;
+      *) printf '%s' "$value" ;;
+    esac
     return 0
-  done <<<"$M_HEADERS_TSV"
+  done <<<"$M_HEADERS"
 }
 
-header_var() { header_field "$1" 2; }
-header_value() { header_field "$1" 3; }
+header_var() { header_field "$1" var; }
+header_fallback() { header_field "$1" fallback; }
+header_value() { header_field "$1" value; }
 
 claude_custom_headers() { # -> the "Name: Value" lines ANTHROPIC_CUSTOM_HEADERS takes
   local name out=''
@@ -215,15 +225,23 @@ headers_json() { # <ref fn> -> `"Name": "<ref>"` members, comma-separated; empty
 
 # --------------------------------------------------------- generated configs
 
-pi_secret_ref() { # <variable name> -> the command pi runs to read it at request time
-  printf "!bash -c '. %s; env_value %s'" "$COMMON_DIR/common.sh" "$1"
+pi_secret_ref() { # <variable name> [<fallback>] -> the command pi runs to read it
+                  # at request time. The fallback is written into the command as
+                  # a bare word, so a value that would need quoting inside the
+                  # single-quoted command is refused; the caller writes the
+                  # resolved literal instead.
+  case ${2:-} in
+    '') printf "!bash -c '. %s; env_value %s'" "$COMMON_DIR/common.sh" "$1" ;;
+    *[!A-Za-z0-9._:/-]*) return 1 ;;
+    *) printf "!bash -c '. %s; env_value %s %s'" "$COMMON_DIR/common.sh" "$1" "$2" ;;
+  esac
 }
 
 pi_provider_json() { # <provider> <apiKey reference> [<header ref fn>] — one
                      # models.json provider block, after models_resolve. HEADERS
                      # are included when a reference function is given.
   local id=$1 api_key=$2 headers=''
-  if [ -n "${3:-}" ] && [ -n "$M_HEADERS_TSV" ]; then
+  if [ -n "${3:-}" ] && [ -n "$M_HEADERS" ]; then
     headers="      \"headers\": {
 $(headers_json "$3")
       },
@@ -273,7 +291,7 @@ opencode_provider_json() { # <provider> <apiKey reference> [<header ref fn>] —
                            # BASE_URL plus "/v1". The key and the header values
                            # are only ever referenced ({file:...}).
   local name=$1 api_key=$2 headers=''
-  if [ -n "${3:-}" ] && [ -n "$M_HEADERS_TSV" ]; then
+  if [ -n "${3:-}" ] && [ -n "$M_HEADERS" ]; then
     headers=",
         \"headers\": {
 $(headers_json "$3")
