@@ -1,6 +1,6 @@
 # CodingAgentTools
 
-> Run Claude Code, OpenCode and pi on Anthropic-compatible LLM backends (DeepSeek · MiniMax · GLM · Kimi · MiMo · OpenRouter · your own llama.cpp) — one repo, one `make setup`, one `.env` per provider driving all three CLIs, and the skills and global instruction file all three share.
+> Run Claude Code, OpenCode and pi on Anthropic-compatible LLM backends (DeepSeek · MiniMax · GLM · Kimi · MiMo · your own llama.cpp) — one repo, one `make setup`, one `.env` per provider driving all three CLIs, and the skills and global instruction file all three share.
 
 One repo that installs a `claude<name>` launcher command per provider and generates the pi and OpenCode configs covering every provider — [Claude Code](https://docs.anthropic.com/claude-code), [OpenCode](https://opencode.ai) and the [pi coding agent](https://pi.dev), all against Anthropic-compatible backends:
 
@@ -11,7 +11,6 @@ One repo that installs a `claude<name>` launcher command per provider and genera
 | GLM (Z.ai) | `claudeglm` | `https://api.z.ai/api/anthropic` | `glm-5.3` |
 | Kimi (Moonshot) | `claudekimi` | `https://api.kimi.com/coding` | `kimi-k3` |
 | MiMo (Xiaomi) | `claudemimo` | `https://token-plan-sgp.xiaomimimo.com/anthropic` | `mimo-v2.5-pro` |
-| OpenRouter | `claudeox` | `https://openrouter.ai/api` | `stealth/ox-alpha` |
 | Local (llama.cpp) | `claudelocal` | `http://127.0.0.1:11301` | `default` |
 | gtr (llama.cpp behind Cloudflare) | `claudegtr` | `https://gtr-llama.spaghetti-monster.com` | `default` |
 
@@ -28,8 +27,6 @@ Each provider exposes a native Anthropic-compatible endpoint, so there is no pro
 > **Note:** Local is not a hosted service — it points at a `llama-server` on your own machine, which serves the Anthropic shape on `/v1/messages`. Here that server is LlamaGate (`~/Workspace/LlamaGate`): `just start` brings it up on `127.0.0.1:11301`, `just profiles` lists the models it can load and `just start <profile>` swaps to one. There is no account and no key, so `API_TOKEN` is a placeholder the CLIs merely require to be non-empty. Both llama.cpp providers use the fixed model id `default`: llama-server answers with whatever it has loaded and ignores the requested name, so swapping the model on the server needs no edit here. Keep `CONTEXT_WINDOW` at or below the server's `--ctx-size`.
 
 > **Note:** MiMo has three endpoints. The default `https://token-plan-sgp.xiaomimimo.com/anthropic` is the **global Token Plan subscription** endpoint (tokens start with `tp-`). China accounts use `https://token-plan-cn.xiaomimimo.com/anthropic` instead, and **pay-as-you-go (metered) billing** (keys start with `sk-`) uses `https://api.xiaomimimo.com/anthropic` — switch `BASE_URL` in `providers/mimo/.env` accordingly. Note the docs mostly mention only the CN host; the `-sgp` host is what actually accepts global-plan tokens.
-
-> **Note:** OpenRouter is a router rather than a model vendor, and `BASE_URL` is its Anthropic skin — the same `/v1/messages` route, with thinking blocks, tool use and streaming passed through untouched. `MODEL` is therefore any OpenRouter id, vendor prefix and all; the three CLIs split their `<provider>/<model>` reference on the first slash only, so `stealth/ox-alpha` survives intact. The preset is [Ox Alpha](https://openrouter.ai/stealth/ox-alpha): free, 1M context, and run by a provider that stays anonymous for the preview and retains prompts and completions. Stealth models are withdrawn without notice — point `MODEL` in `providers/ox/.env` at another id when it goes.
 
 > **Note:** gtr is a `llama-server` on another machine, published through a Cloudflare tunnel and gated by Cloudflare Access. Requests without Access credentials get a 302 to the login page, so `HEADERS` in `providers/gtr/.env` has to carry an Access service token (`CF-Access-Client-Id` / `CF-Access-Client-Secret`) — the comments in the file show both that and the short-lived `cloudflared access token` variant. Like Local, `API_TOKEN` is only a placeholder unless `llama-server` runs with `--api-key`.
 
@@ -109,7 +106,8 @@ mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/mig
 [2026-09-03 — pi ランチャー廃止とグローバル models.json 生成](docs/migrations/2026-09-03-pi-global-models.md),
 [2026-09-05 — OpenCode の lean エージェント](docs/migrations/2026-09-05-opencode-lean-agent.md),
 [2026-09-08 — claude-code-settings の統合](docs/migrations/2026-09-08-merge-claude-code-settings.md),
-and [2026-09-08 — OpenCode の `/goal`](docs/migrations/2026-09-08-opencode-goal.md).
+[2026-09-08 — OpenCode の `/goal`](docs/migrations/2026-09-08-opencode-goal.md),
+and [2026-09-09 — GLM の軽量モデルと ox 廃止](docs/migrations/2026-09-09-glm-flash-and-ox-removal.md).
 
 ### Make targets
 
@@ -132,19 +130,24 @@ claudemmx         # Claude Code on MiniMax
 claudeglm         # Claude Code on GLM (Z.ai)
 claudekimi        # Claude Code on Kimi (Moonshot)
 claudemimo        # Claude Code on MiMo (Xiaomi)
-claudeox          # Claude Code on OpenRouter (Ox Alpha)
 claudegtr         # Claude Code on gtr (llama.cpp behind Cloudflare)
 
 opencode          # OpenCode — every configured provider is in /models
 pi                # pi — every configured provider is in /model
 ```
 
-Arguments pass through to `claude` verbatim:
+Arguments pass through to `claude` verbatim, `--model` included — so a launcher
+is not pinned to the `MODEL` in its `.env`, and any id the provider serves works
+for one run:
 
 ```bash
 claudeglm --help
 claudedeepseek -p "Review my TypeScript type definitions"
+claudeglm --model glm-5.3-flash            # the cheap model for a whole session
 ```
+
+That covers the main slot only; the haiku and subagent slots keep following
+`SMALL_MODEL`. In-session `/model <id>` does the same thing.
 
 pi has no `pi<name>` commands. `make setup` (and `make pi-global`) write every provider that has a token into `~/.pi/agent/models.json`, so a bare `pi` has all of them and `/model` switches mid-session:
 
@@ -273,7 +276,7 @@ ARGS=
 | `MODEL` | Fills every main model slot: Claude Code's opus / sonnet / fable, OpenCode's `model` in the generated global config, the model pi starts on |
 | `SMALL_MODEL` | Fills every cheap slot: Claude Code's haiku + subagent, OpenCode's `small_model`, pi's second Ctrl+P entry. Defaults to `MODEL` |
 | `CONTEXT_WINDOW`, `MAX_TOKENS` | Model limits. pi writes them into its generated `models.json` (it otherwise assumes 128k / 16k and caps each request at `MAX_TOKENS`/3), and Claude Code takes `CONTEXT_WINDOW` as its auto-compact window |
-| `SMALL_CONTEXT_WINDOW`, `SMALL_MAX_TOKENS` | The same two limits for `SMALL_MODEL` when it is a different size — GLM sets them for `glm-4.7`. Default to the values above |
+| `SMALL_CONTEXT_WINDOW`, `SMALL_MAX_TOKENS` | The same two limits for `SMALL_MODEL` when it is a different size. Default to the values above |
 | `REASONING`, `INPUT` | Whether the models support extended thinking (`true`/`false`) and what they accept (`text` or `text,image`) |
 | `HEADERS` | Optional extra request headers, one `Name: Value` per line (the format Claude Code's `ANTHROPIC_CUSTOM_HEADERS` takes), sent by all three CLIs — e.g. a Cloudflare Access service token in front of a self-hosted server. The value is a bash string, so a multi-line double-quoted value or a `$(...)` computed at launch both work |
 | `ARGS` | Default CLI options prepended to every `claude<NAME>` launch (word-split; your command-line arguments come after them). OpenCode and pi have no launcher, so it does not reach them |
@@ -525,6 +528,5 @@ are stale. Re-run `make setup` from the new location.
 - [Z.ai / GLM Claude Code docs](https://docs.z.ai/devpack/tool/claude)
 - [Kimi / Moonshot AI Platform](https://platform.moonshot.ai/docs)
 - [Xiaomi MiMo: Claude Code Integration (Token Plan)](https://mimo.mi.com/docs/en-US/tokenplan/integration/claudecode)
-- [OpenRouter: Claude Code Integration](https://openrouter.ai/docs/cookbook/coding-agents/claude-code-integration) / [Ox Alpha](https://openrouter.ai/stealth/ox-alpha)
 - [OpenCode: Config](https://opencode.ai/docs/config/) / [Providers](https://opencode.ai/docs/providers/)
 - [pi: Custom models](https://pi.dev/docs/latest/models) / [Providers](https://pi.dev/docs/latest/providers) / [DeepSeek's pi integration guide](https://api-docs.deepseek.com/quick_start/agent_integrations/pi_mono/)
