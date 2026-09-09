@@ -16,7 +16,7 @@
       "label": "DeepSeek (opencode)",
       "enabled": true,
       "schema": "stdin",
-      "command": "opencode run --model deepseek/deepseek-v4-flash --agent plan",
+      "command": "opencode run --model deepseek/deepseek-v4.1-flash-expires-on-0910 --agent plan",
       "timeout_ms": 1200000,
       "notes": "--agent plan で read-only"
     },

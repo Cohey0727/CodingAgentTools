@@ -309,10 +309,16 @@ $(headers_json "$3")
   # registry lists, which is usually the provider's OpenAI-compatible route
   # rather than the Anthropic one BASE_URL points at.
   if [ "$M_SCHEMA" = models.dev ]; then
+    # The registry supplies the package, the endpoint and its own catalogue; the
+    # models declared here are merged on top, so a provider can offer one the
+    # registry does not carry.
     cat <<EOF
     "$(opencode_provider_id)": {
       "options": {
         "apiKey": "$api_key"$headers
+      },
+      "models": {
+$M_OPENCODE_MODELS_JSON
       }
     }
 EOF
