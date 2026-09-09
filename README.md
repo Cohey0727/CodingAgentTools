@@ -1,32 +1,28 @@
 # CodingAgentTools
 
-> Run Claude Code, OpenCode and pi on Anthropic-compatible LLM backends (DeepSeek · MiniMax · GLM · Kimi · MiMo · your own llama.cpp) — one repo, one `make setup`, one `configs.jsonc` driving all three CLIs, and the skills and global instruction file all three share.
+> Run Claude Code, OpenCode and pi on Anthropic-compatible LLM backends (DeepSeek · GLM · Kimi · your own llama.cpp) — one repo, one `make setup`, one `configs.jsonc` driving all three CLIs, and the skills and global instruction file all three share.
 
 One repo that installs a `claude<name>` launcher command per provider and generates the pi and OpenCode configs covering every provider — [Claude Code](https://docs.anthropic.com/claude-code), [OpenCode](https://opencode.ai) and the [pi coding agent](https://pi.dev), all against Anthropic-compatible backends:
 
 | Provider | Command | Endpoint | Flagship model |
 |----------|----------|----------|----------------|
 | DeepSeek | `claudedeepseek` | `https://api.deepseek.com/anthropic` | `deepseek-v4-pro` |
-| MiniMax  | `claudemmx` | `https://api.minimax.io/anthropic` | `MiniMax-M3` |
 | GLM (Z.ai) | `claudeglm` | `https://api.z.ai/api/anthropic` | `glm-5.3` |
 | Kimi (Moonshot) | `claudekimi` | `https://api.kimi.com/coding` | `kimi-k3` |
-| MiMo (Xiaomi) | `claudemimo` | `https://token-plan-sgp.xiaomimimo.com/anthropic` | `mimo-v2.5-pro` |
 | Local (llama.cpp) | `claudelocal` | `http://127.0.0.1:11301` | `default` |
 | gtr (llama.cpp behind Cloudflare) | `claudegtr` | `https://gtr-llama.spaghetti-monster.com` | `default` |
 
 OpenCode and pi have no per-provider command: `make setup` writes every provider into their global configs, so a bare `opencode` gets them all under `/models` and a bare `pi` under `/model`.
 
-Kimi and MiMo run that flagship as its 1M-context variant under Claude Code (`kimi-k3[1m]`); OpenCode and pi take the plain id.
+Kimi runs that flagship as its 1M-context variant under Claude Code (`kimi-k3[1m]`); the other CLIs take the id their own catalog lists.
 
 Each provider exposes a native Anthropic-compatible endpoint, so there is no proxy or translation layer — just environment variables. That holds for the local one too: `llama-server` answers `/v1/messages` in the Anthropic shape. The generated pi and OpenCode configs run against the very same endpoint and token, and every model any of the three can reach is declared in one place: `configs.jsonc` at the repo root, in git, with [tags](#tags) naming the slot each model fills. It holds no secret — an API key is written there as `${DEEPSEEK_API_KEY}` and read from the single gitignored `.env` beside it.
 
-> **Note:** every launcher command is `claude<name>`. Bare provider names are deliberately avoided: `kimi` is Moonshot's official Kimi CLI, `minimax` is the official MiniMax Code desktop app command, and `mmx` is an unrelated bun-installed tool. MiniMax uses the short name `mmx` (`claudemmx`).
+> **Note:** every launcher command is `claude<name>`. Bare provider names are deliberately avoided — `kimi`, for one, is Moonshot's own CLI.
 
 > **Note:** Kimi has two endpoints. The default `https://api.kimi.com/coding` is for the **coding subscription plan**. For **pay-as-you-go (metered) billing**, switch `BASE_URL` to `https://api.moonshot.ai/anthropic` in `providers/kimi/.env`.
 
 > **Note:** Local is not a hosted service — it points at a `llama-server` on your own machine, which serves the Anthropic shape on `/v1/messages`. Here that server is LlamaGate (`~/Workspace/LlamaGate`): `just start` brings it up on `127.0.0.1:11301`, `just profiles` lists the models it can load and `just start <profile>` swaps to one. There is no account and no key, so `API_TOKEN` is a placeholder the CLIs merely require to be non-empty. Both llama.cpp providers use the fixed model id `default`: llama-server answers with whatever it has loaded and ignores the requested name, so swapping the model on the server needs no edit here. Keep `CONTEXT_WINDOW` at or below the server's `--ctx-size`.
-
-> **Note:** MiMo has three endpoints. The default `https://token-plan-sgp.xiaomimimo.com/anthropic` is the **global Token Plan subscription** endpoint (tokens start with `tp-`). China accounts use `https://token-plan-cn.xiaomimimo.com/anthropic` instead, and **pay-as-you-go (metered) billing** (keys start with `sk-`) uses `https://api.xiaomimimo.com/anthropic` — switch `BASE_URL` in `providers/mimo/.env` accordingly. Note the docs mostly mention only the CN host; the `-sgp` host is what actually accepts global-plan tokens.
 
 > **Note:** gtr is a `llama-server` on another machine, published through a Cloudflare tunnel and gated by Cloudflare Access. Requests without Access credentials get a 302 to the login page, so `HEADERS` in `providers/gtr/.env` has to carry an Access service token (`CF-Access-Client-Id` / `CF-Access-Client-Secret`) — the comments in the file show both that and the short-lived `cloudflared access token` variant. Like Local, `API_TOKEN` is only a placeholder unless `llama-server` runs with `--api-key`.
 
@@ -132,10 +128,8 @@ and [2026-09-09 — providers/ 廃止と configs.jsonc への集約](docs/migrat
 
 ```bash
 claudedeepseek    # Claude Code on DeepSeek
-claudemmx         # Claude Code on MiniMax
 claudeglm         # Claude Code on GLM (Z.ai)
 claudekimi        # Claude Code on Kimi (Moonshot)
-claudemimo        # Claude Code on MiMo (Xiaomi)
 claudegtr         # Claude Code on gtr (llama.cpp behind Cloudflare)
 
 opencode          # OpenCode — every configured provider is in /models
@@ -374,7 +368,7 @@ on only one model, and an unknown tag is an error rather than a label —
 | `tags` | Which slots this model fills. Omit it to offer the model in OpenCode and pi without giving it a Claude Code slot |
 | `context_window`, `max_tokens` | **Required.** pi writes them into its generated `models.json` (it otherwise assumes 128k / 16k and caps each request at `max_tokens`/3), and Claude Code takes the main model's `context_window` as its auto-compact window |
 | `reasoning`, `input` | Whether the model supports extended thinking (default `true`) and what it accepts (`["text"]` or `["text", "image"]`) |
-| `claude_id` | The id to send when the caller is Claude Code, for a variant only it understands — Kimi and MiMo use it for the 1M-context `[1m]` form. Defaults to `id` |
+| `claude_id` | The id to send when the caller is Claude Code, for a variant only it understands — Kimi uses it for the 1M-context `[1m]` form. Defaults to `id` |
 
 `defaults` at the top level supplies any of these to every model that does not
 set it itself.
@@ -460,7 +454,7 @@ if they do.
 it considers primary, and for most providers that is their OpenAI-compatible
 route rather than the Anthropic `BASE_URL` above — DeepSeek resolves to
 `@ai-sdk/openai-compatible` at `api.deepseek.com`, Z.AI to `api.z.ai/api/paas/v4`,
-while MiniMax and `kimi-for-coding` are registered as `@ai-sdk/anthropic`. So
+while `kimi-for-coding` is registered as `@ai-sdk/anthropic`. So
 that agent and the launcher stop sharing a route, models the registry does not
 carry disappear, and a model tagged for a slot that the registry lacks leaves the
 generated reference pointing at nothing.
@@ -729,14 +723,10 @@ Where each provider's key comes from:
 | DeepSeek | https://platform.deepseek.com/ |
 | GLM (Z.ai) | https://z.ai/manage-apikey/apikey-list |
 | Kimi (Moonshot) | https://platform.moonshot.ai/console/api-keys |
-| MiMo (Xiaomi) | https://platform.xiaomimimo.com/token-plan — Token Plan tokens start with `tp-`, metered keys with `sk-` |
-| MiniMax | https://www.minimax.io/platform |
 | Local / gtr | No account and no key; `API_KEY` is a placeholder the CLIs only require to be non-empty |
 
 - [DeepSeek: Claude Code Integration Guide](https://api-docs.deepseek.com/guides/agent_integrations/claude_code)
-- [MiniMax Platform](https://www.minimax.io/platform)
 - [Z.ai / GLM Claude Code docs](https://docs.z.ai/devpack/tool/claude)
 - [Kimi / Moonshot AI Platform](https://platform.moonshot.ai/docs)
-- [Xiaomi MiMo: Claude Code Integration (Token Plan)](https://mimo.mi.com/docs/en-US/tokenplan/integration/claudecode)
 - [OpenCode: Config](https://opencode.ai/docs/config/) / [Providers](https://opencode.ai/docs/providers/)
 - [pi: Custom models](https://pi.dev/docs/latest/models) / [Providers](https://pi.dev/docs/latest/providers) / [DeepSeek's pi integration guide](https://api-docs.deepseek.com/quick_start/agent_integrations/pi_mono/)
