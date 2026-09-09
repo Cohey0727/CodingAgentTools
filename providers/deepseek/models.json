@@ -19,6 +19,14 @@
 
   "models": [
     { "id": "deepseek-v4-pro", "tags": ["default"] },
-    { "id": "deepseek-v4-flash", "tags": ["small"] }
+    { "id": "deepseek-v4-flash", "tags": ["small"] },
+
+    // No tag: offered in OpenCode and pi, fills no Claude Code slot. Reach it
+    // from Claude Code with --model.
+    { "id": "deepseek-v4-flash-vision-exp", "input": ["text", "image"] },
+
+    // Served but absent from both GET /models and the pricing docs, and the id
+    // says it stops answering on 09-10.
+    { "id": "deepseek-v4.1-flash-expires-on-0910" }
   ]
 }
