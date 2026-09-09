@@ -12,26 +12,29 @@ OpenCode / pi の 3 つとも `bin/models.py` 経由でこのファイルを読�
 
 ## tag
 
-tag は 3 つの CLI のスロット名そのもの。Claude Code のどのスロットに
+モデルスロットが複数あるのは Claude Code だけで、そのスロットは全部環境変数。
+なので tag は環境変数名そのものにした。中間の語彙を挟まないので、どの変数に
 どのモデルが入るかが models.json だけで読める。
 
 | tag | 入るところ |
 |---|---|
-| `default` | 自前の tag を持たないメインスロット全部 |
-| `small` | 自前の tag を持たない安いスロット全部 |
-| `claude_model` | `ANTHROPIC_MODEL` |
-| `claude_opus_model` | `ANTHROPIC_DEFAULT_OPUS_MODEL` |
-| `claude_sonnet_model` | `ANTHROPIC_DEFAULT_SONNET_MODEL` |
-| `claude_fable_model` | `ANTHROPIC_DEFAULT_FABLE_MODEL` |
-| `claude_haiku_model` | `ANTHROPIC_DEFAULT_HAIKU_MODEL` |
-| `claude_subagent_model` | `CLAUDE_CODE_SUBAGENT_MODEL` |
-| `opencode_model` / `opencode_small_model` | OpenCode の `model` / `small_model` |
-| `pi_model` / `pi_small_model` | pi の `defaultModel` / 安いほう |
+| `default` | 自前の tag を持たないスロット全部。OpenCode と pi の起動モデル |
+| `small` | 下の 2 つの安いスロットと OpenCode の `small_model` |
+| `ANTHROPIC_MODEL` | メインスロット |
+| `ANTHROPIC_DEFAULT_OPUS_MODEL` | `/model opus` |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | `/model sonnet` |
+| `ANTHROPIC_DEFAULT_FABLE_MODEL` | `/model fable` |
+| `ANTHROPIC_DEFAULT_HAIKU_MODEL` | 安いスロット |
+| `CLAUDE_CODE_SUBAGENT_MODEL` | サブエージェント |
 
-個別 tag > `claude_model` > `default` / `small` の順で決まるので、素直に
-2 段構成のプロバイダは `default` と `small` の 2 つだけで足りる。1 つの tag を
-2 つのモデルに付ける、知らない tag を書く、どのモデルも埋めないスロットが
-できる、のいずれも `make setup` がエラーで止める。
+OpenCode と pi には `models` に並べたモデルが**全部**出る。セッション内の
+`/models` `/model` で選ぶものなので、モデルごとに宣言することは何もない。
+起動時に乗るのが `default` と `small`。
+
+個別の変数名 > `ANTHROPIC_MODEL` > `default` / `small` の順で決まるので、素直に
+2 段構成のプロバイダは `default` と `small` の 2 つだけで足りる。`default` が
+ないファイル、1 つの tag を 2 つのモデルに付けたファイル、知らない tag を
+書いたファイルは `make setup` がエラーで止める。
 
 ## 変数の対応
 
@@ -40,6 +43,7 @@ tag は 3 つの CLI のスロット名そのもの。Claude Code のどのス�
 | `NAME` | `name` |
 | `MODEL` | `tags: ["default"]` |
 | `SMALL_MODEL` | `tags: ["small"]` |
+| `ANTHROPIC_DEFAULT_HAIKU_MODEL` などスロット個別の上書き | 同名の tag |
 | `OPENCODE_EXTRA_MODELS` | `models` に足すだけ（列挙されたモデルは全部 OpenCode と pi に出る） |
 | `CONTEXT_WINDOW` / `MAX_TOKENS` | モデルごとの `context_window` / `max_tokens`（`defaults` で共通化できる） |
 | `SMALL_CONTEXT_WINDOW` / `SMALL_MAX_TOKENS` | 該当モデルの `context_window` / `max_tokens` |
@@ -51,7 +55,7 @@ tag は 3 つの CLI のスロット名そのもの。Claude Code のどのス�
 | `CLAUDE_CODE_AUTO_COMPACT_WINDOW` | `claude.auto_compact_window`（既定はメインモデルの `context_window`） |
 | `OPENCODE_LEAN` | `opencode.lean` |
 | `OPENCODE_CONTEXT_WINDOW` / `OPENCODE_MAX_TOKENS` | `opencode.context_window` / `opencode.max_tokens` |
-| `ANTHROPIC_MODEL` / `ANTHROPIC_DEFAULT_*_MODEL` / `CLAUDE_CODE_SUBAGENT_MODEL` / `OPENCODE_MODEL` / `OPENCODE_SMALL_MODEL` / `PI_MODEL` / `PI_SMALL_MODEL` | 対応する tag |
+| `OPENCODE_MODEL` / `OPENCODE_SMALL_MODEL` / `PI_MODEL` / `PI_SMALL_MODEL` | 廃止。OpenCode と pi は全モデルを一覧に出し、起動モデルは `default` / `small` |
 | `API_TOKEN` / `BASE_URL` / `HEADERS` | `.env` のまま |
 
 `ANTHROPIC_AUTH_TOKEN` と `ANTHROPIC_BASE_URL` の別名はなくなった。`.env` に
@@ -84,7 +88,7 @@ make setup                    # .env の移行 + launcher 再生成 + pi / OpenC
 `providers/<name>/models.json` の `models` に 1 行足して再生成するだけ:
 
 ```jsonc
-{ "id": "glm-5.3-air", "tags": [] }   // tag なし = 一覧に出るがスロットは埋めない
+{ "id": "glm-5.3-air", "tags": [] }   // tag なし = OpenCode と pi には出るが Claude Code のスロットは埋めない
 ```
 
 ```bash

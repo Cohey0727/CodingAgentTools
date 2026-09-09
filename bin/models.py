@@ -20,35 +20,31 @@ from pathlib import Path
 # Every tag a model may carry. Each names a slot in one of the three CLIs, so an
 # unknown one is a typo rather than a label: a model that fills no slot carries
 # no tags at all and is merely listed.
+# "default" and "small" are the two roles every CLI has some use for. The rest
+# are Claude Code variables, spelled exactly as Claude Code reads them, because
+# only Claude Code has more than one model slot: OpenCode and pi are given every
+# model in the file and pick between them in the session.
 ROLE_TAGS = (
     "default",
     "small",
-    "claude_model",
-    "claude_opus_model",
-    "claude_sonnet_model",
-    "claude_haiku_model",
-    "claude_fable_model",
-    "claude_subagent_model",
-    "opencode_model",
-    "opencode_small_model",
-    "pi_model",
-    "pi_small_model",
+    "ANTHROPIC_MODEL",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+    "ANTHROPIC_DEFAULT_FABLE_MODEL",
+    "CLAUDE_CODE_SUBAGENT_MODEL",
 )
 
-# Slot -> the tags it follows, most specific first. A slot with no tag of its
-# own falls back to the generic "default" / "small" pair, so a provider whose
-# models fill every slot the obvious way needs only those two tags.
-SLOTS = {
-    "claude_model": ("claude_model", "default"),
-    "claude_opus_model": ("claude_opus_model", "claude_model", "default"),
-    "claude_sonnet_model": ("claude_sonnet_model", "claude_model", "default"),
-    "claude_fable_model": ("claude_fable_model", "claude_model", "default"),
-    "claude_haiku_model": ("claude_haiku_model", "small", "default"),
-    "claude_subagent_model": ("claude_subagent_model", "small", "default"),
-    "opencode_model": ("opencode_model", "default"),
-    "opencode_small_model": ("opencode_small_model", "small", "default"),
-    "pi_model": ("pi_model", "default"),
-    "pi_small_model": ("pi_small_model", "small", "default"),
+# Claude Code variable -> the tags it follows, most specific first. A slot with
+# no tag of its own falls back to the generic "default" / "small" pair, so a
+# provider whose models divide the obvious way needs only those two tags.
+CLAUDE_SLOTS = {
+    "ANTHROPIC_MODEL": ("ANTHROPIC_MODEL", "default"),
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": ("ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_MODEL", "default"),
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": ("ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_MODEL", "default"),
+    "ANTHROPIC_DEFAULT_FABLE_MODEL": ("ANTHROPIC_DEFAULT_FABLE_MODEL", "ANTHROPIC_MODEL", "default"),
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": ("ANTHROPIC_DEFAULT_HAIKU_MODEL", "small", "default"),
+    "CLAUDE_CODE_SUBAGENT_MODEL": ("CLAUDE_CODE_SUBAGENT_MODEL", "small", "default"),
 }
 
 MODEL_KEYS = {"id", "claude_id", "tags", "context_window", "max_tokens", "reasoning", "input"}
@@ -168,17 +164,12 @@ def load(directory):
             by_tag[tag] = model
         models.append(model)
 
+    if "default" not in by_tag:
+        raise ConfigError(f"{path}: no model is tagged 'default'")
+
     slots = {}
-    for slot, candidates in SLOTS.items():
-        for tag in candidates:
-            if tag in by_tag:
-                slots[slot] = by_tag[tag]
-                break
-        else:
-            raise ConfigError(
-                f"{path}: no model fills the {slot} slot — tag one with "
-                f"{' or '.join(repr(t) for t in candidates)}"
-            )
+    for slot, candidates in CLAUDE_SLOTS.items():
+        slots[slot] = next(by_tag[tag] for tag in candidates if tag in by_tag)
 
     env = claude.get("env") or {}
     if not isinstance(env, dict):
@@ -189,7 +180,9 @@ def load(directory):
         "command": claude.get("command") or f"claude{name}",
         "args": claude.get("args", ""),
         "env": {k: str(v) for k, v in env.items()},
-        "auto_compact_window": claude.get("auto_compact_window") or slots["claude_model"]["context_window"],
+        "auto_compact_window": claude.get("auto_compact_window") or slots["ANTHROPIC_MODEL"]["context_window"],
+        "default_model": by_tag["default"],
+        "small_model": by_tag.get("small", by_tag["default"]),
         "lean": bool(opencode.get("lean", False)),
         "opencode_context_window": opencode.get("context_window"),
         "opencode_max_tokens": opencode.get("max_tokens"),
@@ -239,22 +232,17 @@ def shell(config):
         "M_CLAUDE_ENV_SH": "\n".join(
             f"export {key}={shlex.quote(value)}" for key, value in sorted(config["env"].items())
         ),
-        "M_CLAUDE_MODEL": slots["claude_model"]["claude_id"],
-        "M_CLAUDE_OPUS_MODEL": slots["claude_opus_model"]["claude_id"],
-        "M_CLAUDE_SONNET_MODEL": slots["claude_sonnet_model"]["claude_id"],
-        "M_CLAUDE_HAIKU_MODEL": slots["claude_haiku_model"]["claude_id"],
-        "M_CLAUDE_FABLE_MODEL": slots["claude_fable_model"]["claude_id"],
-        "M_CLAUDE_SUBAGENT_MODEL": slots["claude_subagent_model"]["claude_id"],
-        "M_CLAUDE_AUTO_COMPACT_WINDOW": str(config["auto_compact_window"]),
-        "M_OPENCODE_MODEL": slots["opencode_model"]["id"],
-        "M_OPENCODE_SMALL_MODEL": slots["opencode_small_model"]["id"],
+        "M_CLAUDE_CODE_AUTO_COMPACT_WINDOW": str(config["auto_compact_window"]),
+        "M_DEFAULT_MODEL": config["default_model"]["id"],
+        "M_SMALL_MODEL": config["small_model"]["id"],
         "M_OPENCODE_LEAN": "true" if config["lean"] else "false",
         "M_OPENCODE_MODELS_JSON": opencode_models_json(config),
-        "M_PI_MODEL": slots["pi_model"]["id"],
-        "M_PI_SMALL_MODEL": slots["pi_small_model"]["id"],
         "M_PI_MODELS_JSON": pi_models_json(config),
         "M_MODEL_IDS": " ".join(model["id"] for model in config["models"]),
     }
+    for slot in CLAUDE_SLOTS:
+        values[f"M_{slot}"] = slots[slot]["claude_id"]
+
     return "\n".join(f"{key}={shlex.quote(value)}" for key, value in values.items())
 
 

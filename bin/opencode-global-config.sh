@@ -56,7 +56,7 @@ default_provider=$(default_provider "${providers[@]}")
 
 default_models=$(
   models_resolve "$PROVIDERS_DIR/$default_provider"
-  printf '%s\n%s' "$M_OPENCODE_MODEL" "$M_OPENCODE_SMALL_MODEL"
+  printf '%s\n%s' "$M_DEFAULT_MODEL" "$M_SMALL_MODEL"
 )
 model="$default_provider-anthropic/$(head -1 <<<"$default_models")"
 small_model="$default_provider-anthropic/$(tail -n +2 <<<"$default_models")"

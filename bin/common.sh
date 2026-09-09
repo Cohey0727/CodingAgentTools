@@ -235,7 +235,7 @@ opencode_agent_json() { # <provider name> <prompt file> — the lean agent for a
     "$name": {
       "description": "$name with a short prompt and core tools only",
       "mode": "primary",
-      "model": "$name-anthropic/$M_OPENCODE_MODEL",
+      "model": "$name-anthropic/$M_DEFAULT_MODEL",
       "prompt": "{file:$prompt}",
       "tools": { $tools }
     }

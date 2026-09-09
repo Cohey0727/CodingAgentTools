@@ -285,50 +285,52 @@ through `bin/models.py`. A whole provider is a dozen lines:
 
 `//` line comments are allowed, so the constraints behind a value can sit next
 to it. Every model listed is offered by OpenCode's `/models` and pi's `/model`,
-whether or not it fills a slot.
+whether or not it carries a tag.
 
 ### Tags
 
-A tag names a slot in one of the CLIs, so `models.json` says outright which
-model Claude Code reaches for as opus and which one it hands to a subagent:
+Only Claude Code has more than one model slot, and each of its slots is an
+environment variable. So a tag *is* that variable, spelled the way Claude Code
+reads it — `models.json` says outright which model it reaches for as opus and
+which one it hands to a subagent, with no vocabulary in between:
 
 | Tag | Fills |
 |-----|-------|
-| `default` | Every main slot below that has no tag of its own |
-| `small` | Every cheap slot below that has no tag of its own |
-| `claude_model` | `ANTHROPIC_MODEL` |
-| `claude_opus_model` | `ANTHROPIC_DEFAULT_OPUS_MODEL` |
-| `claude_sonnet_model` | `ANTHROPIC_DEFAULT_SONNET_MODEL` |
-| `claude_fable_model` | `ANTHROPIC_DEFAULT_FABLE_MODEL` |
-| `claude_haiku_model` | `ANTHROPIC_DEFAULT_HAIKU_MODEL` |
-| `claude_subagent_model` | `CLAUDE_CODE_SUBAGENT_MODEL` |
-| `opencode_model` | OpenCode's `model` |
-| `opencode_small_model` | OpenCode's `small_model` |
-| `pi_model` | pi's `defaultModel` |
-| `pi_small_model` | pi's cheap entry |
+| `default` | Every slot below that has no tag of its own, and the model OpenCode and pi start on |
+| `small` | The two cheap slots below, and OpenCode's `small_model` |
+| `ANTHROPIC_MODEL` | The main slot |
+| `ANTHROPIC_DEFAULT_OPUS_MODEL` | What `/model opus` selects |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | What `/model sonnet` selects |
+| `ANTHROPIC_DEFAULT_FABLE_MODEL` | What `/model fable` selects |
+| `ANTHROPIC_DEFAULT_HAIKU_MODEL` | The cheap slot |
+| `CLAUDE_CODE_SUBAGENT_MODEL` | What a subagent runs on |
 
-A slot with no tag of its own falls back to `claude_model` (the opus / sonnet /
-fable trio), then to `default` or `small`. So a provider whose models divide the
-obvious way needs only those two tags, and a specific tag is how one model is
-pulled out of that pattern:
+OpenCode and pi get **every** model in the file — they pick between them in the
+session (`/models`, `/model`), so there is nothing per-model to declare for
+them. `default` and `small` are what they start on.
+
+A slot with no tag of its own falls back to `ANTHROPIC_MODEL` (the opus /
+sonnet / fable trio), then to `default` or `small`. So a provider whose models
+divide the obvious way needs only those two tags, and naming a variable is how
+one model is pulled out of that pattern:
 
 ```json
 { "id": "glm-5.3",       "tags": ["default"] },
-{ "id": "glm-5.3-mini",  "tags": ["claude_haiku_model"] },
+{ "id": "glm-5.3-mini",  "tags": ["ANTHROPIC_DEFAULT_HAIKU_MODEL"] },
 { "id": "glm-5.3-flash", "tags": ["small"] }
 ```
 
-Here Claude Code's haiku slot is `glm-5.3-mini` while the subagent slot, OpenCode's
-`small_model` and pi both stay on `glm-5.3-flash`. A tag may appear on only one
-model, and an unknown tag is an error rather than a label — `make setup` refuses
-to install until it is fixed.
+Here Claude Code's haiku slot is `glm-5.3-mini` while its subagent slot and
+OpenCode's `small_model` stay on `glm-5.3-flash`. `default` is required, a tag
+may appear on only one model, and an unknown tag is an error rather than a
+label — `make setup` refuses to install until it is fixed.
 
 ### Model fields
 
 | Field | Meaning |
 |-------|---------|
 | `id` | **Required.** The id sent to the provider |
-| `tags` | Which slots this model fills. Omit it to list the model without giving it a role |
+| `tags` | Which slots this model fills. Omit it to offer the model in OpenCode and pi without giving it a Claude Code slot |
 | `context_window`, `max_tokens` | **Required.** pi writes them into its generated `models.json` (it otherwise assumes 128k / 16k and caps each request at `max_tokens`/3), and Claude Code takes the main model's `context_window` as its auto-compact window |
 | `reasoning`, `input` | Whether the model supports extended thinking (default `true`) and what it accepts (`["text"]` or `["text", "image"]`) |
 | `claude_id` | The id to send when the caller is Claude Code, for a variant only it understands — Kimi and MiMo use it for the 1M-context `[1m]` form. Defaults to `id` |
@@ -436,8 +438,8 @@ to read them back out of `providers/<name>/.env`, so a rotated token or a
 a model or endpoint. A file this repo did not generate is never touched
 (first-line marker).
 
-Because pi has no subagents, `pi_small_model` is not a slot the agent reaches
-for on its own — it is the model `/model` starts the list on.
+Because pi has no subagents and no cheap-model slot, `small` reaches it only as
+the second entry in the `/model` list.
 
 ## Skills and global instructions
 
@@ -555,12 +557,12 @@ marker): merge it by hand or move it aside.
 
 **A CLI starts on the wrong model, or pi reports the wrong context size** —
 `providers/<name>/models.json` is the only source. `make list` prints each
-model with the tags it carries, which is what decides the slot; a specific tag
-(`claude_haiku_model`, `opencode_small_model`, …) wins over `default` / `small`.
+model with the tags it carries, which is what decides the slot; naming a
+variable (`ANTHROPIC_DEFAULT_HAIKU_MODEL`, …) wins over `default` / `small`.
 Re-run `make pi-global && make opencode-global` afterwards — those two configs
 are generated, not read live.
 
-**`models.json: ... unknown tag` / `... no model fills the <slot> slot`** —
+**`models.json: ... unknown tag` / `... no model is tagged 'default'`** —
 `make setup` validates every provider before it writes anything. The message
 names the file, the model index and the tags it accepts; `python3 bin/models.py
 check providers/<name>` re-runs just that check.

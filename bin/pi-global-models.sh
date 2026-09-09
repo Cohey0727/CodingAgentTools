@@ -62,7 +62,7 @@ fi
 start_provider=$(default_provider "${providers[@]}")
 start_model=$(
   models_resolve "$PROVIDERS_DIR/$start_provider"
-  printf '%s' "$M_PI_MODEL"
+  printf '%s' "$M_DEFAULT_MODEL"
 )
 
 mkdir -p "$AGENT_DIR"

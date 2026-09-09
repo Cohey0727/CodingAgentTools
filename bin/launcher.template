@@ -36,18 +36,19 @@ if [[ -n "$CFG_HEADERS" ]]; then
   export ANTHROPIC_CUSTOM_HEADERS="$CFG_HEADERS"
 fi
 
-# One model per slot, each the id tagged for it in models.json. Assignment is
-# unconditional: an ANTHROPIC_* inherited from an outer launcher session would
+# One model per slot: models.json tags each model with the variable it fills,
+# and models_resolve returns that variable's value as M_<name>. Assignment is
+# unconditional — an ANTHROPIC_* inherited from an outer launcher session would
 # otherwise pin this one to the outer provider's model.
-export ANTHROPIC_MODEL="$M_CLAUDE_MODEL"
-export ANTHROPIC_DEFAULT_OPUS_MODEL="$M_CLAUDE_OPUS_MODEL"
-export ANTHROPIC_DEFAULT_SONNET_MODEL="$M_CLAUDE_SONNET_MODEL"
-export ANTHROPIC_DEFAULT_FABLE_MODEL="$M_CLAUDE_FABLE_MODEL"
-export ANTHROPIC_DEFAULT_HAIKU_MODEL="$M_CLAUDE_HAIKU_MODEL"
-export CLAUDE_CODE_SUBAGENT_MODEL="$M_CLAUDE_SUBAGENT_MODEL"
+export ANTHROPIC_MODEL="$M_ANTHROPIC_MODEL"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="$M_ANTHROPIC_DEFAULT_OPUS_MODEL"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="$M_ANTHROPIC_DEFAULT_SONNET_MODEL"
+export ANTHROPIC_DEFAULT_FABLE_MODEL="$M_ANTHROPIC_DEFAULT_FABLE_MODEL"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="$M_ANTHROPIC_DEFAULT_HAIKU_MODEL"
+export CLAUDE_CODE_SUBAGENT_MODEL="$M_CLAUDE_CODE_SUBAGENT_MODEL"
 
 # The main model's context window doubles as Claude Code's auto-compact threshold.
-export CLAUDE_CODE_AUTO_COMPACT_WINDOW="$M_CLAUDE_AUTO_COMPACT_WINDOW"
+export CLAUDE_CODE_AUTO_COMPACT_WINDOW="$M_CLAUDE_CODE_AUTO_COMPACT_WINDOW"
 
 # "claude": { "env": { ... } } from models.json, exported as-is.
 eval "$M_CLAUDE_ENV_SH"
