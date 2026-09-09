@@ -275,6 +275,7 @@ ARGS=
 | `BASE_URL` | Provider's Anthropic-compatible endpoint |
 | `MODEL` | Fills every main model slot: Claude Code's opus / sonnet / fable, OpenCode's `model` in the generated global config, the model pi starts on |
 | `SMALL_MODEL` | Fills every cheap slot: Claude Code's haiku + subagent, OpenCode's `small_model`, pi's second Ctrl+P entry. Defaults to `MODEL` |
+| `OPENCODE_EXTRA_MODELS` | Extra model ids OpenCode lists on top of `MODEL` / `SMALL_MODEL`, space-separated. Claude Code and pi reach another model with `--model`; OpenCode has no launcher to pass one, so an id missing from the generated config cannot be picked there. Empty by default |
 | `CONTEXT_WINDOW`, `MAX_TOKENS` | Model limits. pi writes them into its generated `models.json` (it otherwise assumes 128k / 16k and caps each request at `MAX_TOKENS`/3), and Claude Code takes `CONTEXT_WINDOW` as its auto-compact window |
 | `SMALL_CONTEXT_WINDOW`, `SMALL_MAX_TOKENS` | The same two limits for `SMALL_MODEL` when it is a different size. Default to the values above |
 | `REASONING`, `INPUT` | Whether the models support extended thinking (`true`/`false`) and what they accept (`text` or `text,image`) |
@@ -295,7 +296,6 @@ above them — uncomment one only when a CLI has to differ from the rest.
 | `ANTHROPIC_BASE_URL` | `BASE_URL` | all three |
 | `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU,FABLE}_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL` | the model slots Claude Code fills from `MODEL` / `SMALL_MODEL` | Claude Code |
 | `OPENCODE_MODEL`, `OPENCODE_SMALL_MODEL` | `MODEL` / `SMALL_MODEL` for OpenCode | the OpenCode global config |
-| `OPENCODE_EXTRA_MODELS` | nothing — space-separated ids OpenCode lists on top of `MODEL` / `SMALL_MODEL`. Claude Code and pi reach another model with `--model`; OpenCode has no launcher to pass one, so an id missing from the generated config cannot be picked there | the OpenCode global config |
 | `OPENCODE_CONTEXT_WINDOW`, `OPENCODE_MAX_TOKENS` | `CONTEXT_WINDOW` / `MAX_TOKENS` for OpenCode. These are the window a session may grow into before OpenCode compacts it, so a backend too slow to prefill its full context sets them lower — `gtr` does | the OpenCode global config |
 | `OPENCODE_LEAN` | nothing — `true` gives the provider [a lean agent of its own](#lean-agents) | the OpenCode global config |
 | `PI_MODEL`, `PI_SMALL_MODEL` | `MODEL` / `SMALL_MODEL` for pi | the pi global models.json |
