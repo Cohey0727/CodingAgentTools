@@ -31,10 +31,9 @@ description: 同じレビュー依頼を複数 LLM に並列で投げ、回答�
 | schema | 実行方法 |
 |--------|---------|
 | `self` | **このセッションの Claude 自身**がレビュアーの1人として直接レビューを書く。外部プロセスは起動しない |
-| `claude-code` | Claude Code 互換 CLI (claudemimo / claudedeepseek など)。`cat prompt.md \| <command> -p` で非対話実行し、stdout に回答が出る |
 | `stdin` | 任意コマンド。`command` をそのまま実行し、stdin にプロンプト・stdout に回答 |
 
-LLM の追加は llms.json にエントリを1つ足すだけ (Claude Code 互換 CLI なら `schema: "claude-code"` + コマンド名のみ)。編集はレポ側のファイルに対して行い、コミットする (シンボリックリンクなのでどちらのパスを編集しても実体は同じ)。
+外部レビュアーは OpenCode に統一する。追加は llms.json にエントリを1つ足すだけで、`schema: "stdin"` + `command: "opencode run --model <provider>/<id> --agent plan"` を書く (`--agent plan` が read-only を担保する)。使えるモデルは `opencode models` で確認し、無ければ configs.jsonc に足して `make opencode-global` を回す。編集はレポ側のファイルに対して行い、コミットする (シンボリックリンクなのでどちらのパスを編集しても実体は同じ)。
 
 ## 実行手順
 
@@ -115,15 +114,12 @@ worktree (とユーザー環境) から、レビュー基準になるドキュ�
 
 ### 6. 並列実行
 
-**外部LLM** (`schema: claude-code` / `stdin`) は、**1つの Bash 呼び出しにまとめず個別に** `run_in_background: true` で起動する:
+**外部LLM** (`schema: stdin`) は、**1つの Bash 呼び出しにまとめず個別に** `run_in_background: true` で起動する:
 
 各レビュアーの回答は**中間成果物**として tmp に `review-<name>.md` で1ファイルずつ吐き出す (これがホストLLMの総括の入力になる):
 
 ```bash
-# schema: claude-code の場合 — worktree を cwd にして起動 (リポジトリ探索を可能にする)
-cd <tmp>/fusion-wt && cat <tmp>/prompt.md | timeout <timeout_ms/1000>s <command> -p > <tmp>/review-<name>.md 2> <tmp>/err-<name>.log
-
-# schema: stdin の場合
+# worktree を cwd にして起動する (リポジトリ探索を可能にする)
 cd <tmp>/fusion-wt && cat <tmp>/prompt.md | timeout <timeout_ms/1000>s <command> > <tmp>/review-<name>.md 2> <tmp>/err-<name>.log
 ```
 
@@ -157,7 +153,7 @@ tmp の中間成果物 `review-<name>.md` 一式を入力として、**ホスト
 **出力へのメタ情報混入は禁止。以下を最終出力 (review.md / PRレビュー / ユーザーへの報告文) に一切含めてはならない:**
 
 - **スキル名・手法名** — 「Fusion Review」「fusion-review」「フュージョンレビュー」「統合レビュー」「マルチモデルレビュー」等の文字列。見出し・タイトル・本文・脚注のいずれにも書かない
-- モデル名 (claude, deepseek, mimo など) — 指摘の出元を示す表記
+- モデル名 (claude, deepseek, glm など) — 指摘の出元を示す表記
 - 回答モデル数 (「N/M モデルが回答」「3モデル中2モデルが指摘」など)
 - 投票・合意状況 (「1対2で可決」「全会一致」「単独指摘」など)
 - レビュアーの回答品質評価 (「Xの指摘が的確だった」「Yは見落としが多かった」など)
