@@ -3,11 +3,10 @@ PREFIX  ?= $(HOME)/.local
 BIN_DIR := $(PREFIX)/bin
 
 ROOT          := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
-PROVIDERS_DIR := $(ROOT)/providers
 COMMON        := $(ROOT)/bin/common.sh
 
-# Every provider target acts on all directories under providers/.
-PROVIDER_LIST := $(notdir $(wildcard $(PROVIDERS_DIR)/*))
+# Every provider target acts on every provider in configs.json.
+PROVIDER_LIST := $(shell . $(ROOT)/bin/common.sh && provider_names)
 
 .PHONY: setup setup-providers setup-skills list uninstall help pi-global opencode-global
 
@@ -34,12 +33,9 @@ list:
 
 uninstall:
 	@for p in $(PROVIDER_LIST); do \
-		dir="$(PROVIDERS_DIR)/$$p"; \
-		[ -f "$$dir/models.json" ] || continue; \
-		for cmd in $$(. "$(COMMON)"; provider_command "$$dir"; printf ' '; provider_stale_commands "$$dir"); do \
+		for cmd in $$(. "$(COMMON)"; provider_command "$$p"; printf ' '; provider_stale_commands "$$p"); do \
 			rm -f "$(BIN_DIR)/$$cmd" && echo "  Removed $(BIN_DIR)/$$cmd"; \
 		done; \
-		rm -rf "$$dir/.opencode.json" "$$dir/.pi-agent"; \
 	done
 	@. "$(COMMON)"; out=$$(pi_global_models_path); \
 		if generated_here "$$out"; then \
@@ -60,16 +56,16 @@ uninstall:
 			fi; \
 		done; \
 	fi
-	@echo "  Note: provider .env files are left in place. Delete them manually if no longer needed."
+	@echo "  Note: .env is left in place. Delete it manually if no longer needed."
 	@"$(ROOT)/bin/skills-uninstall.sh"
 
-# Re-generate pi's global models.json from the current provider configs (there
-# are no pi<name> launchers); `make setup` does this too.
+# Re-generate pi's global models.json from configs.json (there are no pi<name>
+# launchers); `make setup` does this too.
 pi-global:
 	@"$(ROOT)/bin/pi-global-models.sh"
 
-# Register every provider in OpenCode's global config, so a bare `opencode`
-# (there are no open<name> launchers) lists them all under /models.
+# Register every provider from configs.json in OpenCode's global config, so a
+# bare `opencode` (there are no open<name> launchers) lists them all.
 opencode-global:
 	@"$(ROOT)/bin/opencode-global-config.sh"
 

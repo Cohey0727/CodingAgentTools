@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 # Interactive setup for claude-compatibles (`make setup`).
 #
-#   bin/setup.sh                  checkbox multi-select, then token prompts
-#   bin/setup.sh deepseek glm     skip the checkbox, still prompt for tokens
+#   bin/setup.sh                  checkbox multi-select, then key prompts
+#   bin/setup.sh deepseek glm     skip the checkbox, still prompt for keys
 #
-# At a token prompt, pressing Enter with no input keeps whatever token is
-# already in that provider's .env. Old-format .env files — the ones that still
-# carry model settings, now in models.json — are migrated first, and settings
-# added to .env.example since are appended. Then a claude<name> launcher per
-# provider is generated into $BIN_DIR (default ~/.local/bin) from the template
-# in bin/, the pi packages in $PI_PACKAGES are installed into pi's user
-# settings, and every provider with a token is registered in pi's global
-# models.json and OpenCode's global config.
+# configs.json lists every provider and refers to its secrets as "${NAME}";
+# the .env beside it holds those values and is the only file with a key in it.
+# At a prompt, pressing Enter with no input keeps whatever is already set.
+# Keys still sitting in the old providers/<name>/.env files are carried over
+# first. Then a claude<name> launcher per provider is generated into $BIN_DIR
+# (default ~/.local/bin) from the template in bin/, the pi packages in
+# $PI_PACKAGES are installed into pi's user settings, and every provider whose
+# key resolves is registered in pi's global models.json and OpenCode's global
+# config.
 
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-PROVIDERS_DIR="$ROOT/providers"
 COMMON="$ROOT/bin/common.sh"
 TEMPLATE="$ROOT/bin/launcher.template"
 BIN_DIR="${BIN_DIR:-${PREFIX:-$HOME/.local}/bin}"
@@ -28,111 +28,82 @@ source "$ROOT/bin/ui.sh"
 
 # ------------------------------------------------------------------ helpers
 
-discover_providers() {
-  local d
-  for d in "$PROVIDERS_DIR"/*/; do
-    [ -f "$d/.env.example" ] && [ -f "$d/models.json" ] && basename "$d"
-  done
-  return 0
-}
+discover_providers() { provider_names; }
 
 provider_launcher() { # <provider> -> "claude<x>"
-  provider_command "$PROVIDERS_DIR/$1"
+  provider_command "$1"
 }
 
 provider_stale_launchers() { # <provider> -> commands earlier versions installed
-  provider_stale_commands "$PROVIDERS_DIR/$1"
+  provider_stale_commands "$1"
 }
 
-api_key_url() { # <provider> -> signup URL from the .env.example comment, if any
-  sed -n 's/^#.*get an API key at \(https\?:[^ ]*\).*/\1/p' \
-    "$PROVIDERS_DIR/$1/.env.example" | head -1
+api_key_var() { # <provider> -> the .env variable its API_KEY points at
+  ( models_resolve "$1" && printf '%s' "$M_API_KEY_VAR" )
 }
 
-current_token() { # <env file> -> configured token, maybe ""
-  [ -f "$1" ] || return 0
-  local tok
-  tok=$(grep -E '^(API_TOKEN|ANTHROPIC_AUTH_TOKEN)=.+' "$1" | head -1 | cut -d= -f2- || true)
-  if [ -z "$tok" ]; then
-    tok=$(grep -E '^[A-Z_]+_API_KEY=.+' "$1" | head -1 | cut -d= -f2- || true)
-  fi
-  printf '%s' "$tok"
+current_token() { # <provider> -> its resolved key, maybe ""
+  ( models_resolve "$1" 2>/dev/null && printf '%s' "$M_API_KEY" )
 }
 
-set_token() { # <env file> <token> — rewrite the API_TOKEN line
-  local file=$1 token=$2 key=API_TOKEN tmp line
-  tmp=$(mktemp "${file}.XXXXXX")
+api_key_url() { # <provider> -> the signup URL commented above its variable in
+                # .env.example, if there is one
+  local var
+  var=$(api_key_var "$1")
+  [ -n "$var" ] || return 0
+  awk -v want="$var=" '
+    /^#/ { if (match($0, /https?:\/\/[^ ]+/)) url = substr($0, RSTART, RLENGTH); next }
+    index($0, want) == 1 { print url; exit }
+    { url = "" }
+  ' "$ENV_EXAMPLE"
+}
+
+quote_env_value() { # <value> -> it, double-quoted when bash would not take it bare
+  case $1 in
+    ''|*[[:space:]\"\'\$\\]*) printf '"%s"' "${1//\"/\\\"}" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+set_env_var() { # <variable> <value> — rewrite its line in .env, or append one
+  local var=$1 value=$2 tmp line found=0
+  touch "$ENV_FILE"
+  chmod 600 "$ENV_FILE"
+  tmp=$(mktemp "${ENV_FILE}.XXXXXX")
   while IFS= read -r line || [ -n "$line" ]; do
-    case $line in
-      "$key="*) printf '%s=%s\n' "$key" "$token" ;;
-      *) printf '%s\n' "$line" ;;
-    esac
-  done < "$file" > "$tmp"
+    if [ "${line%%=*}" = "$var" ] && [ "$line" != "${line#*=}" ]; then
+      printf '%s=%s\n' "$var" "$(quote_env_value "$value")"
+      found=1
+    else
+      printf '%s\n' "$line"
+    fi
+  done < "$ENV_FILE" > "$tmp"
+  if [ "$found" = 0 ]; then
+    printf '%s=%s\n' "$var" "$(quote_env_value "$value")" >> "$tmp"
+  fi
   chmod 600 "$tmp"
-  mv "$tmp" "$file"
+  mv "$tmp" "$ENV_FILE"
 }
 
-# Settings that moved to models.json. An .env still carrying any of them is the
-# old layout and gets rebuilt from .env.example.
-MOVED_SETTINGS='NAME|MODEL|SMALL_MODEL|OPENCODE_EXTRA_MODELS|CONTEXT_WINDOW|MAX_TOKENS'
-MOVED_SETTINGS="$MOVED_SETTINGS|SMALL_CONTEXT_WINDOW|SMALL_MAX_TOKENS|REASONING|INPUT|ARGS"
-MOVED_SETTINGS="$MOVED_SETTINGS|COMMAND|CLAUDE_ARGS|CLAUDE_MODEL_SUFFIX|OPENCODE_LEAN"
+# ------------------------------------------------------------------ the .env
 
-headers_block() { # <env file> -> its HEADERS assignment, however many lines the
-                  # double-quoted value spans; empty when there is none
-  awk '
-    !started && /^HEADERS=/ { started = 1; quotes = 0 }
-    started {
-      print
-      quotes += gsub(/"/, "&")
-      if (quotes % 2 == 0) exit
-    }
-  ' "$1"
+ensure_env() { # create .env from the example, carrying over the old per-provider files
+  if [ ! -f "$ENV_FILE" ]; then
+    cp "$ENV_EXAMPLE" "$ENV_FILE"
+    chmod 600 "$ENV_FILE"
+    printf '  %s• created .env from .env.example%s\n' "$DIM" "$RST"
+  fi
+  migrate_provider_envs
 }
 
-ensure_env() { # <provider> — create .env from example; migrate the old layout
-  local p=$1 dir env tok headers tmp
-  dir="$PROVIDERS_DIR/$p"
-  env="$dir/.env"
-  if [ ! -f "$env" ]; then
-    cp "$dir/.env.example" "$env"
-    chmod 600 "$env"
-    printf '  %s• created providers/%s/.env from example%s\n' "$DIM" "$p" "$RST"
-    return 0
-  fi
-  # Nothing to do for an .env that carries none of them and already has BASE_URL.
-  if ! grep -qE "^($MOVED_SETTINGS)=" "$env" && grep -qE '^BASE_URL=' "$env"; then
-    return 0
-  fi
-
-  tok=$(current_token "$env")
-  headers=$(headers_block "$env")
-  mv "$env" "$env.bak"
-  cp "$dir/.env.example" "$env"
-  chmod 600 "$env"
-  if [ -n "$tok" ]; then set_token "$env" "$tok"; fi
-  # A configured HEADERS is a credential of its own and has no home in
-  # models.json, so it is carried across verbatim.
-  if [ -n "$headers" ] && [ "$headers" != 'HEADERS=' ]; then
-    tmp=$(mktemp "${env}.XXXXXX")
-    grep -v '^HEADERS=$' "$env" > "$tmp"
-    printf '%s\n' "$headers" >> "$tmp"
-    chmod 600 "$tmp"
-    mv "$tmp" "$env"
-  fi
-  printf '  %s• migrated old-format providers/%s/.env (backup: .env.bak)%s\n' "$DIM" "$p" "$RST"
-}
-
-sync_env_keys() { # <provider> — append settings added to .env.example since .env was written
-  local p=$1 dir env tmp line key buf added=0
-  dir="$PROVIDERS_DIR/$p"
-  env="$dir/.env"
-  [ -f "$env" ] || return 0
-  tmp=$(mktemp "${env}.XXXXXX")
+sync_env_keys() { # append variables added to .env.example since .env was written
+  local tmp line key buf added=0
+  [ -f "$ENV_FILE" ] || return 0
+  tmp=$(mktemp "${ENV_FILE}.XXXXXX")
   buf=''
   while IFS= read -r line || [ -n "$line" ]; do
     case $line in
-      # A blank line ends a block; the comments right above a setting come with it.
+      # A blank line ends a block; the comments right above a variable come with it.
       '') buf=''; continue ;;
       '#'*) buf="$buf$line"$'\n'; continue ;;
     esac
@@ -140,16 +111,69 @@ sync_env_keys() { # <provider> — append settings added to .env.example since .
     case $key in
       ''|*[!A-Za-z0-9_]*) buf=''; continue ;;
     esac
-    if grep -q "^$key=" "$env"; then buf=''; continue; fi
+    if grep -q "^$key=" "$ENV_FILE"; then buf=''; continue; fi
     printf '\n%s%s\n' "$buf" "$line" >> "$tmp"
     buf=''
     added=$((added + 1))
-  done < "$dir/.env.example"
+  done < "$ENV_EXAMPLE"
   if [ "$added" -gt 0 ]; then
-    cat "$tmp" >> "$env"
-    printf '  %s• added %d new setting(s) to providers/%s/.env%s\n' "$DIM" "$added" "$p" "$RST"
+    cat "$tmp" >> "$ENV_FILE"
+    printf '  %s• added %d new variable(s) to .env%s\n' "$DIM" "$added" "$RST"
   fi
   rm -f "$tmp"
+}
+
+# The layout before configs.json kept one .env per provider, holding the key as
+# API_TOKEN and any extra headers as "Name: Value" lines in HEADERS. Values
+# still sitting there are moved into the single .env, once, and only into
+# variables that are still empty.
+raw_headers() { # <old provider .env> -> its HEADERS value, one "Name: Value" per
+                # line, quotes removed and any $(...) left unevaluated
+  awk '
+    !started && /^HEADERS=/ { started = 1; quotes = 0; sub(/^HEADERS=/, "") }
+    started {
+      quotes += gsub(/"/, "")
+      print
+      if (quotes % 2 == 0) exit
+    }
+  ' "$1"
+}
+
+migrate_provider_envs() {
+  local dir provider file token headers name value target moved=0
+  [ -d "$ROOT/providers" ] || return 0
+  for dir in "$ROOT"/providers/*/; do
+    provider=$(basename "$dir")
+    file="$dir.env"
+    [ -f "$file" ] || continue
+    provider_names | grep -qx "$provider" || continue
+    models_resolve "$provider" || continue
+
+    token=$(grep -E '^(API_TOKEN|ANTHROPIC_AUTH_TOKEN)=.+' "$file" | head -1 | cut -d= -f2- || true)
+    if [ -n "$M_API_KEY_VAR" ] && [ -n "$token" ] && [ -z "$(env_value "$M_API_KEY_VAR")" ]; then
+      set_env_var "$M_API_KEY_VAR" "$token"
+      moved=$((moved + 1))
+    fi
+
+    headers=$(raw_headers "$file")
+    [ -n "$headers" ] || continue
+    while IFS= read -r name; do
+      [ -n "$name" ] || continue
+      target=$(header_var "$name")
+      [ -n "$target" ] || continue
+      [ -z "$(env_value "$target")" ] || continue
+      value=$(printf '%s\n' "$headers" | awk -v want="$name:" '
+        { sub(/^[ \t]+/, "") }
+        index($0, want) == 1 { sub(/^[^:]*:[ \t]*/, ""); print; exit }')
+      [ -n "$value" ] || continue
+      set_env_var "$target" "$value"
+      moved=$((moved + 1))
+    done < <(header_names)
+  done
+  if [ "$moved" -gt 0 ]; then
+    printf '  %s• carried %d value(s) over from providers/*/.env into .env%s\n' "$DIM" "$moved" "$RST"
+    printf '  %s  the old files are left in place — delete providers/ once you are happy%s\n' "$DIM" "$RST"
+  fi
 }
 
 # --------------------------------------------------------- checkbox picker
@@ -247,66 +271,79 @@ pick_providers() { # <provider>... -> SELECTED; returns 1 if nothing chosen
 # ------------------------------------------------------------ token prompt
 
 prompt_token() { # <provider>
-  local p=$1 env tok url hint new
-  env="$PROVIDERS_DIR/$p/.env"
-  tok=$(current_token "$env")
+  local p=$1 var tok url hint new
+  var=$(api_key_var "$p")
+  tok=$(current_token "$p")
   url=$(api_key_url "$p")
   section "$p"
+  if [ -z "$var" ]; then
+    printf '  %s✔ API_KEY is set in configs.json — nothing to paste%s\n' "$GRN" "$RST"
+    return 0
+  fi
+  printf '  %s%s%s\n' "$DIM" "$var in .env" "$RST"
   if [ -n "$url" ]; then printf '  %sget an API key at %s%s\n' "$DIM" "$url" "$RST"; fi
   if [ -n "$tok" ]; then
     if [ "${#tok}" -gt 4 ]; then hint="****${tok: -4}"; else hint='****'; fi
-    printf '  %stoken%s [%s — Enter to keep]: ' "$B" "$RST" "$hint"
+    printf '  %skey%s [%s — Enter to keep]: ' "$B" "$RST" "$hint"
   else
-    printf '  %stoken%s: ' "$B" "$RST"
+    printf '  %skey%s: ' "$B" "$RST"
   fi
   IFS= read -r new || new=''
   new=$(printf '%s' "$new" | tr -d '[:space:]')
   if [ -z "$new" ]; then
     if [ -n "$tok" ]; then
-      printf '  %s✔ kept existing token%s\n' "$GRN" "$RST"
+      printf '  %s✔ kept existing key%s\n' "$GRN" "$RST"
     else
-      printf '  %s⚠ left empty — edit providers/%s/.env later%s\n' "$YLW" "$p" "$RST"
+      printf '  %s⚠ left empty — set %s in %s later%s\n' "$YLW" "$var" "$(tilde "$ENV_FILE")" "$RST"
     fi
   else
-    set_token "$env" "$new"
-    printf '  %s✔ token updated%s\n' "$GRN" "$RST"
+    set_env_var "$var" "$new"
+    printf '  %s✔ key updated%s\n' "$GRN" "$RST"
   fi
+  # A provider may also need headers; those are edited by hand.
+  while IFS= read -r hint; do
+    [ -n "$hint" ] || continue
+    printf '  %s⚠ %s is empty — needed for the %s header%s\n' \
+      "$YLW" "${hint%%	*}" "${hint#*	}" "$RST"
+  done < <(
+    models_resolve "$p"
+    while IFS= read -r name; do
+      [ -n "$name" ] || continue
+      v=$(header_var "$name")
+      [ -n "$v" ] && [ -z "$(env_value "$v")" ] && printf '%s\t%s\n' "$v" "$name"
+    done < <(header_names)
+  )
 }
 
 # ------------------------------------------------------------- installation
 
 install_one() { # <provider> <command> <template>
-  local p=$1 cmd=$2 template=$3 dir env bin
-  dir="$PROVIDERS_DIR/$p"
-  env="$dir/.env"
-  sed -e 's|@@PROVIDER_DIR@@|'"$dir"'|g' \
+  local p=$1 cmd=$2 template=$3 bin
+  sed -e 's|@@PROVIDER@@|'"$p"'|g' \
     -e 's|@@COMMON@@|'"$COMMON"'|g' \
     "$template" > "$BIN_DIR/$cmd"
   chmod +x "$BIN_DIR/$cmd"
   bin=$(tilde "$BIN_DIR/$cmd")
-  if grep -Eq '^(API_TOKEN|ANTHROPIC_AUTH_TOKEN)=.+' "$env"; then
-    printf '  %s✔%s %s%s%-10s%s %s%-29s%s %stoken: set%s\n' \
+  if [ -n "$(current_token "$p")" ]; then
+    printf '  %s✔%s %s%s%-10s%s %s%-29s%s %skey: set%s\n' \
       "$GRN" "$RST" "$B" "$CYN" "$p" "$RST" "$DIM" "$bin" "$RST" "$GRN" "$RST"
   else
-    printf '  %s✔%s %s%s%-10s%s %s%-29s%s %stoken: not set — edit providers/%s/.env%s\n' \
-      "$GRN" "$RST" "$B" "$CYN" "$p" "$RST" "$DIM" "$bin" "$RST" "$YLW" "$p" "$RST"
+    printf '  %s✔%s %s%s%-10s%s %s%-29s%s %skey: not set — edit %s%s\n' \
+      "$GRN" "$RST" "$B" "$CYN" "$p" "$RST" "$DIM" "$bin" "$RST" "$YLW" "$(tilde "$ENV_FILE")" "$RST"
   fi
 }
 
-install_launcher() { # <provider> — the claude<NAME> command. Commands earlier
-                     # versions generated for the provider (recognised by the
-                     # baked-in PROVIDER_DIR) and its .pi-agent dir go away.
+install_launcher() { # <provider> — the claude<name> command. Commands earlier
+                     # versions generated for the provider go away.
   local p=$1 cmd
   install_one "$p" "$(provider_launcher "$p")" "$TEMPLATE"
   for cmd in $(provider_stale_launchers "$p"); do
-    if [ -f "$BIN_DIR/$cmd" ] && grep -q '^PROVIDER_DIR="' "$BIN_DIR/$cmd"; then
+    if [ -f "$BIN_DIR/$cmd" ] && grep -qE '^PROVIDER(_DIR)?="' "$BIN_DIR/$cmd"; then
       rm -f "$BIN_DIR/$cmd"
       printf '  %s• removed %s%s\n' "$DIM" "$BIN_DIR/$cmd" "$RST"
     fi
   done
-  rm -rf "$PROVIDERS_DIR/$p/.pi-agent"
 }
-
 # pi resolves packages from its user settings, so one install covers every
 # provider.
 install_pi_packages() {
@@ -359,11 +396,16 @@ main() {
 
   banner
 
+  if ! models_check; then
+    echo "setup: configs.json is invalid — fix it and re-run." >&2
+    exit 1
+  fi
+
   if [ "$#" -gt 0 ]; then
     providers=("$@")
     for p in "${providers[@]}"; do
-      if [ ! -f "$PROVIDERS_DIR/$p/.env.example" ]; then
-        echo "setup: unknown provider '$p' (no providers/$p/.env.example)" >&2
+      if ! provider_names | grep -qx "$p"; then
+        echo "setup: unknown provider '$p' (not in configs.json)" >&2
         exit 1
       fi
     done
@@ -375,13 +417,15 @@ main() {
     fi
     while IFS= read -r p; do all+=("$p"); done < <(discover_providers)
     if [ "${#all[@]}" -eq 0 ]; then
-      echo "setup: no providers found under $PROVIDERS_DIR" >&2
+      echo "setup: configs.json lists no providers" >&2
       exit 1
     fi
-    # Pre-check providers that already have a token configured.
+    ensure_env
+    sync_env_keys
+    # Pre-check providers whose key already resolves.
     CHECKED=()
     for i in "${!all[@]}"; do
-      tok=$(current_token "$PROVIDERS_DIR/${all[$i]}/.env")
+      tok=$(current_token "${all[$i]}")
       if [ -n "$tok" ]; then CHECKED[$i]=1; else CHECKED[$i]=0; fi
     done
     if ! pick_providers "${all[@]}"; then
@@ -391,16 +435,10 @@ main() {
     providers=("${SELECTED[@]}")
   fi
 
-  for p in "${providers[@]}"; do
-    if ! models_check "$PROVIDERS_DIR/$p"; then
-      echo "setup: providers/$p/models.json is invalid — fix it and re-run." >&2
-      exit 1
-    fi
-  done
+  ensure_env
+  sync_env_keys
 
   for p in "${providers[@]}"; do
-    ensure_env "$p"
-    sync_env_keys "$p"
     prompt_token "$p"
   done
 
@@ -414,12 +452,12 @@ main() {
 
   section 'generating global pi models.json'
   if ! "$ROOT/bin/pi-global-models.sh"; then
-    printf '  %s⚠ skipped — set a token and re-run%s\n' "$YLW" "$RST"
+    printf '  %s⚠ skipped — set a key and re-run%s\n' "$YLW" "$RST"
   fi
 
   section 'generating global OpenCode config'
   if ! "$ROOT/bin/opencode-global-config.sh"; then
-    printf '  %s⚠ skipped — set a token and re-run%s\n' "$YLW" "$RST"
+    printf '  %s⚠ skipped — set a key and re-run%s\n' "$YLW" "$RST"
   fi
 
   check_environment

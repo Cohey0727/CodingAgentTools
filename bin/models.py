@@ -1,25 +1,29 @@
 #!/usr/bin/env python3
-"""Resolve a provider's models.json into the values Claude Code, OpenCode and pi need.
+"""Resolve configs.json into the values Claude Code, OpenCode and pi need.
 
-providers/<name>/models.json holds every model the provider serves: its id, its
-limits, and the tags that say which slot it fills. providers/<name>/.env holds
-only what cannot be in git — API_TOKEN, BASE_URL and HEADERS.
+configs.json at the repo root holds every provider: its endpoint, the models it
+serves, and the tags that say which slot each model fills. Any "${NAME}" in a
+string is read from the environment, so the file carries references to secrets
+rather than secrets. The .env beside it holds those values.
 
 The file is JSON with // line comments allowed.
 
-  models.py sh <provider dir>       shell assignments (M_-prefixed) for eval
-  models.py check <provider dir>    validate only, print nothing
-  models.py tags <provider dir>     "<id>\t<tag>,<tag>" per model
+  models.py sh <provider>       shell assignments (M_-prefixed) for eval
+  models.py check [<provider>]  validate, print nothing on success
+  models.py tags <provider>     "<id><tab><tag>,<tag>" per model
+  models.py providers           one provider name per line
+  models.py env-vars            every "${NAME}" the file references, with its provider
 """
 
 import json
+import os
+import re
 import shlex
 import sys
 from pathlib import Path
 
-# Every tag a model may carry. Each names a slot in one of the three CLIs, so an
-# unknown one is a typo rather than a label: a model that fills no slot carries
-# no tags at all and is merely listed.
+CONFIGS = Path(__file__).resolve().parent.parent / "configs.json"
+
 # "default" and "small" are the two roles, and every slot follows one of them.
 # The rest are the Claude Code variables that can break away from that pair,
 # spelled exactly as Claude Code reads them; there is no tag for a variable
@@ -44,9 +48,11 @@ CLAUDE_SLOTS = {
 }
 
 MODEL_KEYS = {"id", "claude_id", "tags", "context_window", "max_tokens", "reasoning", "input"}
-TOP_KEYS = {"name", "defaults", "claude", "opencode", "models"}
+PROVIDER_KEYS = {"API_KEY", "BASE_URL", "REQUEST_HEADERS", "defaults", "claude", "opencode", "models"}
 CLAUDE_KEYS = {"command", "args", "env", "auto_compact_window"}
 OPENCODE_KEYS = {"lean", "context_window", "max_tokens"}
+
+REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 
 class ConfigError(Exception):
@@ -54,7 +60,7 @@ class ConfigError(Exception):
 
 
 def strip_comments(text):
-    """Drop // line comments outside of strings, so models.json can be annotated.
+    """Drop // line comments outside of strings, so configs.json can be annotated.
 
     Newlines are kept, so a JSON error still points at the right line.
     """
@@ -86,6 +92,21 @@ def strip_comments(text):
     return "".join(out)
 
 
+def expand(value):
+    """"${NAME}" -> the environment's value, empty when it is not set."""
+    return REFERENCE.sub(lambda m: os.environ.get(m.group(1), ""), value)
+
+
+def sole_reference(value):
+    """The variable name when the value is exactly one "${NAME}", else empty.
+
+    A value shaped that way can be handed to pi as a command that reads the
+    variable at request time, instead of being copied anywhere.
+    """
+    match = REFERENCE.fullmatch(value or "")
+    return match.group(1) if match else ""
+
+
 def _check_keys(where, obj, allowed):
     for key in obj:
         if key not in allowed:
@@ -100,107 +121,134 @@ def _int(where, value, key):
     return value
 
 
-def load(directory):
-    """providers/<name>/models.json -> the validated config, tags resolved to slots."""
-    path = Path(directory) / "models.json"
+def load_file():
     try:
-        raw = json.loads(strip_comments(path.read_text()))
+        raw = json.loads(strip_comments(CONFIGS.read_text()))
     except FileNotFoundError:
-        raise ConfigError(f"{path}: not found")
+        raise ConfigError(f"{CONFIGS}: not found")
     except json.JSONDecodeError as exc:
-        raise ConfigError(f"{path}: invalid JSON — {exc}")
-    if not isinstance(raw, dict):
-        raise ConfigError(f"{path}: top level must be an object")
-    _check_keys(path, raw, TOP_KEYS)
+        raise ConfigError(f"{CONFIGS}: invalid JSON — {exc}")
+    if not isinstance(raw, dict) or not isinstance(raw.get("providers"), dict):
+        raise ConfigError(f"{CONFIGS}: top level must be an object with a \"providers\" object")
+    if not raw["providers"]:
+        raise ConfigError(f"{CONFIGS}: providers is empty")
+    return raw["providers"]
 
-    name = raw.get("name") or Path(directory).name
+
+def load(name):
+    """One provider, validated, with its tags resolved to slots."""
+    providers = load_file()
+    if name not in providers:
+        known = ", ".join(providers)
+        raise ConfigError(f"{CONFIGS}: no provider named {name!r} (known: {known})")
+    where = f"{CONFIGS}: providers.{name}"
+    raw = providers[name]
+    if not isinstance(raw, dict):
+        raise ConfigError(f"{where}: must be an object")
+    _check_keys(where, raw, PROVIDER_KEYS)
+
+    base_url = expand(raw.get("BASE_URL") or "").rstrip("/")
+    if not base_url:
+        raise ConfigError(f"{where}: BASE_URL is required")
+
+    headers_raw = raw.get("REQUEST_HEADERS") or {}
+    if not isinstance(headers_raw, dict):
+        raise ConfigError(f"{where}: REQUEST_HEADERS must be an object")
+    headers = [
+        {"name": key, "var": sole_reference(value), "value": expand(value)}
+        for key, value in headers_raw.items()
+    ]
+
     defaults = raw.get("defaults") or {}
-    _check_keys(f"{path}: defaults", defaults, MODEL_KEYS - {"id", "claude_id", "tags"})
+    _check_keys(f"{where}.defaults", defaults, MODEL_KEYS - {"id", "claude_id", "tags"})
     claude = raw.get("claude") or {}
-    _check_keys(f"{path}: claude", claude, CLAUDE_KEYS)
+    _check_keys(f"{where}.claude", claude, CLAUDE_KEYS)
     opencode = raw.get("opencode") or {}
-    _check_keys(f"{path}: opencode", opencode, OPENCODE_KEYS)
+    _check_keys(f"{where}.opencode", opencode, OPENCODE_KEYS)
 
     entries = raw.get("models")
     if not isinstance(entries, list) or not entries:
-        raise ConfigError(f"{path}: models must be a non-empty array")
+        raise ConfigError(f"{where}: models must be a non-empty array")
 
     models = []
     by_tag = {}
     for index, entry in enumerate(entries):
-        where = f"{path}: models[{index}]"
+        at = f"{where}.models[{index}]"
         if not isinstance(entry, dict):
-            raise ConfigError(f"{where}: must be an object")
-        _check_keys(where, entry, MODEL_KEYS)
+            raise ConfigError(f"{at}: must be an object")
+        _check_keys(at, entry, MODEL_KEYS)
         model_id = entry.get("id")
         if not isinstance(model_id, str) or not model_id:
-            raise ConfigError(f"{where}: id is required")
+            raise ConfigError(f"{at}: id is required")
         merged = dict(defaults)
         merged.update(entry)
         tags = merged.get("tags") or []
         if not isinstance(tags, list):
-            raise ConfigError(f"{where}: tags must be an array")
+            raise ConfigError(f"{at}: tags must be an array")
         input_kinds = merged.get("input", ["text"])
         if not isinstance(input_kinds, list) or not all(k in ("text", "image") for k in input_kinds):
-            raise ConfigError(f"{where}: input must be an array of \"text\" / \"image\"")
+            raise ConfigError(f"{at}: input must be an array of \"text\" / \"image\"")
         model = {
             "id": model_id,
             "claude_id": merged.get("claude_id", model_id),
             "tags": tags,
-            "context_window": _int(where, merged.get("context_window"), "context_window"),
-            "max_tokens": _int(where, merged.get("max_tokens"), "max_tokens"),
+            "context_window": _int(at, merged.get("context_window"), "context_window"),
+            "max_tokens": _int(at, merged.get("max_tokens"), "max_tokens"),
             "reasoning": bool(merged.get("reasoning", True)),
             "input": input_kinds,
         }
         for tag in tags:
             if tag not in ROLE_TAGS:
-                raise ConfigError(f"{where}: unknown tag {tag!r} (known: {', '.join(ROLE_TAGS)})")
+                raise ConfigError(f"{at}: unknown tag {tag!r} (known: {', '.join(ROLE_TAGS)})")
             if tag in by_tag:
-                raise ConfigError(f"{where}: tag {tag!r} is already on {by_tag[tag]['id']!r}")
+                raise ConfigError(f"{at}: tag {tag!r} is already on {by_tag[tag]['id']!r}")
             by_tag[tag] = model
         models.append(model)
 
     if "default" not in by_tag:
-        raise ConfigError(f"{path}: no model is tagged 'default'")
+        raise ConfigError(f"{where}: no model is tagged 'default'")
 
-    slots = {}
-    for slot, candidates in CLAUDE_SLOTS.items():
-        slots[slot] = next(by_tag[tag] for tag in candidates if tag in by_tag)
+    slots = {
+        slot: next(by_tag[tag] for tag in candidates if tag in by_tag)
+        for slot, candidates in CLAUDE_SLOTS.items()
+    }
 
     env = claude.get("env") or {}
     if not isinstance(env, dict):
-        raise ConfigError(f"{path}: claude.env must be an object")
+        raise ConfigError(f"{where}.claude: env must be an object")
 
     return {
         "name": name,
+        "api_key": expand(raw.get("API_KEY") or ""),
+        "api_key_var": sole_reference(raw.get("API_KEY") or ""),
+        "base_url": base_url,
+        "headers": headers,
         "command": claude.get("command") or f"claude{name}",
         "args": claude.get("args", ""),
         "env": {k: str(v) for k, v in env.items()},
         "auto_compact_window": claude.get("auto_compact_window") or slots["ANTHROPIC_MODEL"]["context_window"],
-        "default_model": by_tag["default"],
-        "small_model": by_tag.get("small", by_tag["default"]),
         "lean": bool(opencode.get("lean", False)),
         "opencode_context_window": opencode.get("context_window"),
         "opencode_max_tokens": opencode.get("max_tokens"),
         "models": models,
         "slots": slots,
+        "default_model": by_tag["default"],
+        "small_model": by_tag.get("small", by_tag["default"]),
     }
 
 
 def pi_models_json(config):
     """The "models" array body of a pi models.json provider block, indented to fit."""
-    blocks = []
-    for model in config["models"]:
-        blocks.append(
-            "        {\n"
-            f'          "id": "{model["id"]}",\n'
-            f'          "reasoning": {"true" if model["reasoning"] else "false"},\n'
-            f'          "input": {json.dumps(model["input"])},\n'
-            f'          "contextWindow": {model["context_window"]},\n'
-            f'          "maxTokens": {model["max_tokens"]}\n'
-            "        }"
-        )
-    return ",\n".join(blocks)
+    return ",\n".join(
+        "        {\n"
+        f'          "id": "{model["id"]}",\n'
+        f'          "reasoning": {"true" if model["reasoning"] else "false"},\n'
+        f'          "input": {json.dumps(model["input"])},\n'
+        f'          "contextWindow": {model["context_window"]},\n'
+        f'          "maxTokens": {model["max_tokens"]}\n'
+        "        }"
+        for model in config["models"]
+    )
 
 
 def opencode_models_json(config):
@@ -211,12 +259,11 @@ def opencode_models_json(config):
     """
     context_cap = config["opencode_context_window"]
     output_cap = config["opencode_max_tokens"]
-    lines = []
-    for model in config["models"]:
-        context = context_cap or model["context_window"]
-        output = output_cap or model["max_tokens"]
-        lines.append(f'        "{model["id"]}": {{ "limit": {{ "context": {context}, "output": {output} }} }}')
-    return ",\n".join(lines)
+    return ",\n".join(
+        f'        "{model["id"]}": {{ "limit": {{ "context": {context_cap or model["context_window"]},'
+        f' "output": {output_cap or model["max_tokens"]} }} }}'
+        for model in config["models"]
+    )
 
 
 def shell(config):
@@ -224,6 +271,14 @@ def shell(config):
     values = {
         "M_NAME": config["name"],
         "M_COMMAND": config["command"],
+        "M_API_KEY": config["api_key"],
+        "M_API_KEY_VAR": config["api_key_var"],
+        "M_BASE_URL": config["base_url"],
+        # One header per line: name, the variable it came from (empty when the
+        # value is a literal), then the value.
+        "M_HEADERS_TSV": "\n".join(
+            "\t".join((h["name"], h["var"], h["value"])) for h in config["headers"]
+        ),
         "M_CLAUDE_ARGS": config["args"],
         "M_CLAUDE_ENV_SH": "\n".join(
             f"export {key}={shlex.quote(value)}" for key, value in sorted(config["env"].items())
@@ -238,28 +293,49 @@ def shell(config):
     }
     for slot in CLAUDE_SLOTS:
         values[f"M_{slot}"] = slots[slot]["claude_id"]
-
     return "\n".join(f"{key}={shlex.quote(value)}" for key, value in values.items())
 
 
-def tags(config):
-    return "\n".join(f"{model['id']}\t{','.join(model['tags'])}" for model in config["models"])
+def env_vars():
+    """Every "${NAME}" the file references, as "<provider><tab><var><tab><what>"."""
+    lines = []
+    for name, raw in load_file().items():
+        for var in REFERENCE.findall(raw.get("API_KEY") or ""):
+            lines.append(f"{name}\t{var}\tAPI_KEY")
+        for header, value in (raw.get("REQUEST_HEADERS") or {}).items():
+            for var in REFERENCE.findall(value or ""):
+                lines.append(f"{name}\t{var}\tREQUEST_HEADERS {header}")
+        for var in REFERENCE.findall(raw.get("BASE_URL") or ""):
+            lines.append(f"{name}\t{var}\tBASE_URL")
+    return "\n".join(lines)
 
 
 def main(argv):
-    if len(argv) != 3 or argv[1] not in ("sh", "check", "tags"):
+    action = argv[1] if len(argv) > 1 else ""
+    argument = argv[2] if len(argv) > 2 else ""
+    if action not in ("sh", "check", "tags", "providers", "env-vars"):
         print(__doc__.strip(), file=sys.stderr)
         return 2
-    action, directory = argv[1], argv[2]
     try:
-        config = load(directory)
+        if action == "providers":
+            print("\n".join(load_file()))
+        elif action == "env-vars":
+            print(env_vars())
+        elif action == "check" and not argument:
+            for name in load_file():
+                load(name)
+        elif not argument:
+            print(f"models.py {action}: a provider name is required", file=sys.stderr)
+            return 2
+        else:
+            config = load(argument)
+            if action == "sh":
+                print(shell(config))
+            elif action == "tags":
+                print("\n".join(f"{m['id']}\t{','.join(m['tags'])}" for m in config["models"]))
     except ConfigError as exc:
-        print(f"models.json: {exc}", file=sys.stderr)
+        print(f"configs.json: {exc}", file=sys.stderr)
         return 1
-    if action == "sh":
-        print(shell(config))
-    elif action == "tags":
-        print(tags(config))
     return 0
 
 

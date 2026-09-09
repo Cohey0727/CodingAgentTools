@@ -1,6 +1,9 @@
-# Per-provider secrets (real API keys)
-providers/*/.env
-providers/*/.env.bak
+# Every API key lives here (configs.json only references them)
+/.env
+/.env.bak
+
+# providers/ is not part of the repo; a checkout may still hold key files there
+providers/
 
 # Personal data the freelance skills fill their templates with
 skills/freelance-invoice/personal-config.json

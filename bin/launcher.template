@@ -6,37 +6,34 @@
 
 set -euo pipefail
 
-PROVIDER_DIR="@@PROVIDER_DIR@@"
+PROVIDER="@@PROVIDER@@"
 COMMON="@@COMMON@@"
-ENV_FILE="$PROVIDER_DIR/.env"
 SELF="${0##*/}"
 
-for f in "$COMMON" "$ENV_FILE" "$PROVIDER_DIR/models.json"; do
-  if [[ ! -f "$f" ]]; then
-    echo "$SELF: file not found at $f" >&2
-    echo "  re-run 'make setup' from the project root." >&2
-    exit 1
-  fi
-done
+if [[ ! -f "$COMMON" ]]; then
+  echo "$SELF: file not found at $COMMON" >&2
+  echo "  re-run 'make setup' from the project root." >&2
+  exit 1
+fi
 
 # shellcheck disable=SC1090
 source "$COMMON"
 
-# models.json is the single source of truth for every model slot; .env carries
-# only the token, the endpoint and any extra headers.
-load_settings "$ENV_FILE"
-require_settings "$SELF" "$ENV_FILE"
-models_resolve "$PROVIDER_DIR"
+# configs.json is the whole configuration; the .env beside it holds the values
+# its "${NAME}" references point at. Neither is exported into this shell — only
+# the resolved values below reach `claude`.
+models_resolve "$PROVIDER"
+require_settings "$SELF"
 
-export ANTHROPIC_AUTH_TOKEN="$CFG_TOKEN"
-export ANTHROPIC_BASE_URL="$CFG_BASE_URL"
+export ANTHROPIC_AUTH_TOKEN="$M_API_KEY"
+export ANTHROPIC_BASE_URL="$M_BASE_URL"
 
-# HEADERS ("Name: Value" lines) is exactly what ANTHROPIC_CUSTOM_HEADERS takes.
-if [[ -n "$CFG_HEADERS" ]]; then
-  export ANTHROPIC_CUSTOM_HEADERS="$CFG_HEADERS"
+CUSTOM_HEADERS=$(claude_custom_headers)
+if [[ -n "$CUSTOM_HEADERS" ]]; then
+  export ANTHROPIC_CUSTOM_HEADERS="$CUSTOM_HEADERS"
 fi
 
-# One model per slot: models.json tags each model with the variable it fills,
+# One model per slot: configs.json tags each model with the variable it fills,
 # and models_resolve returns that variable's value as M_<name>. Assignment is
 # unconditional — an ANTHROPIC_* inherited from an outer launcher session would
 # otherwise pin this one to the outer provider's model.
@@ -50,14 +47,11 @@ export CLAUDE_CODE_SUBAGENT_MODEL="$M_CLAUDE_CODE_SUBAGENT_MODEL"
 # The main model's context window doubles as Claude Code's auto-compact threshold.
 export CLAUDE_CODE_AUTO_COMPACT_WINDOW="$M_CLAUDE_CODE_AUTO_COMPACT_WINDOW"
 
-# "claude": { "env": { ... } } from models.json, exported as-is.
+# "claude": { "env": { ... } } from configs.json, exported as-is.
 eval "$M_CLAUDE_ENV_SH"
-
-DEFAULT_ARGS="$M_CLAUDE_ARGS"
-strip_metadata
 
 # A stale ANTHROPIC_API_KEY in the environment would shadow AUTH_TOKEN.
 unset ANTHROPIC_API_KEY
 
-# shellcheck disable=SC2086  # word-splitting DEFAULT_ARGS is intended
-exec claude $DEFAULT_ARGS "$@"
+# shellcheck disable=SC2086  # word-splitting the default args is intended
+exec claude $M_CLAUDE_ARGS "$@"

@@ -22,13 +22,13 @@ target 'make uninstall' 'remove the launchers, generated configs and symlinks th
 target 'make help' 'this screen'
 
 section 'notes'
-note 'providers/<name>/models.json holds every model and the tags naming each slot'
-note 'providers/<name>/.env holds only API_TOKEN, BASE_URL and HEADERS'
+note 'configs.json holds every provider: endpoint, models and the tags naming each slot'
+note '.env holds the values configs.json refers to as ${NAME} — nothing else'
 note 'skills and AGENTS.md are installed as symlinks — edits here take effect immediately'
 note '~/.claude/skills is read by Claude Code and opencode'
 note '~/.agents/skills is read by Codex, opencode and pi'
 note 'opencode/ adds OpenCode-only extensions: /goal keeps one objective going across turns'
 note 'AGENTS.md is the single global instruction file — Claude Code reads it as ~/.claude/CLAUDE.md'
 note 'real files and directories at a target path are never overwritten'
-note 'provider .env files are never touched by uninstall'
+note '.env is never touched by uninstall'
 echo

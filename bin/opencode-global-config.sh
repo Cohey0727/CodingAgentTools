@@ -4,13 +4,13 @@
 # `opencode` reads the generated ~/.config/opencode/opencode.json, and /models
 # lists every provider.
 #
-# Models come from providers/<name>/models.json. The token and each HEADERS
-# value stay in providers/<name>/.env: the config references them as {file:...}
-# pointing at a copy this script writes (chmod 600), so the config itself
-# carries no secrets. Re-run after editing either file — the copies are replaced.
+# Everything comes from configs.json. The config itself carries no secret: each
+# key and header value is referenced as {file:...} pointing at a copy this
+# script writes (chmod 600) from the .env. Re-run after rotating a key — the
+# copies are replaced, and copies of providers whose key was emptied are dropped.
 #
-# A provider whose models.json sets "opencode": { "lean": true } also gets an
-# agent of its own, pinned to its model, that replaces OpenCode's stock system
+# A provider whose configs.json entry sets "opencode": { "lean": true } also gets
+# an agent of its own, pinned to its model, that replaces OpenCode's stock system
 # prompt with a short one and drops the tools a small self-hosted model has no
 # use for. The session starts on that agent when the provider is also the
 # default one.
@@ -18,7 +18,6 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-PROVIDERS_DIR="$ROOT/providers"
 LEAN_PROMPT="$ROOT/bin/opencode-lean-prompt.md"
 # shellcheck disable=SC1090
 source "$ROOT/bin/common.sh"
@@ -33,21 +32,15 @@ if [ -f "$OUT" ] && ! generated_here "$OUT"; then
   exit 1
 fi
 
-# Every provider with a token, an endpoint and a valid models.json. Each is
-# resolved in a subshell: load_settings exports the whole .env, and providers
-# must not leak into each other.
+# Every provider whose key resolves to something.
 providers=()
-for dir in "$PROVIDERS_DIR"/*/; do
-  provider=$(basename "$dir")
-  dir="${dir%/}"
-  [ -f "$dir/.env" ] && [ -f "$dir/models.json" ] || continue
-  if ( load_settings "$dir/.env"; [ -n "$CFG_TOKEN" ] && [ -n "$CFG_BASE_URL" ] ) && models_check "$dir"; then
-    providers+=("$provider")
-  fi
-done
+while IFS= read -r provider; do
+  [ -n "$provider" ] || continue
+  if configured_provider "$provider"; then providers+=("$provider"); fi
+done < <(provider_names)
 
 if [ "${#providers[@]}" -eq 0 ]; then
-  echo "opencode-global: no provider has a token yet — run 'make setup' first." >&2
+  echo "opencode-global: no provider has a key yet — run 'make setup' first." >&2
   exit 1
 fi
 
@@ -55,15 +48,14 @@ fi
 default_provider=$(default_provider "${providers[@]}")
 
 default_models=$(
-  models_resolve "$PROVIDERS_DIR/$default_provider"
+  models_resolve "$default_provider"
   printf '%s\n%s' "$M_DEFAULT_MODEL" "$M_SMALL_MODEL"
 )
 model="$default_provider-anthropic/$(head -1 <<<"$default_models")"
 small_model="$default_provider-anthropic/$(tail -n +2 <<<"$default_models")"
 
-# The tokens dir is fully managed here: wipe it, then write the current set so
-# providers whose .env lost their token leave no stale secret behind. HEADERS
-# values are stored the same way, one file per header.
+# The secrets dir is fully managed here: wipe it, then write the current set so
+# a provider whose key was emptied leaves no stale copy behind.
 mkdir -p "$TOKENS_DIR"
 chmod 700 "$TOKENS_DIR"
 rm -f "$TOKENS_DIR"/*.token "$TOKENS_DIR"/*.header "$TOKENS_DIR"/*.prompt.md
@@ -72,17 +64,16 @@ opencode_header_ref() { # <name> -> {file:...} reference for the provider in sco
   printf '{file:%s/%s.%s.header}' "$TOKENS_DIR" "$provider" "$1"
 }
 
-lean_provider() { # <provider> — does its models.json ask for the lean agent?
-  ( models_resolve "$PROVIDERS_DIR/$1"; [ "$M_OPENCODE_LEAN" = true ] )
+lean_provider() { # <provider> — does configs.json ask for the lean agent?
+  ( models_resolve "$1"; [ "$M_OPENCODE_LEAN" = true ] )
 }
 
 entries=()
 agents=()
 for provider in "${providers[@]}"; do
   entries+=("$(
-    load_settings "$PROVIDERS_DIR/$provider/.env"
-    models_resolve "$PROVIDERS_DIR/$provider"
-    printf '%s' "$CFG_TOKEN" > "$TOKENS_DIR/$provider.token"
+    models_resolve "$provider"
+    printf '%s' "$M_API_KEY" > "$TOKENS_DIR/$provider.token"
     chmod 600 "$TOKENS_DIR/$provider.token"
     while IFS= read -r name; do
       [ -n "$name" ] || continue
@@ -94,7 +85,7 @@ for provider in "${providers[@]}"; do
   if lean_provider "$provider"; then
     cp "$LEAN_PROMPT" "$TOKENS_DIR/$provider.prompt.md"
     agents+=("$(
-      models_resolve "$PROVIDERS_DIR/$provider"
+      models_resolve "$provider"
       opencode_agent_json "$provider" "$TOKENS_DIR/$provider.prompt.md"
     )")
   fi

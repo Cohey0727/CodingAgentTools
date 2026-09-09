@@ -3,19 +3,18 @@
 # (`make pi-global`). pi has no launcher in this repo: a bare `pi` reads the
 # generated ~/.pi/agent/models.json, and /model lists every provider.
 #
-# Models come from providers/<name>/models.json. Tokens and HEADERS values stay
-# in providers/<name>/.env: the generated file only holds shell commands that
-# read them back out at request time, so a rotated token or a computed header
-# needs no re-run.
+# Everything comes from configs.json. No secret is written here: an API_KEY or
+# header value that configs.json refers to as "${NAME}" becomes a shell command
+# pi runs at request time to read it back out of the .env, so a rotated key or a
+# computed header needs no re-run.
 #
-# A provider is registered under its plain folder name, which is what pi shows
+# A provider is registered under its name in configs.json, which is what pi shows
 # next to a model. Where that name also exists in pi's own catalog, pi keeps
-# this file's endpoint and token and adds the catalog's models to the list.
+# this file's endpoint and key and adds the catalog's models to the list.
 
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-PROVIDERS_DIR="$ROOT/providers"
 # shellcheck disable=SC1090
 source "$ROOT/bin/common.sh"
 
@@ -28,40 +27,40 @@ if [ -f "$OUT" ] && ! generated_here "$OUT"; then
   exit 1
 fi
 
-pi_global_header_ref() { # <name> -> command pi runs to read the value from .env
-  printf "!bash -c '. %s; load_settings %s; header_value %s'" \
-    "$ROOT/bin/common.sh" "$env_file" "$1"
+# A value configs.json points at a variable for is referenced, never copied; one
+# written literally there is already in git, so it is passed through as-is.
+pi_api_key_ref() {
+  if [ -n "$M_API_KEY_VAR" ]; then pi_secret_ref "$M_API_KEY_VAR"; else printf '%s' "$M_API_KEY"; fi
+}
+
+pi_header_ref() { # <header name>
+  local var
+  var=$(header_var "$1")
+  if [ -n "$var" ]; then pi_secret_ref "$var"; else header_value "$1"; fi
 }
 
 providers=()
 entries=()
-for dir in "$PROVIDERS_DIR"/*/; do
-  provider=$(basename "$dir")
-  dir="${dir%/}"
-  env_file="$dir/.env"
-  [ -f "$env_file" ] && [ -f "$dir/models.json" ] || continue
-  # Each provider is resolved in a subshell: load_settings exports the whole
-  # .env, and providers must not leak into each other.
+while IFS= read -r provider; do
+  [ -n "$provider" ] || continue
+  # Each provider is resolved in a subshell so none leaks into the next.
   entry=$(
-    load_settings "$env_file"
-    [ -n "$CFG_TOKEN" ] && [ -n "$CFG_BASE_URL" ] || exit 0
-    models_resolve "$dir" || exit 1
-    pi_provider_json "$provider" \
-      "!grep -m1 -E '^API_TOKEN=.+' '$env_file' | cut -d= -f2-" \
-      pi_global_header_ref
+    models_resolve "$provider" || exit 1
+    [ -n "$M_API_KEY" ] || exit 0
+    pi_provider_json "$provider" "$(pi_api_key_ref)" pi_header_ref
   )
   if [ -n "$entry" ]; then providers+=("$provider"); entries+=("$entry"); fi
-done
+done < <(provider_names)
 
 if [ "${#entries[@]}" -eq 0 ]; then
-  echo "pi-global: no provider has a token yet — run 'make setup' first." >&2
+  echo "pi-global: no provider has a key yet — run 'make setup' first." >&2
   exit 1
 fi
 
 # The provider pi starts on, and its main model.
 start_provider=$(default_provider "${providers[@]}")
 start_model=$(
-  models_resolve "$PROVIDERS_DIR/$start_provider"
+  models_resolve "$start_provider"
   printf '%s' "$M_DEFAULT_MODEL"
 )
 
