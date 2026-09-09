@@ -196,7 +196,7 @@ draw_item() { # <index>
   local i=$1 mark cmd tok
   if [ "${CHECKED[$i]}" = 1 ]; then mark="${GRN}x${RST}"; else mark=' '; fi
   cmd=$(provider_launcher "${ITEMS[$i]}")
-  tok=$(current_token "$PROVIDERS_DIR/${ITEMS[$i]}/.env")
+  tok=$(current_token "${ITEMS[$i]}")
   printf '\033[2K\r'
   if [ "$i" = "$CURSOR" ]; then
     printf '\033[7m> [%s] %-12s\033[0m' "$mark" "${ITEMS[$i]}"
@@ -204,9 +204,9 @@ draw_item() { # <index>
     printf '  [%s] %s%-12s%s' "$mark" "$B" "${ITEMS[$i]}" "$RST"
   fi
   if [ -n "$tok" ]; then
-    printf '  %s→ %-44s%s %stoken: set%s\n' "$DIM" "$cmd" "$RST" "$GRN" "$RST"
+    printf '  %s→ %-44s%s %skey: set%s\n' "$DIM" "$cmd" "$RST" "$GRN" "$RST"
   else
-    printf '  %s→ %-44s%s %stoken: not set%s\n' "$DIM" "$cmd" "$RST" "$DIM" "$RST"
+    printf '  %s→ %-44s%s %skey: not set%s\n' "$DIM" "$cmd" "$RST" "$DIM" "$RST"
   fi
 }
 

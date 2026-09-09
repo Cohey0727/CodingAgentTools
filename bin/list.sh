@@ -5,7 +5,6 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-PROVIDERS_DIR="$ROOT/providers"
 COMMON="$ROOT/bin/common.sh"
 # shellcheck disable=SC1091
 source "$ROOT/bin/ui.sh"

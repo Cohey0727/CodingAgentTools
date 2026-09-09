@@ -16,8 +16,8 @@ target 'make setup' 'both halves: the provider wizard, then the skill symlinks'
 target 'make setup-providers' 'pick providers, paste tokens, install launchers and the pi / OpenCode configs'
 target 'make setup-skills' 'link skills/, agents/, AGENTS.md and opencode/ into every agent CLI'
 target 'make list' 'every provider, skill, subagent and OpenCode extension, with its install status'
-target 'make pi-global' "re-generate pi's global models.json from the current provider configs"
-target 'make opencode-global' "re-generate OpenCode's global config from the current provider configs"
+target 'make pi-global' "re-generate pi's global models.json from configs.json"
+target 'make opencode-global' "re-generate OpenCode's global config from configs.json"
 target 'make uninstall' 'remove the launchers, generated configs and symlinks this repo installed'
 target 'make help' 'this screen'
 

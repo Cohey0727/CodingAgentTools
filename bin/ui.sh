@@ -13,13 +13,13 @@ banner() { # [<subtitle>] — SKIP_BANNER=1 keeps a make target that runs
   [ -z "${SKIP_BANNER:-}" ] || return 0
   local subtitle=${1:-launchers, provider configs and skills for every agent CLI}
   printf '%s\n' \
-    "  ${CYN} ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗${RST}" \
-    "  ${CYN}██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝${RST}" \
-    "  ${CYN}██║     ██║     ███████║██║   ██║██║  ██║█████╗${RST}" \
-    "  ${CYN}██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝${RST}" \
-    "  ${CYN}╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗${RST}" \
-    "  ${CYN} ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝${RST}" \
-    "        ${B}C O D I N G   A G E N T   T O O L S${RST}" \
+    "      ${CYN} ██████╗ █████╗ ████████╗${RST}" \
+    "      ${CYN}██╔════╝██╔══██╗╚══██╔══╝${RST}" \
+    "      ${CYN}██║     ███████║   ██║   ${RST}" \
+    "      ${CYN}██║     ██╔══██║   ██║   ${RST}" \
+    "      ${CYN}╚██████╗██║  ██║   ██║   ${RST}" \
+    "      ${CYN} ╚═════╝╚═╝  ╚═╝   ╚═╝   ${RST}" \
+    "  ${B}C O D I N G   A G E N T   T O O L S${RST}" \
     "  ${DIM}${subtitle}${RST}"
   echo
 }
