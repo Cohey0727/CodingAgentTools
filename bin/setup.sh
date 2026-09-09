@@ -5,12 +5,13 @@
 #   bin/setup.sh deepseek glm     skip the checkbox, still prompt for tokens
 #
 # At a token prompt, pressing Enter with no input keeps whatever token is
-# already in that provider's .env. Old-format .env files are migrated first,
-# and settings added to .env.example since are appended. Then a claude<NAME>
-# launcher per provider is generated into $BIN_DIR (default ~/.local/bin)
-# from the template in bin/, the pi packages in $PI_PACKAGES are installed
-# into pi's user settings, and every provider with a token is registered in
-# pi's global models.json and OpenCode's global config.
+# already in that provider's .env. Old-format .env files — the ones that still
+# carry model settings, now in models.json — are migrated first, and settings
+# added to .env.example since are appended. Then a claude<name> launcher per
+# provider is generated into $BIN_DIR (default ~/.local/bin) from the template
+# in bin/, the pi packages in $PI_PACKAGES are installed into pi's user
+# settings, and every provider with a token is registered in pi's global
+# models.json and OpenCode's global config.
 
 set -euo pipefail
 
@@ -30,21 +31,17 @@ source "$ROOT/bin/ui.sh"
 discover_providers() {
   local d
   for d in "$PROVIDERS_DIR"/*/; do
-    [ -f "$d/.env.example" ] && basename "$d"
+    [ -f "$d/.env.example" ] && [ -f "$d/models.json" ] && basename "$d"
   done
   return 0
 }
 
 provider_launcher() { # <provider> -> "claude<x>"
-  local file="$PROVIDERS_DIR/$1/.env"
-  [ -f "$file" ] || file="$PROVIDERS_DIR/$1/.env.example"
-  ( load_settings "$file"; launcher_name "$1" )
+  provider_command "$PROVIDERS_DIR/$1"
 }
 
 provider_stale_launchers() { # <provider> -> commands earlier versions installed
-  local file="$PROVIDERS_DIR/$1/.env"
-  [ -f "$file" ] || file="$PROVIDERS_DIR/$1/.env.example"
-  ( load_settings "$file"; stale_launcher_names "$1" )
+  provider_stale_commands "$PROVIDERS_DIR/$1"
 }
 
 api_key_url() { # <provider> -> signup URL from the .env.example comment, if any
@@ -52,17 +49,7 @@ api_key_url() { # <provider> -> signup URL from the .env.example comment, if any
     "$PROVIDERS_DIR/$1/.env.example" | head -1
 }
 
-token_key() { # <env file> -> the key holding the token: the highest-priority
-              # one that is present and non-empty, else API_TOKEN
-  local file=$1 key
-  for key in ANTHROPIC_AUTH_TOKEN API_TOKEN; do
-    if grep -qE "^$key=.+" "$file"; then printf '%s' "$key"; return 0; fi
-  done
-  if grep -qE '^API_TOKEN=' "$file"; then printf 'API_TOKEN'; return 0; fi
-  printf 'ANTHROPIC_AUTH_TOKEN'
-}
-
-current_token() { # <env file> -> configured token (new or old format), maybe ""
+current_token() { # <env file> -> configured token, maybe ""
   [ -f "$1" ] || return 0
   local tok
   tok=$(grep -E '^(API_TOKEN|ANTHROPIC_AUTH_TOKEN)=.+' "$1" | head -1 | cut -d= -f2- || true)
@@ -72,9 +59,8 @@ current_token() { # <env file> -> configured token (new or old format), maybe ""
   printf '%s' "$tok"
 }
 
-set_token() { # <env file> <token> — rewrite the line holding the token
-  local file=$1 token=$2 key tmp line
-  key=$(token_key "$file")
+set_token() { # <env file> <token> — rewrite the API_TOKEN line
+  local file=$1 token=$2 key=API_TOKEN tmp line
   tmp=$(mktemp "${file}.XXXXXX")
   while IFS= read -r line || [ -n "$line" ]; do
     case $line in
@@ -86,22 +72,55 @@ set_token() { # <env file> <token> — rewrite the line holding the token
   mv "$tmp" "$file"
 }
 
+# Settings that moved to models.json. An .env still carrying any of them is the
+# old layout and gets rebuilt from .env.example.
+MOVED_SETTINGS='NAME|MODEL|SMALL_MODEL|OPENCODE_EXTRA_MODELS|CONTEXT_WINDOW|MAX_TOKENS'
+MOVED_SETTINGS="$MOVED_SETTINGS|SMALL_CONTEXT_WINDOW|SMALL_MAX_TOKENS|REASONING|INPUT|ARGS"
+MOVED_SETTINGS="$MOVED_SETTINGS|COMMAND|CLAUDE_ARGS|CLAUDE_MODEL_SUFFIX|OPENCODE_LEAN"
+
+headers_block() { # <env file> -> its HEADERS assignment, however many lines the
+                  # double-quoted value spans; empty when there is none
+  awk '
+    !started && /^HEADERS=/ { started = 1; quotes = 0 }
+    started {
+      print
+      quotes += gsub(/"/, "&")
+      if (quotes % 2 == 0) exit
+    }
+  ' "$1"
+}
+
 ensure_env() { # <provider> — create .env from example; migrate the old layout
-  local p=$1 dir env key
+  local p=$1 dir env tok headers tmp
   dir="$PROVIDERS_DIR/$p"
   env="$dir/.env"
   if [ ! -f "$env" ]; then
     cp "$dir/.env.example" "$env"
     chmod 600 "$env"
     printf '  %s• created providers/%s/.env from example%s\n' "$DIM" "$p" "$RST"
-  elif ! grep -qE '^(BASE_URL|ANTHROPIC_BASE_URL)=' "$env"; then
-    key=$(current_token "$env")
-    mv "$env" "$env.bak"
-    cp "$dir/.env.example" "$env"
-    chmod 600 "$env"
-    if [ -n "$key" ]; then set_token "$env" "$key"; fi
-    printf '  %s• migrated old-format providers/%s/.env (backup: .env.bak)%s\n' "$DIM" "$p" "$RST"
+    return 0
   fi
+  # Nothing to do for an .env that carries none of them and already has BASE_URL.
+  if ! grep -qE "^($MOVED_SETTINGS)=" "$env" && grep -qE '^BASE_URL=' "$env"; then
+    return 0
+  fi
+
+  tok=$(current_token "$env")
+  headers=$(headers_block "$env")
+  mv "$env" "$env.bak"
+  cp "$dir/.env.example" "$env"
+  chmod 600 "$env"
+  if [ -n "$tok" ]; then set_token "$env" "$tok"; fi
+  # A configured HEADERS is a credential of its own and has no home in
+  # models.json, so it is carried across verbatim.
+  if [ -n "$headers" ] && [ "$headers" != 'HEADERS=' ]; then
+    tmp=$(mktemp "${env}.XXXXXX")
+    grep -v '^HEADERS=$' "$env" > "$tmp"
+    printf '%s\n' "$headers" >> "$tmp"
+    chmod 600 "$tmp"
+    mv "$tmp" "$env"
+  fi
+  printf '  %s• migrated old-format providers/%s/.env (backup: .env.bak)%s\n' "$DIM" "$p" "$RST"
 }
 
 sync_env_keys() { # <provider> — append settings added to .env.example since .env was written
@@ -371,6 +390,13 @@ main() {
     fi
     providers=("${SELECTED[@]}")
   fi
+
+  for p in "${providers[@]}"; do
+    if ! models_check "$PROVIDERS_DIR/$p"; then
+      echo "setup: providers/$p/models.json is invalid — fix it and re-run." >&2
+      exit 1
+    fi
+  done
 
   for p in "${providers[@]}"; do
     ensure_env "$p"

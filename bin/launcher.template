@@ -11,7 +11,7 @@ COMMON="@@COMMON@@"
 ENV_FILE="$PROVIDER_DIR/.env"
 SELF="${0##*/}"
 
-for f in "$COMMON" "$ENV_FILE"; do
+for f in "$COMMON" "$ENV_FILE" "$PROVIDER_DIR/models.json"; do
   if [[ ! -f "$f" ]]; then
     echo "$SELF: file not found at $f" >&2
     echo "  re-run 'make setup' from the project root." >&2
@@ -22,43 +22,37 @@ done
 # shellcheck disable=SC1090
 source "$COMMON"
 
-# .env is the single source of truth: its generic settings become the
-# ANTHROPIC_* / CLAUDE_CODE_* variables Claude Code itself reads, and any
-# extra KEY=VALUE pairs are exported verbatim.
+# models.json is the single source of truth for every model slot; .env carries
+# only the token, the endpoint and any extra headers.
 load_settings "$ENV_FILE"
 require_settings "$SELF" "$ENV_FILE"
+models_resolve "$PROVIDER_DIR"
 
 export ANTHROPIC_AUTH_TOKEN="$CFG_TOKEN"
 export ANTHROPIC_BASE_URL="$CFG_BASE_URL"
 
 # HEADERS ("Name: Value" lines) is exactly what ANTHROPIC_CUSTOM_HEADERS takes.
-if [[ -n "${ANTHROPIC_CUSTOM_HEADERS:-$CFG_HEADERS}" ]]; then
-  export ANTHROPIC_CUSTOM_HEADERS="${ANTHROPIC_CUSTOM_HEADERS:-$CFG_HEADERS}"
+if [[ -n "$CFG_HEADERS" ]]; then
+  export ANTHROPIC_CUSTOM_HEADERS="$CFG_HEADERS"
 fi
 
-# CLAUDE_MODEL_SUFFIX appends a Claude Code-only marker such as "[1m]" to
-# every model slot. A model id that already carries one is left alone.
-if [[ -n "${CLAUDE_MODEL_SUFFIX:-}" ]]; then
-  MODEL="$CFG_MODEL_PLAIN$CLAUDE_MODEL_SUFFIX"
-  SMALL_MODEL="$CFG_SMALL_MODEL_PLAIN$CLAUDE_MODEL_SUFFIX"
-else
-  MODEL="$CFG_MODEL"
-  SMALL_MODEL="$CFG_SMALL_MODEL"
-fi
+# One model per slot, each the id tagged for it in models.json. Assignment is
+# unconditional: an ANTHROPIC_* inherited from an outer launcher session would
+# otherwise pin this one to the outer provider's model.
+export ANTHROPIC_MODEL="$M_CLAUDE_MODEL"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="$M_CLAUDE_OPUS_MODEL"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="$M_CLAUDE_SONNET_MODEL"
+export ANTHROPIC_DEFAULT_FABLE_MODEL="$M_CLAUDE_FABLE_MODEL"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="$M_CLAUDE_HAIKU_MODEL"
+export CLAUDE_CODE_SUBAGENT_MODEL="$M_CLAUDE_SUBAGENT_MODEL"
 
-export ANTHROPIC_MODEL="${ANTHROPIC_MODEL:-$MODEL}"
-export ANTHROPIC_DEFAULT_OPUS_MODEL="${ANTHROPIC_DEFAULT_OPUS_MODEL:-$ANTHROPIC_MODEL}"
-export ANTHROPIC_DEFAULT_SONNET_MODEL="${ANTHROPIC_DEFAULT_SONNET_MODEL:-$ANTHROPIC_MODEL}"
-export ANTHROPIC_DEFAULT_FABLE_MODEL="${ANTHROPIC_DEFAULT_FABLE_MODEL:-$ANTHROPIC_MODEL}"
-export ANTHROPIC_DEFAULT_HAIKU_MODEL="${ANTHROPIC_DEFAULT_HAIKU_MODEL:-$SMALL_MODEL}"
-export CLAUDE_CODE_SUBAGENT_MODEL="${CLAUDE_CODE_SUBAGENT_MODEL:-$SMALL_MODEL}"
+# The main model's context window doubles as Claude Code's auto-compact threshold.
+export CLAUDE_CODE_AUTO_COMPACT_WINDOW="$M_CLAUDE_AUTO_COMPACT_WINDOW"
 
-# The context window doubles as Claude Code's auto-compact threshold.
-if [[ -n "$CFG_CONTEXT_WINDOW" ]]; then
-  export CLAUDE_CODE_AUTO_COMPACT_WINDOW="${CLAUDE_CODE_AUTO_COMPACT_WINDOW:-$CFG_CONTEXT_WINDOW}"
-fi
+# "claude": { "env": { ... } } from models.json, exported as-is.
+eval "$M_CLAUDE_ENV_SH"
 
-DEFAULT_ARGS="${CLAUDE_ARGS:-$CFG_ARGS}"
+DEFAULT_ARGS="$M_CLAUDE_ARGS"
 strip_metadata
 
 # A stale ANTHROPIC_API_KEY in the environment would shadow AUTH_TOKEN.

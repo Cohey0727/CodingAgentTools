@@ -1,0 +1,26 @@
+// GLM (Z.ai / Zhipu AI) models. Claude Code, OpenCode and pi all read this
+// file; the token and the endpoint live in .env.
+// Reference: https://docs.z.ai/devpack/tool/claude
+{
+  "name": "glm",
+
+  // Both models are 1M context / 128K output, so neither overrides these.
+  "defaults": {
+    "context_window": 1000000,
+    "max_tokens": 131072,
+    "reasoning": true,
+    "input": ["text"]
+  },
+
+  "claude": {
+    "env": { "CLAUDE_CODE_EFFORT_LEVEL": "max" }
+  },
+
+  "models": [
+    // The 1M-context "[1m]" ids Z.ai documents for Claude Code exist only on
+    // the coding-plan route; the endpoint in .env rejects them with
+    // "modelCode: does not exist", and glm-5.3 is already a 1M model there.
+    { "id": "glm-5.3", "tags": ["default"] },
+    { "id": "glm-5.3-flash", "tags": ["small"] }
+  ]
+}

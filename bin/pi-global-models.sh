@@ -3,9 +3,10 @@
 # (`make pi-global`). pi has no launcher in this repo: a bare `pi` reads the
 # generated ~/.pi/agent/models.json, and /model lists every provider.
 #
-# Tokens and HEADERS values stay in providers/<name>/.env: the generated file
-# only holds shell commands that read them back out at request time, so a
-# rotated token or a computed header needs no re-run.
+# Models come from providers/<name>/models.json. Tokens and HEADERS values stay
+# in providers/<name>/.env: the generated file only holds shell commands that
+# read them back out at request time, so a rotated token or a computed header
+# needs no re-run.
 #
 # A provider is registered under its plain folder name, which is what pi shows
 # next to a model. Where that name also exists in pi's own catalog, pi keeps
@@ -21,7 +22,7 @@ source "$ROOT/bin/common.sh"
 OUT=$(pi_global_models_path)
 AGENT_DIR=$(dirname "$OUT")
 
-if [ -f "$OUT" ] && [ "$(head -1 "$OUT")" != "$PI_GLOBAL_MARKER" ]; then
+if [ -f "$OUT" ] && ! generated_here "$OUT"; then
   echo "pi-global: $OUT already exists and was not generated here." >&2
   echo "  merge it by hand, or move it aside and re-run 'make pi-global'." >&2
   exit 1
@@ -36,16 +37,17 @@ providers=()
 entries=()
 for dir in "$PROVIDERS_DIR"/*/; do
   provider=$(basename "$dir")
-  env_file="$dir.env"
-  [ -f "$env_file" ] || continue
+  dir="${dir%/}"
+  env_file="$dir/.env"
+  [ -f "$env_file" ] && [ -f "$dir/models.json" ] || continue
   # Each provider is resolved in a subshell: load_settings exports the whole
   # .env, and providers must not leak into each other.
   entry=$(
     load_settings "$env_file"
-    [ -n "$CFG_TOKEN" ] && [ -n "$CFG_BASE_URL" ] && [ -n "$CFG_MODEL" ] || exit 0
-    pi_resolve
+    [ -n "$CFG_TOKEN" ] && [ -n "$CFG_BASE_URL" ] || exit 0
+    models_resolve "$dir" || exit 1
     pi_provider_json "$provider" \
-      "!grep -m1 -E '^(API_TOKEN|ANTHROPIC_AUTH_TOKEN)=.+' '$env_file' | cut -d= -f2-" \
+      "!grep -m1 -E '^API_TOKEN=.+' '$env_file' | cut -d= -f2-" \
       pi_global_header_ref
   )
   if [ -n "$entry" ]; then providers+=("$provider"); entries+=("$entry"); fi
@@ -59,9 +61,8 @@ fi
 # The provider pi starts on, and its main model.
 start_provider=$(default_provider "${providers[@]}")
 start_model=$(
-  load_settings "$PROVIDERS_DIR/$start_provider/.env"
-  pi_resolve
-  printf '%s' "$PI_CFG_MODEL"
+  models_resolve "$PROVIDERS_DIR/$start_provider"
+  printf '%s' "$M_PI_MODEL"
 )
 
 mkdir -p "$AGENT_DIR"

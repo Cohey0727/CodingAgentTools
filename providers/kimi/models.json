@@ -1,0 +1,30 @@
+// Kimi (Moonshot AI) models. Claude Code, OpenCode and pi all read this file;
+// the token and the endpoint live in .env.
+// Reference: https://platform.moonshot.ai/docs
+{
+  "name": "kimi",
+
+  "defaults": {
+    "context_window": 1048576,
+    "max_tokens": 131072,
+    "reasoning": true,
+    "input": ["text", "image"]
+  },
+
+  "claude": {
+    "env": {
+      "CLAUDE_CODE_EFFORT_LEVEL": "max",
+      "ENABLE_TOOL_SEARCH": "false"
+    }
+  },
+
+  "models": [
+    // claude_id selects the 1M-context variant, which only Claude Code
+    // understands; OpenCode and pi are sent the plain id.
+    {
+      "id": "kimi-k3",
+      "claude_id": "kimi-k3[1m]",
+      "tags": ["default", "small"]
+    }
+  ]
+}

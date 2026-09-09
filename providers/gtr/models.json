@@ -1,0 +1,47 @@
+// gtr models: a llama.cpp server on another machine. Claude Code, OpenCode and
+// pi all read this file; the endpoint and the Cloudflare Access headers live
+// in .env.
+// Reference: https://github.com/ggml-org/llama.cpp/tree/master/tools/server
+{
+  "name": "gtr",
+
+  "claude": {
+    // A single self-hosted model is far slower than the hosted providers, so
+    // the effort level stays low.
+    "env": { "CLAUDE_CODE_EFFORT_LEVEL": "low" }
+  },
+
+  "opencode": {
+    // A lean agent for this provider: a short system prompt in place of
+    // OpenCode's stock one, and only bash / edit / read / write / grep / glob —
+    // no skill list, no subagents, no todo or webfetch tools. Cuts the fixed
+    // part of every request from ~10k tokens to ~4k, which is what makes a
+    // server that prefills at a few hundred tokens a second answer in seconds
+    // rather than minutes.
+    "lean": true,
+
+    // OpenCode compacts a session once it fills the context, so this is the
+    // window a conversation may grow into before it is summarised — not the
+    // server's capacity. The model's own context_window would let a session
+    // reach a size this server needs minutes to prefill.
+    "context_window": 16384,
+    "max_tokens": 4096
+  },
+
+  "models": [
+    // The id is a label, not a selector: llama-server answers with whatever it
+    // has loaded and ignores the name the request asks for, so a fixed
+    // "default" survives swapping the model on the server.
+    //
+    // context_window must not exceed the server's --ctx-size, or requests fail
+    // once the conversation grows past it.
+    {
+      "id": "default",
+      "tags": ["default", "small"],
+      "context_window": 262144,
+      "max_tokens": 32768,
+      "reasoning": true,
+      "input": ["text"]
+    }
+  ]
+}

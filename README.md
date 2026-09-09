@@ -1,6 +1,6 @@
 # CodingAgentTools
 
-> Run Claude Code, OpenCode and pi on Anthropic-compatible LLM backends (DeepSeek · MiniMax · GLM · Kimi · MiMo · your own llama.cpp) — one repo, one `make setup`, one `.env` per provider driving all three CLIs, and the skills and global instruction file all three share.
+> Run Claude Code, OpenCode and pi on Anthropic-compatible LLM backends (DeepSeek · MiniMax · GLM · Kimi · MiMo · your own llama.cpp) — one repo, one `make setup`, one `models.json` per provider driving all three CLIs, and the skills and global instruction file all three share.
 
 One repo that installs a `claude<name>` launcher command per provider and generates the pi and OpenCode configs covering every provider — [Claude Code](https://docs.anthropic.com/claude-code), [OpenCode](https://opencode.ai) and the [pi coding agent](https://pi.dev), all against Anthropic-compatible backends:
 
@@ -18,7 +18,7 @@ OpenCode and pi have no per-provider command: `make setup` writes every provider
 
 Kimi and MiMo run that flagship as its 1M-context variant under Claude Code (`kimi-k3[1m]`); OpenCode and pi take the plain id.
 
-Each provider exposes a native Anthropic-compatible endpoint, so there is no proxy or translation layer — just environment variables. That holds for the local one too: `llama-server` answers `/v1/messages` in the Anthropic shape. The generated pi and OpenCode configs run against the very same endpoint and token: everything for a provider comes from the single `providers/<name>/.env`.
+Each provider exposes a native Anthropic-compatible endpoint, so there is no proxy or translation layer — just environment variables. That holds for the local one too: `llama-server` answers `/v1/messages` in the Anthropic shape. The generated pi and OpenCode configs run against the very same endpoint and token, and every model any of the three can reach is declared in one place: `providers/<name>/models.json`, in git, with [tags](#tags) naming the slot each model fills. Only the API key and the endpoint are left to `providers/<name>/.env`.
 
 > **Note:** every launcher command is `claude<name>`. Bare provider names are deliberately avoided: `kimi` is Moonshot's official Kimi CLI, `minimax` is the official MiniMax Code desktop app command, and `mmx` is an unrelated bun-installed tool. MiniMax uses the short name `mmx` (`claudemmx`).
 
@@ -40,10 +40,12 @@ skills/<name>/SKILL.md           # a skill, linked into ~/.claude/skills and ~/.
 agents/<name>.md                 # a subagent, linked into ~/.claude/agents and ~/.agents/agents
 opencode/command/<name>.md       # an OpenCode slash command, linked into ~/.config/opencode/command
 opencode/plugin/<name>.js        # an OpenCode plugin, reached from a shim in ~/.config/opencode/plugin
-providers/<name>/.env            # all provider settings: key, endpoint, models (gitignored, chmod 600)
+providers/<name>/models.json     # every model the provider serves, with the tags naming each slot (in git)
+providers/<name>/.env            # API_TOKEN, BASE_URL and HEADERS only (gitignored, chmod 600)
 providers/<name>/.env.example    # same file with an empty API_TOKEN (in git)
 bin/ui.sh                        # banner, colors and the output helpers every script shares
-bin/common.sh                    # shared settings resolution (generic setting <- CLI override)
+bin/models.py                    # the only reader of models.json: validates it, resolves tags to slots
+bin/common.sh                    # shared settings resolution: models.json through models.py, secrets from .env
 bin/launcher.template            # Claude Code launcher; @@PROVIDER_DIR@@ baked in at setup time
 bin/opencode-plugin.template     # OpenCode plugin shim; @@IMPL@@ baked in at setup time
 bin/setup.sh                     # provider wizard: pick providers, paste tokens, install (`make setup-providers`)
@@ -59,11 +61,11 @@ docs/migrations/                 # upgrade notes for existing checkouts
 Makefile                         # setup / setup-providers / setup-skills / list / uninstall / pi-global / opencode-global / help
 ```
 
-Adding a provider is just a new `providers/<name>/` folder with a `.env.example`; adding a skill is a new `skills/<name>/SKILL.md` and a `make setup-skills`. An OpenCode slash command is a new `opencode/command/<name>.md`, and a plugin a new `opencode/plugin/<name>.js` exporting `plugin({ tool })` — same `make setup-skills`.
+Adding a provider is just a new `providers/<name>/` folder with a `models.json` and a `.env.example`; adding a skill is a new `skills/<name>/SKILL.md` and a `make setup-skills`. An OpenCode slash command is a new `opencode/command/<name>.md`, and a plugin a new `opencode/plugin/<name>.js` exporting `plugin({ tool })` — same `make setup-skills`.
 
 ## Requirements
 
-- macOS / Linux with `bash` and `make`
+- macOS / Linux with `bash`, `make` and `python3` (`bin/models.py` reads the provider configs)
 - [Claude Code](https://docs.anthropic.com/claude-code) (`claude` on your PATH)
 - [OpenCode](https://opencode.ai) (`opencode` on your PATH) — only OpenCode itself; it gets no launcher, just the generated config. Not bundled by this repo; install it first:
   ```bash
@@ -90,10 +92,10 @@ One interactive wizard does everything:
 
 1. Check the providers you want (arrows + Space, Enter to confirm — providers that already have a token are pre-checked)
 2. Paste each API token — an empty answer keeps the existing token
-3. Each provider's `.env` is created from `.env.example` if missing (`chmod 600`); an existing `.env` gets any settings that were added to `.env.example` since, appended with their comments and your token untouched
+3. Each provider's `models.json` is validated before anything is written; its `.env` is created from `.env.example` if missing (`chmod 600`), and an existing one gets any settings added to `.env.example` since, appended with their comments and your token untouched
 4. One command per provider is generated in `~/.local/bin` — `claude<NAME>`, with the provider folder path baked in
 5. The pi packages that add [`/loop` and `/goal`](#loops-in-pi) are installed once into pi's user settings (`~/.pi/agent/settings.json`)
-6. Every provider with a token is registered in pi's global `~/.pi/agent/models.json` (the token stays in `.env`, read back by a shell command at request time) and in OpenCode's global config (`~/.config/opencode/opencode.json`); both start on [the default provider](#default-provider), and in OpenCode's case its token is copied to `~/.config/opencode/claude-compatibles/` (chmod 600) and only referenced from the config
+6. Every provider with a token is registered in pi's global `~/.pi/agent/models.json` (the token stays in `.env`, read back by a shell command at request time) and in OpenCode's global config (`~/.config/opencode/opencode.json`) — every model in its `models.json`, not just the tagged ones; both start on [the default provider](#default-provider), and in OpenCode's case its token is copied to `~/.config/opencode/claude-compatibles/` (chmod 600) and only referenced from the config
 7. You get a warning if `~/.local/bin`, `claude`, `opencode` or `pi` is missing from your PATH
 8. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode` ([details below](#skills-and-global-instructions))
 
@@ -107,7 +109,8 @@ mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/mig
 [2026-09-05 — OpenCode の lean エージェント](docs/migrations/2026-09-05-opencode-lean-agent.md),
 [2026-09-08 — claude-code-settings の統合](docs/migrations/2026-09-08-merge-claude-code-settings.md),
 [2026-09-08 — OpenCode の `/goal`](docs/migrations/2026-09-08-opencode-goal.md),
-and [2026-09-09 — GLM の軽量モデルと ox 廃止](docs/migrations/2026-09-09-glm-flash-and-ox-removal.md).
+[2026-09-09 — GLM の軽量モデルと ox 廃止](docs/migrations/2026-09-09-glm-flash-and-ox-removal.md),
+and [2026-09-09 — モデル設定の models.json 化](docs/migrations/2026-09-09-models-json.md).
 
 ### Make targets
 
@@ -116,9 +119,9 @@ and [2026-09-09 — GLM の軽量モデルと ox 廃止](docs/migrations/2026-09
 | `make setup` | Both halves: the provider wizard, then the skill, `AGENTS.md` and OpenCode extension install |
 | `make setup-providers` | The wizard above only: tokens, `.env` upkeep, launcher install, pi packages, pi and OpenCode global configs |
 | `make setup-skills` | The shared assets only: `skills/`, `agents/`, `AGENTS.md` and `opencode/` into every agent CLI |
-| `make list` | Every provider with its command and endpoint, then every skill, subagent and OpenCode extension with its install status |
-| `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from the current `.env` files, and set the startup model in `~/.pi/agent/settings.json` — run it after changing a model or endpoint |
-| `make opencode-global` | Re-generate OpenCode's global config from the current `.env` files — run it after editing one |
+| `make list` | Every provider with its command, endpoint and models with their tags, then every skill, subagent and OpenCode extension with its install status |
+| `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from the current provider configs, and set the startup model in `~/.pi/agent/settings.json` — run it after changing a model or endpoint |
+| `make opencode-global` | Re-generate OpenCode's global config from the current provider configs — run it after editing one |
 | `make uninstall` | Remove the installed launchers (including the `pi<name>` / `open<name>` ones earlier versions installed), the pi packages from `$PI_PACKAGES`, the global `models.json` / OpenCode config / token files this repo wrote, the symlinks pointing back into this repo and the plugin shims generated from it. Provider `.env` files are left alone |
 | `make help` | The target list above, on the terminal |
 
@@ -137,8 +140,8 @@ pi                # pi — every configured provider is in /model
 ```
 
 Arguments pass through to `claude` verbatim, `--model` included — so a launcher
-is not pinned to the `MODEL` in its `.env`, and any id the provider serves works
-for one run:
+is not pinned to the model tagged `default` in its `models.json`, and any id the
+provider serves works for one run:
 
 ```bash
 claudeglm --help
@@ -147,7 +150,7 @@ claudeglm --model glm-5.3-flash            # the cheap model for a whole session
 ```
 
 That covers the main slot only; the haiku and subagent slots keep following
-`SMALL_MODEL`. In-session `/model <id>` does the same thing.
+their tags. In-session `/model <id>` does the same thing.
 
 pi has no `pi<name>` commands. `make setup` (and `make pi-global`) write every provider that has a token into `~/.pi/agent/models.json`, so a bare `pi` has all of them and `/model` switches mid-session:
 
@@ -249,84 +252,135 @@ in between; files older than 30 days are pruned on startup.
 > without any external plugin, this one included, if a session ever needs to
 > run with the loop out of the picture entirely.
 
-## `.env` settings
+## Provider settings
 
-Each provider has exactly one settings file: `providers/<name>/.env`, and one
-set of generic settings in it drives all three CLIs. A provider is roughly ten
-lines:
+A provider is two files under `providers/<name>/`:
+
+| File | Holds | In git |
+|------|-------|--------|
+| `models.json` | Every model the provider serves: ids, limits, and the tags that say which slot each one fills | yes |
+| `.env` | `API_TOKEN`, `BASE_URL`, and `HEADERS` where the endpoint needs them | no — gitignored, `chmod 600` |
+
+`.env` is only what cannot be shared:
 
 ```bash
-NAME=deepseek
 API_TOKEN=sk-...
 BASE_URL=https://api.deepseek.com/anthropic
-MODEL=deepseek-v4-pro
-SMALL_MODEL=deepseek-v4-flash
-CONTEXT_WINDOW=1000000
-MAX_TOKENS=384000
-REASONING=true
-INPUT=text
-ARGS=
 ```
+
+Everything else is `models.json`, which Claude Code, OpenCode and pi all read
+through `bin/models.py`. A whole provider is a dozen lines:
+
+```json
+{
+  "name": "deepseek",
+  "defaults": { "context_window": 1000000, "max_tokens": 384000, "reasoning": true, "input": ["text"] },
+  "claude": { "env": { "CLAUDE_CODE_EFFORT_LEVEL": "max" } },
+  "models": [
+    { "id": "deepseek-v4-pro",   "tags": ["default"] },
+    { "id": "deepseek-v4-flash", "tags": ["small"] }
+  ]
+}
+```
+
+`//` line comments are allowed, so the constraints behind a value can sit next
+to it. Every model listed is offered by OpenCode's `/models` and pi's `/model`,
+whether or not it fills a slot.
+
+### Tags
+
+A tag names a slot in one of the CLIs, so `models.json` says outright which
+model Claude Code reaches for as opus and which one it hands to a subagent:
+
+| Tag | Fills |
+|-----|-------|
+| `default` | Every main slot below that has no tag of its own |
+| `small` | Every cheap slot below that has no tag of its own |
+| `claude_model` | `ANTHROPIC_MODEL` |
+| `claude_opus_model` | `ANTHROPIC_DEFAULT_OPUS_MODEL` |
+| `claude_sonnet_model` | `ANTHROPIC_DEFAULT_SONNET_MODEL` |
+| `claude_fable_model` | `ANTHROPIC_DEFAULT_FABLE_MODEL` |
+| `claude_haiku_model` | `ANTHROPIC_DEFAULT_HAIKU_MODEL` |
+| `claude_subagent_model` | `CLAUDE_CODE_SUBAGENT_MODEL` |
+| `opencode_model` | OpenCode's `model` |
+| `opencode_small_model` | OpenCode's `small_model` |
+| `pi_model` | pi's `defaultModel` |
+| `pi_small_model` | pi's cheap entry |
+
+A slot with no tag of its own falls back to `claude_model` (the opus / sonnet /
+fable trio), then to `default` or `small`. So a provider whose models divide the
+obvious way needs only those two tags, and a specific tag is how one model is
+pulled out of that pattern:
+
+```json
+{ "id": "glm-5.3",       "tags": ["default"] },
+{ "id": "glm-5.3-mini",  "tags": ["claude_haiku_model"] },
+{ "id": "glm-5.3-flash", "tags": ["small"] }
+```
+
+Here Claude Code's haiku slot is `glm-5.3-mini` while the subagent slot, OpenCode's
+`small_model` and pi both stay on `glm-5.3-flash`. A tag may appear on only one
+model, and an unknown tag is an error rather than a label — `make setup` refuses
+to install until it is fixed.
+
+### Model fields
+
+| Field | Meaning |
+|-------|---------|
+| `id` | **Required.** The id sent to the provider |
+| `tags` | Which slots this model fills. Omit it to list the model without giving it a role |
+| `context_window`, `max_tokens` | **Required.** pi writes them into its generated `models.json` (it otherwise assumes 128k / 16k and caps each request at `max_tokens`/3), and Claude Code takes the main model's `context_window` as its auto-compact window |
+| `reasoning`, `input` | Whether the model supports extended thinking (default `true`) and what it accepts (`["text"]` or `["text", "image"]`) |
+| `claude_id` | The id to send when the caller is Claude Code, for a variant only it understands — Kimi and MiMo use it for the 1M-context `[1m]` form. Defaults to `id` |
+
+`defaults` at the top level supplies any of these to every model that does not
+set it itself.
+
+### Provider fields
+
+| Field | Meaning |
+|-------|---------|
+| `name` | Command-name suffix: the launcher is installed as `claude<name>` |
+| `claude.command` | The launcher command, when `claude<name>` is not wanted |
+| `claude.args` | Default options prepended to every `claude<name>` launch (word-split; your arguments come after them). OpenCode and pi have no launcher, so it does not reach them |
+| `claude.env` | Extra environment exported to `claude` as-is — this is where `CLAUDE_CODE_EFFORT_LEVEL` and `ENABLE_TOOL_SEARCH` are set |
+| `claude.auto_compact_window` | Overrides the main model's `context_window` as Claude Code's auto-compact threshold |
+| `opencode.lean` | `true` gives the provider [a lean agent of its own](#lean-agents) |
+| `opencode.context_window`, `opencode.max_tokens` | Cap every model's limits for OpenCode only. These are the window a session may grow into before OpenCode compacts it, so a backend too slow to prefill its full context sets them lower — `gtr` does |
+
+### `.env` settings
 
 | Setting | Meaning |
 |---------|---------|
-| `NAME` | Command-name suffix: the launcher is installed as `claude<NAME>` |
 | `API_TOKEN` | **Required.** Your provider API key |
-| `BASE_URL` | Provider's Anthropic-compatible endpoint |
-| `MODEL` | Fills every main model slot: Claude Code's opus / sonnet / fable, OpenCode's `model` in the generated global config, the model pi starts on |
-| `SMALL_MODEL` | Fills every cheap slot: Claude Code's haiku + subagent, OpenCode's `small_model`, pi's second Ctrl+P entry. Defaults to `MODEL` |
-| `OPENCODE_EXTRA_MODELS` | Extra model ids OpenCode lists on top of `MODEL` / `SMALL_MODEL`, space-separated. Claude Code and pi reach another model with `--model`; OpenCode has no launcher to pass one, so an id missing from the generated config cannot be picked there. Empty by default |
-| `CONTEXT_WINDOW`, `MAX_TOKENS` | Model limits. pi writes them into its generated `models.json` (it otherwise assumes 128k / 16k and caps each request at `MAX_TOKENS`/3), and Claude Code takes `CONTEXT_WINDOW` as its auto-compact window |
-| `SMALL_CONTEXT_WINDOW`, `SMALL_MAX_TOKENS` | The same two limits for `SMALL_MODEL` when it is a different size. Default to the values above |
-| `REASONING`, `INPUT` | Whether the models support extended thinking (`true`/`false`) and what they accept (`text` or `text,image`) |
-| `HEADERS` | Optional extra request headers, one `Name: Value` per line (the format Claude Code's `ANTHROPIC_CUSTOM_HEADERS` takes), sent by all three CLIs — e.g. a Cloudflare Access service token in front of a self-hosted server. The value is a bash string, so a multi-line double-quoted value or a `$(...)` computed at launch both work |
-| `ARGS` | Default CLI options prepended to every `claude<NAME>` launch (word-split; your command-line arguments come after them). OpenCode and pi have no launcher, so it does not reach them |
-
-### Overrides
-
-Every generic setting has a CLI-specific override that wins when set. They all
-ship commented out in `.env.example`, with the default they replace written
-above them — uncomment one only when a CLI has to differ from the rest.
-
-| Override | Overrides | Read by |
-|----------|-----------|---------|
-| `COMMAND` | the `claude<NAME>` command name | `make setup` |
-| `CLAUDE_ARGS` | `ARGS` | the launcher |
-| `ANTHROPIC_AUTH_TOKEN` | `API_TOKEN` | all three |
-| `ANTHROPIC_BASE_URL` | `BASE_URL` | all three |
-| `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU,FABLE}_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL` | the model slots Claude Code fills from `MODEL` / `SMALL_MODEL` | Claude Code |
-| `OPENCODE_MODEL`, `OPENCODE_SMALL_MODEL` | `MODEL` / `SMALL_MODEL` for OpenCode | the OpenCode global config |
-| `OPENCODE_CONTEXT_WINDOW`, `OPENCODE_MAX_TOKENS` | `CONTEXT_WINDOW` / `MAX_TOKENS` for OpenCode. These are the window a session may grow into before OpenCode compacts it, so a backend too slow to prefill its full context sets them lower — `gtr` does | the OpenCode global config |
-| `OPENCODE_LEAN` | nothing — `true` gives the provider [a lean agent of its own](#lean-agents) | the OpenCode global config |
-| `PI_MODEL`, `PI_SMALL_MODEL` | `MODEL` / `SMALL_MODEL` for pi | the pi global models.json |
-| `CLAUDE_MODEL_SUFFIX` | nothing — appends a Claude Code-only marker such as `[1m]` to every Claude Code model slot. Kimi and MiMo use it; OpenCode and pi keep sending plain ids | Claude Code |
-| `CLAUDE_CODE_AUTO_COMPACT_WINDOW` | `CONTEXT_WINDOW` | Claude Code |
-| `ANTHROPIC_CUSTOM_HEADERS` | `HEADERS` | Claude Code |
-
-Any extra `KEY=VALUE` line you add is exported to `claude` as well — that is
-how `CLAUDE_CODE_EFFORT_LEVEL` and `ENABLE_TOOL_SEARCH` are set.
+| `BASE_URL` | **Required.** The provider's Anthropic-compatible endpoint |
+| `HEADERS` | Optional extra request headers, one `Name: Value` per line (the format Claude Code's `ANTHROPIC_CUSTOM_HEADERS` takes), sent by all three CLIs — e.g. a Cloudflare Access service token in front of a self-hosted server. The file is sourced by bash, so a multi-line double-quoted value or a `$(...)` computed at launch both work |
 
 ## How it works
 
 Each installed command is the same thin shell script with the provider folder
-and `bin/common.sh` paths baked in. `common.sh` sources the `.env` (`set -a`,
-so extras are exported as-is), resolves the generic settings — override first,
-generic second — and fails fast when `API_TOKEN`, `BASE_URL` or `MODEL` is
-empty.
+and `bin/common.sh` paths baked in. `common.sh` sources the `.env` — a bash
+file, so a `$(...)` in `HEADERS` is evaluated at launch — and hands the folder
+to `bin/models.py`, the only reader of `models.json`. That script validates the
+file, resolves every tag to the slot it fills, and prints the result as shell
+assignments the caller evaluates; a tag on two models, an unknown tag or a slot
+nothing fills is an error, not a silent default.
 
 `claude<name>` exports the variables Claude Code itself reads:
-`ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, the five model slots (each
-`MODEL`/`SMALL_MODEL` plus `CLAUDE_MODEL_SUFFIX`) and
-`CLAUDE_CODE_AUTO_COMPACT_WINDOW`; drops the launcher-only settings and
+`ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, the six model slots (each the
+`claude_id` of the model tagged for it) and `CLAUDE_CODE_AUTO_COMPACT_WINDOW`,
+plus whatever `claude.env` holds; drops the settings only it should see and
 `ANTHROPIC_API_KEY` (it would otherwise shadow `AUTH_TOKEN`); and `exec`s
-`claude $ARGS "$@"`.
+`claude $args "$@"`. Every slot is assigned outright, so an `ANTHROPIC_*`
+inherited from an outer launcher session cannot pin the inner one to the outer
+provider's model.
 
 `opencode` gets no launcher. `make setup` (and `make opencode-global`) write
 every provider that has a token into the global
 `~/.config/opencode/opencode.json` — the same `<name>-anthropic` custom
 `@ai-sdk/anthropic` providers, `baseURL` set to `<BASE_URL>/v1` (the AI SDK
 appends `/messages`, landing on the same `/v1/messages` route Claude Code
-uses), so `/models` lists every provider's `MODEL` and `SMALL_MODEL`. Tokens
+uses), so `/models` lists every model in every provider's `models.json`. Tokens
 stay out of the file: each entry's `apiKey` is a `{file:...}` reference to a
 per-provider token file under `~/.config/opencode/claude-compatibles/`
 (chmod 600) written from the `.env` at the same time — `.env` stays the single
@@ -349,8 +403,9 @@ ten tool definitions — around 10k tokens before the conversation starts. A
 hosted provider prefills that in the time it takes to read this sentence; a
 single self-hosted GPU does not.
 
-`OPENCODE_LEAN=true` in a provider's `.env` gives it an agent named after the
-provider and pinned to its model, which cuts that fixed part to around 4k:
+`"opencode": { "lean": true }` in a provider's `models.json` gives it an agent
+named after the provider and pinned to its model, which cuts that fixed part to
+around 4k:
 
 - `prompt` points at a copy of `bin/opencode-lean-prompt.md`, which *replaces*
   OpenCode's model-specific base prompt rather than adding to it
@@ -370,19 +425,19 @@ and the AGENTS.md files still apply to both.
 `pi` gets no launcher either. `make setup` (and `make pi-global`) write every
 provider that has a token into `~/.pi/agent/models.json`: a `<name>` provider
 with `api: "anthropic-messages"` and `baseUrl` set to `BASE_URL` as-is (pi
-hands it to the Anthropic SDK, which appends `/v1/messages`), plus the two
-models with their limits. The provider id is the plain folder name, which is
-what pi prints next to a model — `default [gtr]`. Where that name also exists
-in pi's own catalog, pi keeps this file's endpoint and token and adds the
-catalog's models to the list, so `/model` may show more than the two. No secret lands in the file: `apiKey` and
+hands it to the Anthropic SDK, which appends `/v1/messages`), plus every model
+in `models.json` with its limits. The provider id is the plain folder name,
+which is what pi prints next to a model — `default [gtr]`. Where that name also
+exists in pi's own catalog, pi keeps this file's endpoint and token and adds the
+catalog's models to the list, so `/model` may show more. No secret lands in the file: `apiKey` and
 each `HEADERS` value are `!`-prefixed shell commands pi runs at request time
 to read them back out of `providers/<name>/.env`, so a rotated token or a
 `$(...)` computed header is picked up without a re-run. Re-run after changing
 a model or endpoint. A file this repo did not generate is never touched
 (first-line marker).
 
-Because pi has no subagents, `SMALL_MODEL` is not a slot the agent uses on its
-own there — it is just another entry in the `/model` list.
+Because pi has no subagents, `pi_small_model` is not a slot the agent reaches
+for on its own — it is the model `/model` starts the list on.
 
 ## Skills and global instructions
 
@@ -499,20 +554,21 @@ marker): merge it by hand or move it aside.
 **`API_TOKEN is empty`** — re-run `make setup`, or set the key in `providers/<name>/.env` directly.
 
 **A CLI starts on the wrong model, or pi reports the wrong context size** —
-`.env` is the only source. Edit `MODEL` / `CONTEXT_WINDOW` / `MAX_TOKENS`
-there, and check whether an override further down the file (`ANTHROPIC_MODEL`,
-`OPENCODE_MODEL`, `PI_MODEL`, …) is winning over it.
+`providers/<name>/models.json` is the only source. `make list` prints each
+model with the tags it carries, which is what decides the slot; a specific tag
+(`claude_haiku_model`, `opencode_small_model`, …) wins over `default` / `small`.
+Re-run `make pi-global && make opencode-global` afterwards — those two configs
+are generated, not read live.
 
-**An older `.env` still lists every variable** — that keeps working: the old
-`ANTHROPIC_*` / `OPENCODE_*` lines are exactly the overrides, so they win over
-the generic settings and nothing changes behaviour. Re-run `make setup` to have
-the generic settings appended, then delete the override lines you do not need —
-or delete the `.env` and re-run `make setup` for a clean one.
+**`models.json: ... unknown tag` / `... no model fills the <slot> slot`** —
+`make setup` validates every provider before it writes anything. The message
+names the file, the model index and the tags it accepts; `python3 bin/models.py
+check providers/<name>` re-runs just that check.
 
-**Upgrading from the old `config` + `.env` layout** — re-run `make setup`. It
-detects an old-format `.env` (no `BASE_URL` and no `ANTHROPIC_BASE_URL` line),
-regenerates it from `.env.example`, carries your API key over, and keeps the
-original as `.env.bak`.
+**An older `.env` still lists `MODEL`, `CONTEXT_WINDOW` and the rest** — re-run
+`make setup`. It rebuilds the file from `.env.example`, carries your API key and
+your `HEADERS` block over verbatim, and keeps the original as `.env.bak`. The
+models those lines described now live in `providers/<name>/models.json`.
 
 **A skill or subagent does not show up** — `make list` shows what is linked. A
 skill added, renamed or deleted since the last install needs a

@@ -1,0 +1,32 @@
+// Local llama.cpp models. Claude Code, OpenCode and pi all read this file; the
+// endpoint lives in .env.
+// Reference: https://github.com/ggml-org/llama.cpp/tree/master/tools/server
+{
+  "name": "local",
+
+  "claude": {
+    // A 35B A3B model on one machine is far slower than the hosted providers,
+    // so the effort level stays low.
+    "env": { "CLAUDE_CODE_EFFORT_LEVEL": "low" }
+  },
+
+  "models": [
+    // The id is a label, not a selector: llama-server answers with whatever it
+    // has loaded and ignores the name the request asks for, so a fixed
+    // "default" survives swapping the model on the server. Only a multi-model
+    // llama-server that routes by name needs the id to match its --alias.
+    //
+    // context_window must not exceed the server's --ctx-size, which LlamaGate
+    // takes from CTX in the active profile, or requests fail once the
+    // conversation grows past it. 262144 is what the profiles carrying a
+    // 35B A3B model set.
+    {
+      "id": "default",
+      "tags": ["default", "small"],
+      "context_window": 262144,
+      "max_tokens": 32768,
+      "reasoning": true,
+      "input": ["text"]
+    }
+  ]
+}

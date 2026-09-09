@@ -4,15 +4,16 @@
 # `opencode` reads the generated ~/.config/opencode/opencode.json, and /models
 # lists every provider.
 #
-# .env stays the single source of truth: the config references each token,
-# and each HEADERS value, as {file:...} pointing at a file this script writes
-# next to it (chmod 600), so the config itself carries no secrets. Re-run
-# after editing any .env — the copies are replaced.
+# Models come from providers/<name>/models.json. The token and each HEADERS
+# value stay in providers/<name>/.env: the config references them as {file:...}
+# pointing at a copy this script writes (chmod 600), so the config itself
+# carries no secrets. Re-run after editing either file — the copies are replaced.
 #
-# A provider with OPENCODE_LEAN=true also gets an agent of its own, pinned to
-# its model, that replaces OpenCode's stock system prompt with a short one and
-# drops the tools a small self-hosted model has no use for. The session starts
-# on that agent when the provider is also the default one.
+# A provider whose models.json sets "opencode": { "lean": true } also gets an
+# agent of its own, pinned to its model, that replaces OpenCode's stock system
+# prompt with a short one and drops the tools a small self-hosted model has no
+# use for. The session starts on that agent when the provider is also the
+# default one.
 
 set -euo pipefail
 
@@ -26,21 +27,21 @@ OUT=$(opencode_global_config_path)
 CONFIG_DIR=$(dirname "$OUT")
 TOKENS_DIR=$(opencode_tokens_dir)
 
-if [ -f "$OUT" ] && [ "$(head -1 "$OUT")" != "$OPENCODE_GLOBAL_MARKER" ]; then
+if [ -f "$OUT" ] && ! generated_here "$OUT"; then
   echo "opencode-global: $OUT already exists and was not generated here." >&2
   echo "  merge it by hand, or move it aside and re-run 'make opencode-global'." >&2
   exit 1
 fi
 
-# Every provider with a token, endpoint and model. Each is resolved in a
-# subshell: load_settings exports the whole .env, and providers must not leak
-# into each other.
+# Every provider with a token, an endpoint and a valid models.json. Each is
+# resolved in a subshell: load_settings exports the whole .env, and providers
+# must not leak into each other.
 providers=()
 for dir in "$PROVIDERS_DIR"/*/; do
   provider=$(basename "$dir")
-  env_file="$dir.env"
-  [ -f "$env_file" ] || continue
-  if ( load_settings "$env_file"; [ -n "$CFG_TOKEN" ] && [ -n "$CFG_BASE_URL" ] && [ -n "$CFG_MODEL" ] ); then
+  dir="${dir%/}"
+  [ -f "$dir/.env" ] && [ -f "$dir/models.json" ] || continue
+  if ( load_settings "$dir/.env"; [ -n "$CFG_TOKEN" ] && [ -n "$CFG_BASE_URL" ] ) && models_check "$dir"; then
     providers+=("$provider")
   fi
 done
@@ -54,9 +55,8 @@ fi
 default_provider=$(default_provider "${providers[@]}")
 
 default_models=$(
-  load_settings "$PROVIDERS_DIR/$default_provider/.env"
-  opencode_resolve
-  printf '%s\n%s' "$OC_CFG_MODEL" "$OC_CFG_SMALL_MODEL"
+  models_resolve "$PROVIDERS_DIR/$default_provider"
+  printf '%s\n%s' "$M_OPENCODE_MODEL" "$M_OPENCODE_SMALL_MODEL"
 )
 model="$default_provider-anthropic/$(head -1 <<<"$default_models")"
 small_model="$default_provider-anthropic/$(tail -n +2 <<<"$default_models")"
@@ -72,8 +72,8 @@ opencode_header_ref() { # <name> -> {file:...} reference for the provider in sco
   printf '{file:%s/%s.%s.header}' "$TOKENS_DIR" "$provider" "$1"
 }
 
-lean_provider() { # <provider> — does its .env ask for the lean agent?
-  ( load_settings "$PROVIDERS_DIR/$1/.env"; opencode_resolve; [ "$OC_CFG_LEAN" = true ] )
+lean_provider() { # <provider> — does its models.json ask for the lean agent?
+  ( models_resolve "$PROVIDERS_DIR/$1"; [ "$M_OPENCODE_LEAN" = true ] )
 }
 
 entries=()
@@ -81,7 +81,7 @@ agents=()
 for provider in "${providers[@]}"; do
   entries+=("$(
     load_settings "$PROVIDERS_DIR/$provider/.env"
-    opencode_resolve
+    models_resolve "$PROVIDERS_DIR/$provider"
     printf '%s' "$CFG_TOKEN" > "$TOKENS_DIR/$provider.token"
     chmod 600 "$TOKENS_DIR/$provider.token"
     while IFS= read -r name; do
@@ -94,8 +94,7 @@ for provider in "${providers[@]}"; do
   if lean_provider "$provider"; then
     cp "$LEAN_PROMPT" "$TOKENS_DIR/$provider.prompt.md"
     agents+=("$(
-      load_settings "$PROVIDERS_DIR/$provider/.env"
-      opencode_resolve
+      models_resolve "$PROVIDERS_DIR/$provider"
       opencode_agent_json "$provider" "$TOKENS_DIR/$provider.prompt.md"
     )")
   fi

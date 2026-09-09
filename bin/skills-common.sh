@@ -78,7 +78,7 @@ opencode_plugin_names() { # every opencode/plugin/*.js file in the repo
 
 shim_from_repo() { # <path> -> 0 when it is a plugin shim generated from this repo
   [ -f "$1" ] || return 1
-  [ "$(head -1 "$1")" = "$OPENCODE_PLUGIN_MARKER" ] || return 1
+  generated_here "$1" || return 1
   grep -q "\"$ROOT/" "$1"
 }
 

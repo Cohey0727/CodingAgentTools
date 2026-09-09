@@ -35,18 +35,18 @@ list:
 uninstall:
 	@for p in $(PROVIDER_LIST); do \
 		dir="$(PROVIDERS_DIR)/$$p"; \
-		[ -f "$$dir/.env.example" ] || continue; \
-		for cmd in $$(. "$(COMMON)"; load_settings "$$dir/.env.example"; launcher_name "$$p"; printf ' '; stale_launcher_names "$$p"); do \
+		[ -f "$$dir/models.json" ] || continue; \
+		for cmd in $$(. "$(COMMON)"; provider_command "$$dir"; printf ' '; provider_stale_commands "$$dir"); do \
 			rm -f "$(BIN_DIR)/$$cmd" && echo "  Removed $(BIN_DIR)/$$cmd"; \
 		done; \
 		rm -rf "$$dir/.opencode.json" "$$dir/.pi-agent"; \
 	done
 	@. "$(COMMON)"; out=$$(pi_global_models_path); \
-		if [ -f "$$out" ] && [ "$$(head -1 "$$out")" = "$$PI_GLOBAL_MARKER" ]; then \
+		if generated_here "$$out"; then \
 			rm -f "$$out" && echo "  Removed $$out"; \
 		fi
 	@. "$(COMMON)"; out=$$(opencode_global_config_path); \
-		if [ -f "$$out" ] && [ "$$(head -1 "$$out")" = "$$OPENCODE_GLOBAL_MARKER" ]; then \
+		if generated_here "$$out"; then \
 			rm -f "$$out" && echo "  Removed $$out"; \
 		fi; \
 		rm -rf "$$(opencode_tokens_dir)" && echo "  Removed $$(opencode_tokens_dir)"
@@ -63,8 +63,8 @@ uninstall:
 	@echo "  Note: provider .env files are left in place. Delete them manually if no longer needed."
 	@"$(ROOT)/bin/skills-uninstall.sh"
 
-# Re-generate pi's global models.json from the current .env files (there are
-# no pi<name> launchers); `make setup` does this too.
+# Re-generate pi's global models.json from the current provider configs (there
+# are no pi<name> launchers); `make setup` does this too.
 pi-global:
 	@"$(ROOT)/bin/pi-global-models.sh"
 
