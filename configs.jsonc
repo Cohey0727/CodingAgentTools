@@ -18,10 +18,10 @@
       "claude": { "env": { "CLAUDE_CODE_EFFORT_LEVEL": "max" } },
 
       "models": [
-        { "id": "deepseek-v4-pro", "tags": ["default"] },
-        { "id": "deepseek-v4-flash", "tags": ["small"] },
+        { "id": "deepseek-v4-pro" },
+        { "id": "deepseek-v4-flash" },
         { "id": "deepseek-v4-flash-vision-exp", "input": ["text", "image"] },
-        { "id": "deepseek-v4.1-flash-expires-on-0910" }
+        { "id": "deepseek-v4.1-flash-expires-on-0910", "tags": ["default","small"] }
       ]
     },
 
