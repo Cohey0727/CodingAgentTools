@@ -1,0 +1,7 @@
+# `make hooks` installs these. pre-commit refuses the commit when configs.jsonc
+# is invalid or when a file outside it names something only it may name.
+pre-commit:
+  parallel: false
+  commands:
+    check:
+      run: make check

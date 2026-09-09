@@ -8,7 +8,7 @@ COMMON        := $(ROOT)/bin/common.sh
 # Every provider target acts on every provider in configs.jsonc.
 PROVIDER_LIST := $(shell . $(ROOT)/bin/common.sh && provider_names)
 
-.PHONY: setup setup-providers setup-skills list uninstall help pi-global opencode-global
+.PHONY: setup setup-providers setup-skills list uninstall help pi-global opencode-global check hooks
 
 # Both halves of the repo: the provider wizard first (it prompts), then the
 # skill symlinks. SKIP_BANNER keeps it to a single banner.
@@ -26,6 +26,20 @@ setup-providers:
 # AGENTS.md into whatever name each CLI reads it under.
 setup-skills:
 	@"$(ROOT)/bin/skills-setup.sh"
+
+# Validate configs.jsonc, then refuse any concrete name outside it.
+check:
+	@. "$(COMMON)"; models_check && echo "  configs.jsonc ok"
+	@"$(ROOT)/bin/style-check.sh" && echo "  style ok"
+
+# Install the git hooks that run `make check` before every commit.
+hooks:
+	@command -v lefthook >/dev/null 2>&1 || { \
+		echo "hooks: lefthook is not on your PATH." >&2; \
+		echo "  brew install lefthook   (or: npm install -g lefthook)" >&2; \
+		exit 1; \
+	}
+	@lefthook install
 
 # Show what this repo manages, with install status.
 list:

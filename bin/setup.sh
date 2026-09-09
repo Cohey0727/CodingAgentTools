@@ -7,7 +7,7 @@
 # configs.jsonc lists every provider and refers to its secrets as "${NAME}";
 # the .env beside it holds those values and is the only file with a key in it.
 # At a prompt, pressing Enter with no input keeps whatever is already set.
-# Keys still sitting in the old providers/<name>/.env files are carried over
+# Keys still sitting in the old per-provider .env files are carried over
 # first. Then one launcher per provider per agent that names a command is
 # generated into $BIN_DIR (default ~/.local/bin) from the template in bin/, the
 # packages each agent lists are installed into its settings, and every provider
@@ -33,7 +33,7 @@ launcher_agents() { # -> every agent whose configs.jsonc block names a command
   local a
   while IFS= read -r a; do
     [ -n "$a" ] || continue
-    ( settings_resolve "$a" && [ -n "$S_EXEC" ] ) && printf '%s\n' "$a"
+    ( settings_resolve "$a" && [ -n "$S_COMMAND_TEMPLATE" ] ) && printf '%s\n' "$a"
   done < <(agent_names)
 }
 
@@ -125,14 +125,13 @@ sync_env_keys() { # append variables added to .env.example since .env was writte
   rm -f "$tmp"
 }
 
-# The layout before configs.jsonc kept one .env per provider, holding the key as
-# API_TOKEN and any extra headers as "Name: Value" lines in HEADERS. Values
-# still sitting there are moved into the single .env, once, and only into
-# variables that are still empty.
-raw_headers() { # <old provider .env> -> its HEADERS value, one "Name: Value" per
-                # line, quotes removed and any $(...) left unevaluated
-  awk '
-    !started && /^HEADERS=/ { started = 1; quotes = 0; sub(/^HEADERS=/, "") }
+# A .env written before this repo kept one file per provider, under whatever
+# names that agent's launch block lists as aliases. Values still sitting there
+# are moved into the single .env, once, and only into variables still empty.
+raw_headers() { # <old .env> <variable name> -> that variable's value, one
+                # "Name: Value" per line, quotes removed and $(...) unevaluated
+  awk -v key="^$2=" '
+    !started && $0 ~ key { started = 1; quotes = 0; sub(key, "") }
     started {
       quotes += gsub(/"/, "")
       print
@@ -163,7 +162,11 @@ migrate_provider_envs() {
       moved=$((moved + 1))
     fi
 
-    headers=$(raw_headers "$file")
+    headers=''
+    for name in $S_HEADERS_VARS; do
+      headers=$(raw_headers "$file" "$name")
+      [ -n "$headers" ] && break
+    done
     [ -n "$headers" ] || continue
     while IFS= read -r name; do
       [ -n "$name" ] || continue
@@ -386,16 +389,14 @@ install_agent_packages() { # every "<source>=<command>" an agent lists in config
 }
 
 check_environment() {
+  local agent
   echo
-  if ! command -v claude >/dev/null 2>&1; then
-    warn "'claude' is not on your PATH — install Claude Code first."
-  fi
-  if ! command -v opencode >/dev/null 2>&1; then
-    warn "'opencode' is not on your PATH — the generated global config needs OpenCode (https://opencode.ai)."
-  fi
-  if ! command -v pi >/dev/null 2>&1; then
-    warn "'pi' is not on your PATH — the generated models.json needs the pi coding agent (https://pi.dev)."
-  fi
+  while IFS= read -r agent; do
+    [ -n "$agent" ] || continue
+    settings_resolve "$agent"
+    command -v "$S_EXEC" >/dev/null 2>&1 && continue
+    warn "'$S_EXEC' is not on your PATH — what this repo generates for it goes unused${S_INSTALL_URL:+ ($S_INSTALL_URL)}."
+  done < <(agent_names)
   case ":$PATH:" in
     *":$BIN_DIR:"*) ;;
     *)
@@ -409,7 +410,7 @@ check_environment() {
 # -------------------------------------------------------------------- main
 
 main() {
-  local providers=() all=() p i tok
+  local providers=() all=() p i tok agent
 
   banner
 
@@ -467,15 +468,17 @@ main() {
 
   install_agent_packages
 
-  section 'generating global pi models.json'
-  if ! "$ROOT/bin/pi-global-models.sh"; then
-    printf '  %s⚠ skipped — set a key and re-run%s\n' "$YLW" "$RST"
-  fi
-
-  section 'generating global OpenCode config'
-  if ! "$ROOT/bin/opencode-global-config.sh"; then
-    printf '  %s⚠ skipped — set a key and re-run%s\n' "$YLW" "$RST"
-  fi
+  # Which agents get a generated global config, and what writes it, is theirs
+  # to declare in configs.jsonc.
+  while IFS= read -r agent; do
+    [ -n "$agent" ] || continue
+    settings_resolve "$agent"
+    [ -n "$S_GENERATOR" ] || continue
+    section "generating global $agent config"
+    if ! "$ROOT/$S_GENERATOR"; then
+      printf '  %s⚠ skipped — set a key and re-run%s\n' "$YLW" "$RST"
+    fi
+  done < <(agent_names)
 
   check_environment
 }

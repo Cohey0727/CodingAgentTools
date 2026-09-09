@@ -46,6 +46,7 @@ configs.jsonc                     # every provider: endpoint, models, tags, and 
 bin/ui.sh                        # banner, colors and the output helpers every script shares
 bin/models.py                    # the only reader of configs.jsonc: validates it, resolves tags to slots
 bin/common.sh                    # shared resolution: configs.jsonc through models.py, values from .env
+bin/style-check.sh               # refuse any name configs.jsonc owns from appearing anywhere else
 bin/model-ref.sh                 # "<provider id>/<model>" for one provider, so nothing else spells a model id
 bin/launcher.template            # Claude Code launcher; @@PROVIDER@@ baked in at setup time
 bin/opencode-plugin.template     # OpenCode plugin shim; @@IMPL@@ baked in at setup time
@@ -119,6 +120,8 @@ and [2026-09-09 — providers/ 廃止と configs.jsonc への集約](docs/migrat
 | `make setup` | Both halves: the provider wizard, then the skill, `AGENTS.md` and OpenCode extension install |
 | `make setup-providers` | The wizard above only: tokens, `.env` upkeep, launcher install, pi packages, pi and OpenCode global configs |
 | `make setup-skills` | The shared assets only: `skills/`, `agents/`, `AGENTS.md` and `opencode/` into every agent CLI |
+| `make check` | Validate `configs.jsonc`, then refuse any concrete name outside it (see `CLAUDE.md`). What the pre-commit hook runs |
+| `make hooks` | Install the lefthook pre-commit hook that runs `make check` |
 | `make list` | Every provider with its command, endpoint and models with their tags, then every skill, subagent and OpenCode extension with its install status |
 | `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from `configs.jsonc`, and set the startup model in `~/.pi/agent/settings.json` — run it after changing a model or endpoint |
 | `make opencode-global` | Re-generate OpenCode's global config from `configs.jsonc` — run it after editing it |

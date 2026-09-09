@@ -21,6 +21,7 @@ The file is JSON with // line comments allowed.
   models.py providers              one provider name per line
   models.py agents                 one agent name per line
   models.py env-vars               every "${NAME}" the file references, with its provider
+  models.py vocabulary             every concrete name this file owns, one per line
 """
 
 import json
@@ -37,6 +38,8 @@ AGENT_KEYS = {
     "command",
     "stale_commands",
     "launch",
+    "install_url",
+    "generator",
     "slots",
     "auto_compact_window_from",
     "model_tag",
@@ -52,7 +55,7 @@ MODEL_ENTRY_KEYS = {"keyed_by", "indent", "inline", "value"}
 LEAN_KEYS = {"prompt", "disabled_tools"}
 LAUNCH_KEYS = {
     "exec", "token_var", "base_url_var", "headers_var", "auto_compact_window_var",
-    "unset_vars", "token_var_aliases",
+    "unset_vars", "token_var_aliases", "headers_var_aliases",
 }
 MODEL_KEYS = {"id", "claude_id", "tags", "context_window", "max_tokens", "reasoning", "input"}
 PROVIDER_FIXED_KEYS = {"API_KEY", "BASE_URL", "REQUEST_HEADERS", "schema", "defaults", "models"}
@@ -181,7 +184,8 @@ def document():
     for name, agent in agents.items():
         where = f"{CONFIGS}: agents.{name}"
         _check_keys(where, _object(where, agent), AGENT_KEYS)
-        for key in ("command", "api", "model_tag", "small_model_tag", "auto_compact_window_from"):
+        for key in ("command", "api", "model_tag", "small_model_tag",
+                    "auto_compact_window_from", "install_url", "generator"):
             if key in agent:
                 _string(f"{where}.{key}", agent[key])
         if "stale_commands" in agent:
@@ -200,6 +204,7 @@ def document():
             _string(f"{at}.exec", agent["launch"].get("exec"))
             _string_list(f"{at}.unset_vars", agent["launch"].get("unset_vars") or [])
             _string_list(f"{at}.token_var_aliases", agent["launch"].get("token_var_aliases") or [])
+            _string_list(f"{at}.headers_var_aliases", agent["launch"].get("headers_var_aliases") or [])
         if "model_entry" in agent:
             at = f"{where}.model_entry"
             _check_keys(at, _object(at, agent["model_entry"]), MODEL_ENTRY_KEYS)
@@ -516,7 +521,10 @@ def settings(doc, agent_name):
     packages = agent.get("packages") or {}
     values = {
         "S_START_PROVIDER": doc["start_provider"],
-        "S_EXEC": launch.get("exec", ""),
+        "S_EXEC": launch.get("exec") or agent_name,
+        "S_COMMAND_TEMPLATE": agent.get("command", ""),
+        "S_INSTALL_URL": agent.get("install_url", ""),
+        "S_GENERATOR": agent.get("generator", ""),
         "S_TOKEN_VAR": launch.get("token_var", ""),
         "S_BASE_URL_VAR": launch.get("base_url_var", ""),
         "S_HEADERS_VAR": launch.get("headers_var", ""),
@@ -525,6 +533,10 @@ def settings(doc, agent_name):
         "S_TOKEN_VARS": " ".join(
             ([launch["token_var"]] if launch.get("token_var") else [])
             + list(launch.get("token_var_aliases") or [])
+        ),
+        "S_HEADERS_VARS": " ".join(
+            ([launch["headers_var"]] if launch.get("headers_var") else [])
+            + list(launch.get("headers_var_aliases") or [])
         ),
         "S_MODEL_TAG": agent.get("model_tag", ""),
         "S_SMALL_MODEL_TAG": agent.get("small_model_tag", ""),
@@ -568,6 +580,41 @@ def check(doc):
             taken[filed] = name
 
 
+def vocabulary(doc):
+    """Every concrete name configs.jsonc owns — what no other file may contain.
+
+    Built from the file itself, so adding a provider or renaming a variable
+    changes what the style check forbids without touching the check.
+    """
+    words = set()
+    for agent_name, agent in doc["agents"].items():
+        launch = agent.get("launch") or {}
+        words.update(
+            v for k, v in launch.items() if isinstance(v, str) and k != "exec"
+        )
+        for key in ("unset_vars", "token_var_aliases"):
+            words.update(launch.get(key) or [])
+        words.update(agent.get("slots") or {})
+        words.update(agent.get("packages") or {})
+        if agent.get("api"):
+            words.add(agent["api"])
+        for entry in (agent.get("schemas") or {}).values():
+            if entry and entry.get("npm"):
+                words.add(entry["npm"])
+        for name in doc["providers"]:
+            config = load(name, agent_name, doc)
+            words.update(m["id"] for m in config["models"])
+            words.update(m["claude_id"] for m in config["models"])
+            filed = provider_id(config, agent_name)
+            if filed and filed != name:
+                words.add(filed)
+    # Role tags and agent names are deliberately generic ("default", "small"):
+    # they name a slot, not a vendor, and every file may say them.
+    generic = known_tags(doc) | set(doc["agents"])
+    # A name shorter than this cannot be searched for without matching prose.
+    return "\n".join(sorted(w for w in words - generic if len(w) >= 4))
+
+
 def env_vars(doc):
     """Every reference in the file, as "<provider><tab><var><tab><what><tab><fallback>".
 
@@ -590,7 +637,9 @@ def main(argv):
     action = argv[1] if len(argv) > 1 else ""
     first = argv[2] if len(argv) > 2 else ""
     second = argv[3] if len(argv) > 3 else ""
-    if action not in ("sh", "settings", "check", "tags", "providers", "agents", "env-vars"):
+    if action not in (
+        "sh", "settings", "check", "tags", "providers", "agents", "env-vars", "vocabulary",
+    ):
         print(__doc__.strip(), file=sys.stderr)
         return 2
     try:
@@ -601,6 +650,8 @@ def main(argv):
             print("\n".join(doc["agents"]))
         elif action == "env-vars":
             print(env_vars(doc))
+        elif action == "vocabulary":
+            print(vocabulary(doc))
         elif action == "check":
             check(doc)
         elif action == "settings":

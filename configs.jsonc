@@ -11,6 +11,7 @@
   "agents": {
 
     "claude": {
+      "install_url": "https://docs.anthropic.com/claude-code",
       "command": "claude{name}",
       "stale_commands": ["pi{name}", "open{name}"],
 
@@ -24,8 +25,10 @@
         "auto_compact_window_var": "CLAUDE_CODE_AUTO_COMPACT_WINDOW",
         // Cleared before exec: set, it would shadow the token variable above.
         "unset_vars": ["ANTHROPIC_API_KEY"],
-        // Also accepted as the key when reading a file this repo did not write.
-        "token_var_aliases": ["API_TOKEN"]
+        // Also accepted when reading a file this repo did not write, where the
+        // key and the headers were not yet spelled the way this agent reads them.
+        "token_var_aliases": ["API_TOKEN"],
+        "headers_var_aliases": ["HEADERS"]
       },
 
       // Each of Claude Code's model variables, and the tags it follows, most
@@ -43,6 +46,9 @@
     },
 
     "opencode": {
+      "install_url": "https://opencode.ai",
+      // Run by `make setup` to write this agent's global config.
+      "generator": "bin/opencode-global-config.sh",
       "model_tag": "default",
       "small_model_tag": "small",
 
@@ -79,6 +85,8 @@
     },
 
     "pi": {
+      "install_url": "https://pi.dev",
+      "generator": "bin/pi-global-models.sh",
       "model_tag": "default",
       "api": "anthropic-messages",
 
