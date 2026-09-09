@@ -1,29 +1,13 @@
-// Every provider this repo knows: its endpoint, the models it serves, and the
-// tags that say which slot each model fills. Claude Code, OpenCode and pi all
-// run on this file, resolved by bin/models.py.
-//
-// Every value that can come from outside is written as a reference, so reading
-// the file tells you which ones do: "${NAME}" takes it from the environment, and
-// "${NAME:-fallback}" falls back to the text after ":-" when NAME is unset or
-// empty. The .env next to this file (gitignored) is where those values live, so
-// no secret is ever written here, and an endpoint keeps a working default that
-// .env can override — a different route, a regional host, a proxy in front.
-//
-// "schema" picks where OpenCode gets a provider's catalog: "local" (default) is
-// the "models" array below, "models.dev" is that registry — "id" names the
-// provider there — and "none" leaves it out. README has the trade-offs.
-//
-// // line comments are allowed.
+// Every provider: its endpoint, the models it serves, and the tags naming the
+// slot each model fills. "${NAME}" and "${NAME:-fallback}" resolve from the
+// .env beside this file, so no secret is written here. Fields: see README.
 {
   "providers": {
 
-    // Reference: https://api-docs.deepseek.com/guides/agent_integrations/claude_code
-    // API key: https://platform.deepseek.com/
     "deepseek": {
       "API_KEY": "${DEEPSEEK_API_KEY}",
       "BASE_URL": "${DEEPSEEK_BASE_URL:-https://api.deepseek.com/anthropic}",
 
-      // Applied to every model below that does not set the field itself.
       "defaults": {
         "context_window": 1000000,
         "max_tokens": 384000,
@@ -31,30 +15,20 @@
         "input": ["text"]
       },
 
-      // "env" is exported as-is to `claude` by the launcher.
       "claude": { "env": { "CLAUDE_CODE_EFFORT_LEVEL": "max" } },
 
       "models": [
         { "id": "deepseek-v4-pro", "tags": ["default"] },
         { "id": "deepseek-v4-flash", "tags": ["small"] },
-
-        // No tag: offered in OpenCode and pi, fills no Claude Code slot. Reach
-        // it from Claude Code with --model.
         { "id": "deepseek-v4-flash-vision-exp", "input": ["text", "image"] },
-
-        // Served but absent from both GET /models and the pricing docs, and the
-        // id says it stops answering on 09-10.
         { "id": "deepseek-v4.1-flash-expires-on-0910" }
       ]
     },
 
-    // Reference: https://docs.z.ai/devpack/tool/claude
-    // API key: https://z.ai/manage-apikey/apikey-list
     "glm": {
       "API_KEY": "${GLM_API_KEY}",
       "BASE_URL": "${GLM_BASE_URL:-https://api.z.ai/api/anthropic}",
 
-      // Both models are 1M context / 128K output, so neither overrides these.
       "defaults": {
         "context_window": 1000000,
         "max_tokens": 131072,
@@ -65,18 +39,13 @@
       "claude": { "env": { "CLAUDE_CODE_EFFORT_LEVEL": "max" } },
 
       "models": [
-        // The 1M-context "[1m]" ids Z.ai documents for Claude Code exist only on
-        // the coding-plan route; BASE_URL above rejects them with
-        // "modelCode: does not exist", and glm-5.3 is already a 1M model there.
+        // The "[1m]" ids exist only on the coding-plan route; this BASE_URL
+        // rejects them with "modelCode: does not exist".
         { "id": "glm-5.3", "tags": ["default"] },
         { "id": "glm-5.3-flash", "tags": ["small"] }
       ]
     },
 
-    // Reference: https://platform.moonshot.ai/docs
-    // API key: https://platform.moonshot.ai/console/api-keys
-    // The default is the Kimi coding subscription plan. Set KIMI_BASE_URL to
-    // https://api.moonshot.ai/anthropic for pay-as-you-go (metered) billing.
     "kimi": {
       "API_KEY": "${KIMI_API_KEY}",
       "BASE_URL": "${KIMI_BASE_URL:-https://api.kimi.com/coding}",
@@ -96,18 +65,10 @@
       },
 
       "models": [
-        // claude_id selects the 1M-context variant, which only Claude Code
-        // understands; OpenCode and pi are sent the plain id.
         { "id": "kimi-k3", "claude_id": "kimi-k3[1m]", "tags": ["default", "small"] }
       ]
     },
 
-    // Reference: https://mimo.mi.com/docs
-    // API key: https://platform.xiaomimimo.com/token-plan
-    //   Token Plan tokens start with "tp-", pay-as-you-go API keys with "sk-".
-    // The default is the global Token Plan endpoint. Set MIMO_BASE_URL to
-    //   https://token-plan-cn.xiaomimimo.com/anthropic  -> Token Plan, China accounts
-    //   https://api.xiaomimimo.com/anthropic            -> pay-as-you-go (metered)
     "mimo": {
       "API_KEY": "${MIMO_API_KEY}",
       "BASE_URL": "${MIMO_BASE_URL:-https://token-plan-sgp.xiaomimimo.com/anthropic}",
@@ -131,7 +92,6 @@
       ]
     },
 
-    // API key: https://www.minimax.io/platform
     "minimax": {
       "API_KEY": "${MINIMAX_API_KEY}",
       "BASE_URL": "${MINIMAX_BASE_URL:-https://api.minimax.io/anthropic}",
@@ -143,9 +103,8 @@
         "input": ["text", "image"]
       },
 
-      // "claudeminimax" would be the default. Both bare names are taken on a
-      // typical machine: minimax -> official MiniMax Code app, mmx -> an
-      // unrelated bun tool.
+      // Both bare names are taken on a typical machine: minimax -> the official
+      // MiniMax Code app, mmx -> an unrelated bun tool.
       "claude": {
         "command": "claudemmx",
         "env": { "CLAUDE_CODE_EFFORT_LEVEL": "max" }
@@ -156,35 +115,17 @@
       ]
     },
 
-    // A llama-server on this machine, which serves the Anthropic shape on
-    // /v1/messages. There is no account and no key.
-    // Reference: https://github.com/ggml-org/llama.cpp/tree/master/tools/server
-    //
-    // The server behind it is LlamaGate (~/Workspace/LlamaGate): `just start`
-    // brings it up on 11301, `just profiles` lists the models it can load and
-    // `just start <profile>` swaps to one. Nothing answers while it is down, so
-    // a request fails outright rather than falling back to anything else.
     "local": {
-      // llama-server takes no auth, but the CLIs require the value to be set, so
-      // the fallback is any non-empty string.
+      // llama-server takes no auth, but the CLIs require a non-empty value.
       "API_KEY": "${LOCAL_API_KEY:-local}",
       "BASE_URL": "${LOCAL_BASE_URL:-http://127.0.0.1:11301}",
 
-      // A 35B A3B model on one machine is far slower than the hosted providers,
-      // so the effort level stays low.
       "claude": { "env": { "CLAUDE_CODE_EFFORT_LEVEL": "low" } },
 
       "models": [
-        // The id is a label, not a selector: llama-server answers with whatever
-        // it has loaded and ignores the name the request asks for, so a fixed
-        // "default" survives swapping the model on the server. Only a
-        // multi-model llama-server that routes by name needs the id to match
-        // its --alias.
-        //
-        // context_window must not exceed the server's --ctx-size, which
-        // LlamaGate takes from CTX in the active profile, or requests fail once
-        // the conversation grows past it. 262144 is what the profiles carrying
-        // a 35B A3B model set.
+        // llama-server answers with whatever it has loaded and ignores the id,
+        // so a fixed one survives swapping the model. context_window must stay
+        // at or below the server's --ctx-size.
         {
           "id": "default",
           "tags": ["default", "small"],
@@ -196,49 +137,33 @@
       ]
     },
 
-    // A llama-server on another machine, published through a Cloudflare tunnel
-    // and gated by Cloudflare Access.
-    // Reference: https://github.com/ggml-org/llama.cpp/tree/master/tools/server
     "gtr": {
       // llama-server takes no auth unless started with --api-key, but the CLIs
-      // require the value to be set, so the fallback is any non-empty string.
+      // require a non-empty value.
       "API_KEY": "${GTR_API_KEY:-gtr}",
       "BASE_URL": "${GTR_BASE_URL:-https://gtr-llama.spaghetti-monster.com}",
 
-      // Cloudflare Access answers requests without these with a 302 to its
-      // login page. Zero Trust -> Access -> Service Auth -> Service Tokens,
-      // plus a Service Auth policy on the gtr-llama application that allows it.
-      // A short-lived user token works too: set the .env value with
-      // `cloudflared access token --app=<BASE_URL>` instead.
+      // Cloudflare Access answers a request without these with a 302 to its
+      // login page.
       "REQUEST_HEADERS": {
         "CF-Access-Client-Id": "${GTR_CF_ACCESS_CLIENT_ID}",
         "CF-Access-Client-Secret": "${GTR_CF_ACCESS_CLIENT_SECRET}"
       },
 
-      // A single self-hosted model is far slower than the hosted providers, so
-      // the effort level stays low.
       "claude": { "env": { "CLAUDE_CODE_EFFORT_LEVEL": "low" } },
 
       "opencode": {
-        // A lean agent for this provider: a short system prompt in place of
-        // OpenCode's stock one, and only bash / edit / read / write / grep /
-        // glob — no skill list, no subagents, no todo or webfetch tools. Cuts
-        // the fixed part of every request from ~10k tokens to ~4k, which is what
-        // makes a server that prefills at a few hundred tokens a second answer
-        // in seconds rather than minutes.
         "lean": true,
 
-        // OpenCode compacts a session once it fills the context, so this is the
-        // window a conversation may grow into before it is summarised — not the
-        // server's capacity. The model's own context_window would let a session
-        // reach a size this server needs minutes to prefill.
+        // The window a session may grow into before OpenCode compacts it, not
+        // the server's capacity: this server needs minutes to prefill more.
         "context_window": 16384,
         "max_tokens": 4096
       },
 
       "models": [
-        // As with "local", the id is a label rather than a selector, and
-        // context_window must not exceed the server's --ctx-size.
+        // As with "local", the id is a label and context_window must stay at or
+        // below the server's --ctx-size.
         {
           "id": "default",
           "tags": ["default", "small"],

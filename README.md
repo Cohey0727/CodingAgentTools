@@ -690,6 +690,17 @@ are stale. Re-run `make setup` from the new location.
 
 ## References
 
+Where each provider's key comes from:
+
+| Provider | API key |
+|----------|---------|
+| DeepSeek | https://platform.deepseek.com/ |
+| GLM (Z.ai) | https://z.ai/manage-apikey/apikey-list |
+| Kimi (Moonshot) | https://platform.moonshot.ai/console/api-keys |
+| MiMo (Xiaomi) | https://platform.xiaomimimo.com/token-plan — Token Plan tokens start with `tp-`, metered keys with `sk-` |
+| MiniMax | https://www.minimax.io/platform |
+| Local / gtr | No account and no key; `API_KEY` is a placeholder the CLIs only require to be non-empty |
+
 - [DeepSeek: Claude Code Integration Guide](https://api-docs.deepseek.com/guides/agent_integrations/claude_code)
 - [MiniMax Platform](https://www.minimax.io/platform)
 - [Z.ai / GLM Claude Code docs](https://docs.z.ai/devpack/tool/claude)
