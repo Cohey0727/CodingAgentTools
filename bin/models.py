@@ -20,30 +20,26 @@ from pathlib import Path
 # Every tag a model may carry. Each names a slot in one of the three CLIs, so an
 # unknown one is a typo rather than a label: a model that fills no slot carries
 # no tags at all and is merely listed.
-# "default" and "small" are the two roles every CLI has some use for. The rest
-# are Claude Code variables, spelled exactly as Claude Code reads them, because
-# only Claude Code has more than one model slot: OpenCode and pi are given every
-# model in the file and pick between them in the session.
+# "default" and "small" are the two roles, and every slot follows one of them.
+# The rest are the Claude Code variables that can break away from that pair,
+# spelled exactly as Claude Code reads them; there is no tag for a variable
+# whose only meaning would be "the default one" or "the small one".
 ROLE_TAGS = (
     "default",
     "small",
-    "ANTHROPIC_MODEL",
     "ANTHROPIC_DEFAULT_OPUS_MODEL",
     "ANTHROPIC_DEFAULT_SONNET_MODEL",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL",
     "ANTHROPIC_DEFAULT_FABLE_MODEL",
     "CLAUDE_CODE_SUBAGENT_MODEL",
 )
 
-# Claude Code variable -> the tags it follows, most specific first. A slot with
-# no tag of its own falls back to the generic "default" / "small" pair, so a
-# provider whose models divide the obvious way needs only those two tags.
+# Claude Code variable -> the tags it follows, most specific first.
 CLAUDE_SLOTS = {
-    "ANTHROPIC_MODEL": ("ANTHROPIC_MODEL", "default"),
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": ("ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_MODEL", "default"),
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": ("ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_MODEL", "default"),
-    "ANTHROPIC_DEFAULT_FABLE_MODEL": ("ANTHROPIC_DEFAULT_FABLE_MODEL", "ANTHROPIC_MODEL", "default"),
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": ("ANTHROPIC_DEFAULT_HAIKU_MODEL", "small", "default"),
+    "ANTHROPIC_MODEL": ("default",),
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": ("ANTHROPIC_DEFAULT_OPUS_MODEL", "default"),
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": ("ANTHROPIC_DEFAULT_SONNET_MODEL", "default"),
+    "ANTHROPIC_DEFAULT_FABLE_MODEL": ("ANTHROPIC_DEFAULT_FABLE_MODEL", "default"),
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": ("small", "default"),
     "CLAUDE_CODE_SUBAGENT_MODEL": ("CLAUDE_CODE_SUBAGENT_MODEL", "small", "default"),
 }
 

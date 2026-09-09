@@ -12,29 +12,34 @@ OpenCode / pi の 3 つとも `bin/models.py` 経由でこのファイルを読�
 
 ## tag
 
-モデルスロットが複数あるのは Claude Code だけで、そのスロットは全部環境変数。
-なので tag は環境変数名そのものにした。中間の語彙を挟まないので、どの変数に
-どのモデルが入るかが models.json だけで読める。
+`default` と `small` の 2 つが標準で、全スロットがこのどちらかに従う。
 
 | tag | 入るところ |
 |---|---|
-| `default` | 自前の tag を持たないスロット全部。OpenCode と pi の起動モデル |
-| `small` | 下の 2 つの安いスロットと OpenCode の `small_model` |
-| `ANTHROPIC_MODEL` | メインスロット |
-| `ANTHROPIC_DEFAULT_OPUS_MODEL` | `/model opus` |
-| `ANTHROPIC_DEFAULT_SONNET_MODEL` | `/model sonnet` |
-| `ANTHROPIC_DEFAULT_FABLE_MODEL` | `/model fable` |
-| `ANTHROPIC_DEFAULT_HAIKU_MODEL` | 安いスロット |
-| `CLAUDE_CODE_SUBAGENT_MODEL` | サブエージェント |
+| `default` | `ANTHROPIC_MODEL`、opus / sonnet / fable スロット、OpenCode と pi の起動モデル |
+| `small` | `ANTHROPIC_DEFAULT_HAIKU_MODEL`、`CLAUDE_CODE_SUBAGENT_MODEL`、OpenCode がセッションのタイトル生成に使うモデル |
+
+モデルスロットが複数あるのは Claude Code だけで、そのスロットは全部環境変数。
+なので、この 2 つから外れるための tag は環境変数名そのものにした。
+
+| tag | 入るところ | 未指定なら |
+|---|---|---|
+| `ANTHROPIC_DEFAULT_OPUS_MODEL` | `/model opus` | `default` |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | `/model sonnet` | `default` |
+| `ANTHROPIC_DEFAULT_FABLE_MODEL` | `/model fable` | `default` |
+| `CLAUDE_CODE_SUBAGENT_MODEL` | サブエージェント | `small` |
+
+`ANTHROPIC_MODEL` と `ANTHROPIC_DEFAULT_HAIKU_MODEL` に対応する tag は
+用意しない。この 2 つは `default` と `small` そのもので、別名を作っても
+同じことを言う 2 つ目の書き方が増えるだけ。
 
 OpenCode と pi には `models` に並べたモデルが**全部**出る。セッション内の
 `/models` `/model` で選ぶものなので、モデルごとに宣言することは何もない。
 起動時に乗るのが `default` と `small`。
 
-個別の変数名 > `ANTHROPIC_MODEL` > `default` / `small` の順で決まるので、素直に
-2 段構成のプロバイダは `default` と `small` の 2 つだけで足りる。`default` が
-ないファイル、1 つの tag を 2 つのモデルに付けたファイル、知らない tag を
-書いたファイルは `make setup` がエラーで止める。
+素直に 2 段構成のプロバイダは `default` と `small` の 2 つだけで足りる。
+`default` がないファイル、1 つの tag を 2 つのモデルに付けたファイル、
+知らない tag を書いたファイルは `make setup` がエラーで止める。
 
 ## 変数の対応
 
@@ -43,7 +48,7 @@ OpenCode と pi には `models` に並べたモデルが**全部**出る。セ�
 | `NAME` | `name` |
 | `MODEL` | `tags: ["default"]` |
 | `SMALL_MODEL` | `tags: ["small"]` |
-| `ANTHROPIC_DEFAULT_HAIKU_MODEL` などスロット個別の上書き | 同名の tag |
+| `ANTHROPIC_DEFAULT_OPUS_MODEL` などスロット個別の上書き | 同名の tag（`ANTHROPIC_MODEL` と `ANTHROPIC_DEFAULT_HAIKU_MODEL` は `default` / `small`） |
 | `OPENCODE_EXTRA_MODELS` | `models` に足すだけ（列挙されたモデルは全部 OpenCode と pi に出る） |
 | `CONTEXT_WINDOW` / `MAX_TOKENS` | モデルごとの `context_window` / `max_tokens`（`defaults` で共通化できる） |
 | `SMALL_CONTEXT_WINDOW` / `SMALL_MAX_TOKENS` | 該当モデルの `context_window` / `max_tokens` |

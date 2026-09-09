@@ -168,7 +168,7 @@ opencode                                   # starts on the default provider's mo
 opencode --model glm-anthropic/glm-5.3     # or pick at launch time
 ```
 
-Note `small_model`, which serves OpenCode's lightweight internal calls, stays at the default even after you switch the main model via `/models`.
+Note `small_model` — the model OpenCode names a session with, and its only use for one — stays at the default even after you switch the main model via `/models`.
 
 ### Default provider
 
@@ -289,41 +289,45 @@ whether or not it carries a tag.
 
 ### Tags
 
-Only Claude Code has more than one model slot, and each of its slots is an
-environment variable. So a tag *is* that variable, spelled the way Claude Code
-reads it — `models.json` says outright which model it reaches for as opus and
-which one it hands to a subagent, with no vocabulary in between:
+`default` and `small` are the two roles, and every slot follows one of them:
 
 | Tag | Fills |
 |-----|-------|
-| `default` | Every slot below that has no tag of its own, and the model OpenCode and pi start on |
-| `small` | The two cheap slots below, and OpenCode's `small_model` |
-| `ANTHROPIC_MODEL` | The main slot |
-| `ANTHROPIC_DEFAULT_OPUS_MODEL` | What `/model opus` selects |
-| `ANTHROPIC_DEFAULT_SONNET_MODEL` | What `/model sonnet` selects |
-| `ANTHROPIC_DEFAULT_FABLE_MODEL` | What `/model fable` selects |
-| `ANTHROPIC_DEFAULT_HAIKU_MODEL` | The cheap slot |
-| `CLAUDE_CODE_SUBAGENT_MODEL` | What a subagent runs on |
+| `default` | `ANTHROPIC_MODEL`, the opus / sonnet / fable slots, and the model OpenCode and pi start on |
+| `small` | `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL`, and the model OpenCode titles sessions with |
+
+Only Claude Code has more than one model slot, and each of its slots is an
+environment variable. So the tags that break a slot away from that pair *are*
+those variables, spelled the way Claude Code reads them:
+
+| Tag | Fills | Otherwise follows |
+|-----|-------|-------------------|
+| `ANTHROPIC_DEFAULT_OPUS_MODEL` | What `/model opus` selects | `default` |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | What `/model sonnet` selects | `default` |
+| `ANTHROPIC_DEFAULT_FABLE_MODEL` | What `/model fable` selects | `default` |
+| `CLAUDE_CODE_SUBAGENT_MODEL` | What a subagent runs on | `small` |
+
+There is no tag for `ANTHROPIC_MODEL` or `ANTHROPIC_DEFAULT_HAIKU_MODEL`: those
+two *are* `default` and `small`, and a second name for them would only be a
+second way to say the same thing.
 
 OpenCode and pi get **every** model in the file — they pick between them in the
 session (`/models`, `/model`), so there is nothing per-model to declare for
 them. `default` and `small` are what they start on.
 
-A slot with no tag of its own falls back to `ANTHROPIC_MODEL` (the opus /
-sonnet / fable trio), then to `default` or `small`. So a provider whose models
-divide the obvious way needs only those two tags, and naming a variable is how
-one model is pulled out of that pattern:
+So a provider whose models divide the obvious way needs only those two tags, and
+naming a variable is how one model is pulled out of that pattern:
 
 ```json
 { "id": "glm-5.3",       "tags": ["default"] },
-{ "id": "glm-5.3-mini",  "tags": ["ANTHROPIC_DEFAULT_HAIKU_MODEL"] },
-{ "id": "glm-5.3-flash", "tags": ["small"] }
+{ "id": "glm-5.3-flash", "tags": ["small"] },
+{ "id": "glm-5.3-air",   "tags": ["CLAUDE_CODE_SUBAGENT_MODEL"] }
 ```
 
-Here Claude Code's haiku slot is `glm-5.3-mini` while its subagent slot and
-OpenCode's `small_model` stay on `glm-5.3-flash`. `default` is required, a tag
-may appear on only one model, and an unknown tag is an error rather than a
-label — `make setup` refuses to install until it is fixed.
+Here subagents run on `glm-5.3-air` while the haiku slot and OpenCode's
+`small_model` stay on `glm-5.3-flash`. `default` is required, a tag may appear
+on only one model, and an unknown tag is an error rather than a label —
+`make setup` refuses to install until it is fixed.
 
 ### Model fields
 
@@ -558,7 +562,7 @@ marker): merge it by hand or move it aside.
 **A CLI starts on the wrong model, or pi reports the wrong context size** —
 `providers/<name>/models.json` is the only source. `make list` prints each
 model with the tags it carries, which is what decides the slot; naming a
-variable (`ANTHROPIC_DEFAULT_HAIKU_MODEL`, …) wins over `default` / `small`.
+variable (`CLAUDE_CODE_SUBAGENT_MODEL`, …) wins over `default` / `small`.
 Re-run `make pi-global && make opencode-global` afterwards — those two configs
 are generated, not read live.
 
