@@ -5,7 +5,7 @@ BIN_DIR := $(PREFIX)/bin
 ROOT          := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 COMMON        := $(ROOT)/bin/common.sh
 
-# Every provider target acts on every provider in configs.json.
+# Every provider target acts on every provider in configs.jsonc.
 PROVIDER_LIST := $(shell . $(ROOT)/bin/common.sh && provider_names)
 
 .PHONY: setup setup-providers setup-skills list uninstall help pi-global opencode-global
@@ -59,12 +59,12 @@ uninstall:
 	@echo "  Note: .env is left in place. Delete it manually if no longer needed."
 	@"$(ROOT)/bin/skills-uninstall.sh"
 
-# Re-generate pi's global models.json from configs.json (there are no pi<name>
+# Re-generate pi's global models.json from configs.jsonc (there are no pi<name>
 # launchers); `make setup` does this too.
 pi-global:
 	@"$(ROOT)/bin/pi-global-models.sh"
 
-# Register every provider from configs.json in OpenCode's global config, so a
+# Register every provider from configs.jsonc in OpenCode's global config, so a
 # bare `opencode` (there are no open<name> launchers) lists them all.
 opencode-global:
 	@"$(ROOT)/bin/opencode-global-config.sh"

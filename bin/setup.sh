@@ -4,7 +4,7 @@
 #   bin/setup.sh                  checkbox multi-select, then key prompts
 #   bin/setup.sh deepseek glm     skip the checkbox, still prompt for keys
 #
-# configs.json lists every provider and refers to its secrets as "${NAME}";
+# configs.jsonc lists every provider and refers to its secrets as "${NAME}";
 # the .env beside it holds those values and is the only file with a key in it.
 # At a prompt, pressing Enter with no input keeps whatever is already set.
 # Keys still sitting in the old providers/<name>/.env files are carried over
@@ -123,7 +123,7 @@ sync_env_keys() { # append variables added to .env.example since .env was writte
   rm -f "$tmp"
 }
 
-# The layout before configs.json kept one .env per provider, holding the key as
+# The layout before configs.jsonc kept one .env per provider, holding the key as
 # API_TOKEN and any extra headers as "Name: Value" lines in HEADERS. Values
 # still sitting there are moved into the single .env, once, and only into
 # variables that are still empty.
@@ -277,7 +277,7 @@ prompt_token() { # <provider>
   url=$(api_key_url "$p")
   section "$p"
   if [ -z "$var" ]; then
-    printf '  %s✔ API_KEY is set in configs.json — nothing to paste%s\n' "$GRN" "$RST"
+    printf '  %s✔ API_KEY is set in configs.jsonc — nothing to paste%s\n' "$GRN" "$RST"
     return 0
   fi
   printf '  %s%s%s\n' "$DIM" "$var in .env" "$RST"
@@ -397,7 +397,7 @@ main() {
   banner
 
   if ! models_check; then
-    echo "setup: configs.json is invalid — fix it and re-run." >&2
+    echo "setup: configs.jsonc is invalid — fix it and re-run." >&2
     exit 1
   fi
 
@@ -405,7 +405,7 @@ main() {
     providers=("$@")
     for p in "${providers[@]}"; do
       if ! provider_names | grep -qx "$p"; then
-        echo "setup: unknown provider '$p' (not in configs.json)" >&2
+        echo "setup: unknown provider '$p' (not in configs.jsonc)" >&2
         exit 1
       fi
     done
@@ -417,7 +417,7 @@ main() {
     fi
     while IFS= read -r p; do all+=("$p"); done < <(discover_providers)
     if [ "${#all[@]}" -eq 0 ]; then
-      echo "setup: configs.json lists no providers" >&2
+      echo "setup: configs.jsonc lists no providers" >&2
       exit 1
     fi
     ensure_env

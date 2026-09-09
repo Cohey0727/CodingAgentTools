@@ -16,14 +16,14 @@ target 'make setup' 'both halves: the provider wizard, then the skill symlinks'
 target 'make setup-providers' 'pick providers, paste tokens, install launchers and the pi / OpenCode configs'
 target 'make setup-skills' 'link skills/, agents/, AGENTS.md and opencode/ into every agent CLI'
 target 'make list' 'every provider, skill, subagent and OpenCode extension, with its install status'
-target 'make pi-global' "re-generate pi's global models.json from configs.json"
-target 'make opencode-global' "re-generate OpenCode's global config from configs.json"
+target 'make pi-global' "re-generate pi's global models.json from configs.jsonc"
+target 'make opencode-global' "re-generate OpenCode's global config from configs.jsonc"
 target 'make uninstall' 'remove the launchers, generated configs and symlinks this repo installed'
 target 'make help' 'this screen'
 
 section 'notes'
-note 'configs.json holds every provider: endpoint, models and the tags naming each slot'
-note '.env holds the values configs.json refers to as ${NAME} — nothing else'
+note 'configs.jsonc holds every provider: endpoint, models and the tags naming each slot'
+note '.env holds the values configs.jsonc refers to as ${NAME} — nothing else'
 note 'skills and AGENTS.md are installed as symlinks — edits here take effect immediately'
 note '~/.claude/skills is read by Claude Code and opencode'
 note '~/.agents/skills is read by Codex, opencode and pi'

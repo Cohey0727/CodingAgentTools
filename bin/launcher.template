@@ -19,7 +19,7 @@ fi
 # shellcheck disable=SC1090
 source "$COMMON"
 
-# configs.json is the whole configuration; the .env beside it holds the values
+# configs.jsonc is the whole configuration; the .env beside it holds the values
 # its "${NAME}" references point at. Neither is exported into this shell — only
 # the resolved values below reach `claude`.
 models_resolve "$PROVIDER"
@@ -33,7 +33,7 @@ if [[ -n "$CUSTOM_HEADERS" ]]; then
   export ANTHROPIC_CUSTOM_HEADERS="$CUSTOM_HEADERS"
 fi
 
-# One model per slot: configs.json tags each model with the variable it fills,
+# One model per slot: configs.jsonc tags each model with the variable it fills,
 # and models_resolve returns that variable's value as M_<name>. Assignment is
 # unconditional — an ANTHROPIC_* inherited from an outer launcher session would
 # otherwise pin this one to the outer provider's model.
@@ -47,7 +47,7 @@ export CLAUDE_CODE_SUBAGENT_MODEL="$M_CLAUDE_CODE_SUBAGENT_MODEL"
 # The main model's context window doubles as Claude Code's auto-compact threshold.
 export CLAUDE_CODE_AUTO_COMPACT_WINDOW="$M_CLAUDE_CODE_AUTO_COMPACT_WINDOW"
 
-# "claude": { "env": { ... } } from configs.json, exported as-is.
+# "claude": { "env": { ... } } from configs.jsonc, exported as-is.
 eval "$M_CLAUDE_ENV_SH"
 
 # A stale ANTHROPIC_API_KEY in the environment would shadow AUTH_TOKEN.

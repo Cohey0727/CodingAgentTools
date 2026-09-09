@@ -1,6 +1,6 @@
 # CodingAgentTools
 
-> Run Claude Code, OpenCode and pi on Anthropic-compatible LLM backends (DeepSeek · MiniMax · GLM · Kimi · MiMo · your own llama.cpp) — one repo, one `make setup`, one `configs.json` driving all three CLIs, and the skills and global instruction file all three share.
+> Run Claude Code, OpenCode and pi on Anthropic-compatible LLM backends (DeepSeek · MiniMax · GLM · Kimi · MiMo · your own llama.cpp) — one repo, one `make setup`, one `configs.jsonc` driving all three CLIs, and the skills and global instruction file all three share.
 
 One repo that installs a `claude<name>` launcher command per provider and generates the pi and OpenCode configs covering every provider — [Claude Code](https://docs.anthropic.com/claude-code), [OpenCode](https://opencode.ai) and the [pi coding agent](https://pi.dev), all against Anthropic-compatible backends:
 
@@ -18,7 +18,7 @@ OpenCode and pi have no per-provider command: `make setup` writes every provider
 
 Kimi and MiMo run that flagship as its 1M-context variant under Claude Code (`kimi-k3[1m]`); OpenCode and pi take the plain id.
 
-Each provider exposes a native Anthropic-compatible endpoint, so there is no proxy or translation layer — just environment variables. That holds for the local one too: `llama-server` answers `/v1/messages` in the Anthropic shape. The generated pi and OpenCode configs run against the very same endpoint and token, and every model any of the three can reach is declared in one place: `configs.json` at the repo root, in git, with [tags](#tags) naming the slot each model fills. It holds no secret — an API key is written there as `${DEEPSEEK_API_KEY}` and read from the single gitignored `.env` beside it.
+Each provider exposes a native Anthropic-compatible endpoint, so there is no proxy or translation layer — just environment variables. That holds for the local one too: `llama-server` answers `/v1/messages` in the Anthropic shape. The generated pi and OpenCode configs run against the very same endpoint and token, and every model any of the three can reach is declared in one place: `configs.jsonc` at the repo root, in git, with [tags](#tags) naming the slot each model fills. It holds no secret — an API key is written there as `${DEEPSEEK_API_KEY}` and read from the single gitignored `.env` beside it.
 
 > **Note:** every launcher command is `claude<name>`. Bare provider names are deliberately avoided: `kimi` is Moonshot's official Kimi CLI, `minimax` is the official MiniMax Code desktop app command, and `mmx` is an unrelated bun-installed tool. MiniMax uses the short name `mmx` (`claudemmx`).
 
@@ -40,12 +40,12 @@ skills/<name>/SKILL.md           # a skill, linked into ~/.claude/skills and ~/.
 agents/<name>.md                 # a subagent, linked into ~/.claude/agents and ~/.agents/agents
 opencode/command/<name>.md       # an OpenCode slash command, linked into ~/.config/opencode/command
 opencode/plugin/<name>.js        # an OpenCode plugin, reached from a shim in ~/.config/opencode/plugin
-configs.json                     # every provider: endpoint, models, tags, and ${VAR} references (in git)
+configs.jsonc                     # every provider: endpoint, models, tags, and ${VAR} references (in git)
 .env                             # the values those references point at (gitignored, chmod 600)
 .env.example                     # the same variables, empty (in git)
 bin/ui.sh                        # banner, colors and the output helpers every script shares
-bin/models.py                    # the only reader of configs.json: validates it, resolves tags to slots
-bin/common.sh                    # shared resolution: configs.json through models.py, values from .env
+bin/models.py                    # the only reader of configs.jsonc: validates it, resolves tags to slots
+bin/common.sh                    # shared resolution: configs.jsonc through models.py, values from .env
 bin/launcher.template            # Claude Code launcher; @@PROVIDER@@ baked in at setup time
 bin/opencode-plugin.template     # OpenCode plugin shim; @@IMPL@@ baked in at setup time
 bin/setup.sh                     # provider wizard: pick providers, paste tokens, install (`make setup-providers`)
@@ -61,7 +61,7 @@ docs/migrations/                 # upgrade notes for existing checkouts
 Makefile                         # setup / setup-providers / setup-skills / list / uninstall / pi-global / opencode-global / help
 ```
 
-Adding a provider is a new entry in `configs.json` plus its key in `.env`; adding a skill is a new `skills/<name>/SKILL.md` and a `make setup-skills`. An OpenCode slash command is a new `opencode/command/<name>.md`, and a plugin a new `opencode/plugin/<name>.js` exporting `plugin({ tool })` — same `make setup-skills`.
+Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; adding a skill is a new `skills/<name>/SKILL.md` and a `make setup-skills`. An OpenCode slash command is a new `opencode/command/<name>.md`, and a plugin a new `opencode/plugin/<name>.js` exporting `plugin({ tool })` — same `make setup-skills`.
 
 ## Requirements
 
@@ -92,10 +92,10 @@ One interactive wizard does everything:
 
 1. Check the providers you want (arrows + Space, Enter to confirm — providers that already have a token are pre-checked)
 2. Paste each API token — an empty answer keeps the existing token
-3. `configs.json` is validated before anything is written; `.env` is created from `.env.example` if missing (`chmod 600`), gets any variables added to `.env.example` since, and picks up keys still sitting in the old `providers/<name>/.env` files
+3. `configs.jsonc` is validated before anything is written; `.env` is created from `.env.example` if missing (`chmod 600`), gets any variables added to `.env.example` since, and picks up keys still sitting in the old `providers/<name>/.env` files
 4. One command per provider is generated in `~/.local/bin` — `claude<name>`, with the provider name baked in
 5. The pi packages that add [`/loop` and `/goal`](#loops-in-pi) are installed once into pi's user settings (`~/.pi/agent/settings.json`)
-6. Every provider whose key resolves is registered in pi's global `~/.pi/agent/models.json` (the key stays in `.env`, read back by a shell command at request time) and in OpenCode's global config (`~/.config/opencode/opencode.json`) — every model in `configs.json`, not just the tagged ones; both start on [the default provider](#default-provider), and in OpenCode's case its token is copied to `~/.config/opencode/claude-compatibles/` (chmod 600) and only referenced from the config
+6. Every provider whose key resolves is registered in pi's global `~/.pi/agent/models.json` (the key stays in `.env`, read back by a shell command at request time) and in OpenCode's global config (`~/.config/opencode/opencode.json`) — every model in `configs.jsonc`, not just the tagged ones; both start on [the default provider](#default-provider), and in OpenCode's case its token is copied to `~/.config/opencode/claude-compatibles/` (chmod 600) and only referenced from the config
 7. You get a warning if `~/.local/bin`, `claude`, `opencode` or `pi` is missing from your PATH
 8. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode` ([details below](#skills-and-global-instructions))
 
@@ -109,9 +109,7 @@ mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/mig
 [2026-09-05 — OpenCode の lean エージェント](docs/migrations/2026-09-05-opencode-lean-agent.md),
 [2026-09-08 — claude-code-settings の統合](docs/migrations/2026-09-08-merge-claude-code-settings.md),
 [2026-09-08 — OpenCode の `/goal`](docs/migrations/2026-09-08-opencode-goal.md),
-[2026-09-09 — GLM の軽量モデルと ox 廃止](docs/migrations/2026-09-09-glm-flash-and-ox-removal.md),
-[2026-09-09 — モデル設定の models.json 化](docs/migrations/2026-09-09-models-json.md),
-and [2026-09-09 — configs.json への集約](docs/migrations/2026-09-09-configs-json.md).
+and [2026-09-09 — providers/ 廃止と configs.jsonc への集約](docs/migrations/2026-09-09-configs-jsonc.md).
 
 ### Make targets
 
@@ -121,8 +119,8 @@ and [2026-09-09 — configs.json への集約](docs/migrations/2026-09-09-config
 | `make setup-providers` | The wizard above only: tokens, `.env` upkeep, launcher install, pi packages, pi and OpenCode global configs |
 | `make setup-skills` | The shared assets only: `skills/`, `agents/`, `AGENTS.md` and `opencode/` into every agent CLI |
 | `make list` | Every provider with its command, endpoint and models with their tags, then every skill, subagent and OpenCode extension with its install status |
-| `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from `configs.json`, and set the startup model in `~/.pi/agent/settings.json` — run it after changing a model or endpoint |
-| `make opencode-global` | Re-generate OpenCode's global config from `configs.json` — run it after editing it |
+| `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from `configs.jsonc`, and set the startup model in `~/.pi/agent/settings.json` — run it after changing a model or endpoint |
+| `make opencode-global` | Re-generate OpenCode's global config from `configs.jsonc` — run it after editing it |
 | `make uninstall` | Remove the installed launchers (including the `pi<name>` / `open<name>` ones earlier versions installed), the pi packages from `$PI_PACKAGES`, the global `models.json` / OpenCode config / token files this repo wrote, the symlinks pointing back into this repo and the plugin shims generated from it. Provider `.env` files are left alone |
 | `make help` | The target list above, on the terminal |
 
@@ -141,7 +139,7 @@ pi                # pi — every configured provider is in /model
 ```
 
 Arguments pass through to `claude` verbatim, `--model` included — so a launcher
-is not pinned to the model tagged `default` in `configs.json`, and any id the
+is not pinned to the model tagged `default` in `configs.jsonc`, and any id the
 provider serves works for one run:
 
 ```bash
@@ -259,10 +257,10 @@ Two files at the repo root, and that is the whole configuration:
 
 | File | Holds | In git |
 |------|-------|--------|
-| `configs.json` | Every provider: endpoint, models, limits, the tags that say which slot each one fills, and a `${VAR}` reference wherever a value may come from outside | yes |
+| `configs.jsonc` | Every provider: endpoint, models, limits, the tags that say which slot each one fills, and a `${VAR}` reference wherever a value may come from outside | yes |
 | `.env` | The values those references point at — nothing else | no — gitignored, `chmod 600` |
 
-A whole provider in `configs.json` is a dozen lines, which Claude Code, OpenCode
+A whole provider in `configs.jsonc` is a dozen lines, which Claude Code, OpenCode
 and pi all read through `bin/models.py`:
 
 ```json
@@ -299,7 +297,7 @@ is needed, so nothing from `.env` is ever copied into the file:
 
 Reading the file therefore tells you which values can come from outside and what
 happens when they do not. A secret has no sensible default and is written the
-first way; an endpoint ships the second, so `configs.json` carries a working
+first way; an endpoint ships the second, so `configs.jsonc` carries a working
 default and `.env` can point the provider somewhere else — a regional host, a
 metered endpoint, a proxy or gateway in front of it — without editing a
 git-tracked file:
@@ -394,10 +392,10 @@ provider id in OpenCode's config.
 
 ### `.env`
 
-One variable per line, named by whatever `configs.json` references.
+One variable per line, named by whatever `configs.jsonc` references.
 `.env.example` lists them all with the URL to get each key from, and
 `make setup` prompts for the keys. The variables that already have a default in
-`configs.json` ship commented out there — uncomment one to override it. The file
+`configs.jsonc` ship commented out there — uncomment one to override it. The file
 is sourced by bash, so a value can be computed at use time:
 
 ```bash
@@ -411,7 +409,7 @@ reads a copy taken when `make opencode-global` ran.
 
 Each installed command is the same thin shell script with the provider name and
 the `bin/common.sh` path baked in. `common.sh` runs `bin/models.py`, the only
-reader of `configs.json`, inside a subshell that has the `.env` sourced — a bash
+reader of `configs.jsonc`, inside a subshell that has the `.env` sourced — a bash
 file, so a `$(...)` in a value is evaluated there. That script validates the
 file, expands every `${VAR}`, resolves every tag to the slot it fills, and prints
 the result as shell assignments the caller evaluates; a tag on two models, an
@@ -456,7 +454,7 @@ ten tool definitions — around 10k tokens before the conversation starts. A
 hosted provider prefills that in the time it takes to read this sentence; a
 single self-hosted GPU does not.
 
-`"opencode": { "lean": true }` on a provider in `configs.json` gives it an agent
+`"opencode": { "lean": true }` on a provider in `configs.jsonc` gives it an agent
 named after the provider and pinned to its model, which cuts that fixed part to
 around 4k:
 
@@ -479,7 +477,7 @@ and the AGENTS.md files still apply to both.
 provider that has a token into `~/.pi/agent/models.json`: a `<name>` provider
 with `api: "anthropic-messages"` and `baseUrl` set to `BASE_URL` as-is (pi
 hands it to the Anthropic SDK, which appends `/v1/messages`), plus every model
-in `configs.json` with its limits. The provider id is its name there, which is
+in `configs.jsonc` with its limits. The provider id is its name there, which is
 what pi prints next to a model — `default [gtr]`. Where that name also exists in
 pi's own catalog, pi keeps this file's endpoint and key and adds the catalog's
 models to the list, so `/model` may show more. No secret lands in the file:
@@ -610,24 +608,24 @@ marker): merge it by hand or move it aside.
 set. Re-run `make setup`, or edit `.env` directly.
 
 **A provider talks to the wrong endpoint** — a `<NAME>_BASE_URL` in `.env`
-overrides the default in `configs.json`. `make list` prints the endpoint each
+overrides the default in `configs.jsonc`. `make list` prints the endpoint each
 provider actually resolves to.
 
 **A CLI starts on the wrong model, or pi reports the wrong context size** —
-`configs.json` is the only source. `make list` prints each model with the tags
+`configs.jsonc` is the only source. `make list` prints each model with the tags
 it carries, which is what decides the slot; naming a variable
 (`CLAUDE_CODE_SUBAGENT_MODEL`, …) wins over `default` / `small`.
 Re-run `make pi-global && make opencode-global` afterwards — those two configs
 are generated, not read live.
 
-**`configs.json: ... unknown tag` / `... no model is tagged 'default'`** —
+**`configs.jsonc: ... unknown tag` / `... no model is tagged 'default'`** —
 `make setup` validates every provider before it writes anything. The message
 names the provider, the model index and the tags it accepts; `python3
 bin/models.py check` re-runs the whole check, `check <provider>` just one.
 
 **A checkout still has `providers/<name>/.env` files** — re-run `make setup`. It
 creates the root `.env` and moves each `API_TOKEN` and `HEADERS` value into the
-variable `configs.json` references, filling only variables that are still empty.
+variable `configs.jsonc` references, filling only variables that are still empty.
 The old files are left alone; delete `providers/` once `make list` looks right.
 
 **A skill or subagent does not show up** — `make list` shows what is linked. A

@@ -4,12 +4,12 @@
 # `opencode` reads the generated ~/.config/opencode/opencode.json, and /models
 # lists every provider.
 #
-# Everything comes from configs.json. The config itself carries no secret: each
+# Everything comes from configs.jsonc. The config itself carries no secret: each
 # key and header value is referenced as {file:...} pointing at a copy this
 # script writes (chmod 600) from the .env. Re-run after rotating a key — the
 # copies are replaced, and copies of providers whose key was emptied are dropped.
 #
-# A provider whose configs.json entry sets "opencode": { "lean": true } also gets
+# A provider whose configs.jsonc entry sets "opencode": { "lean": true } also gets
 # an agent of its own, pinned to its model, that replaces OpenCode's stock system
 # prompt with a short one and drops the tools a small self-hosted model has no
 # use for. The session starts on that agent when the provider is also the
@@ -64,7 +64,7 @@ opencode_header_ref() { # <name> -> {file:...} reference for the provider in sco
   printf '{file:%s/%s.%s.header}' "$TOKENS_DIR" "$provider" "$1"
 }
 
-lean_provider() { # <provider> — does configs.json ask for the lean agent?
+lean_provider() { # <provider> — does configs.jsonc ask for the lean agent?
   ( models_resolve "$1"; [ "$M_OPENCODE_LEAN" = true ] )
 }
 

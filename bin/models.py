@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Resolve configs.json into the values Claude Code, OpenCode and pi need.
+"""Resolve configs.jsonc into the values Claude Code, OpenCode and pi need.
 
-configs.json at the repo root holds every provider: its endpoint, the models it
+configs.jsonc at the repo root holds every provider: its endpoint, the models it
 serves, and the tags that say which slot each model fills. In any string,
 "${NAME}" is read from the environment and "${NAME:-fallback}" falls back to the
 text after ":-" when NAME is unset or empty — the shell's own syntax. The .env
@@ -24,7 +24,7 @@ import shlex
 import sys
 from pathlib import Path
 
-CONFIGS = Path(__file__).resolve().parent.parent / "configs.json"
+CONFIGS = Path(__file__).resolve().parent.parent / "configs.jsonc"
 
 # "default" and "small" are the two roles, and every slot follows one of them.
 # The rest are the Claude Code variables that can break away from that pair,
@@ -62,7 +62,7 @@ class ConfigError(Exception):
 
 
 def strip_comments(text):
-    """Drop // line comments outside of strings, so configs.json can be annotated.
+    """Drop // line comments outside of strings, so configs.jsonc can be annotated.
 
     Newlines are kept, so a JSON error still points at the right line.
     """
@@ -348,7 +348,7 @@ def main(argv):
             elif action == "tags":
                 print("\n".join(f"{m['id']}\t{','.join(m['tags'])}" for m in config["models"]))
     except ConfigError as exc:
-        print(f"configs.json: {exc}", file=sys.stderr)
+        print(f"configs.jsonc: {exc}", file=sys.stderr)
         return 1
     return 0
 

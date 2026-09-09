@@ -3,12 +3,12 @@
 # (`make pi-global`). pi has no launcher in this repo: a bare `pi` reads the
 # generated ~/.pi/agent/models.json, and /model lists every provider.
 #
-# Everything comes from configs.json. No secret is written here: an API_KEY or
-# header value that configs.json refers to as "${NAME}" becomes a shell command
+# Everything comes from configs.jsonc. No secret is written here: an API_KEY or
+# header value that configs.jsonc refers to as "${NAME}" becomes a shell command
 # pi runs at request time to read it back out of the .env, so a rotated key or a
 # computed header needs no re-run.
 #
-# A provider is registered under its name in configs.json, which is what pi shows
+# A provider is registered under its name in configs.jsonc, which is what pi shows
 # next to a model. Where that name also exists in pi's own catalog, pi keeps
 # this file's endpoint and key and adds the catalog's models to the list.
 
@@ -27,7 +27,7 @@ if [ -f "$OUT" ] && ! generated_here "$OUT"; then
   exit 1
 fi
 
-# A value configs.json points at a variable for is referenced, never copied. One
+# A value configs.jsonc points at a variable for is referenced, never copied. One
 # written literally there, or whose fallback cannot be a bare word in the
 # command, is already in git, so it is passed through resolved.
 pi_api_key_ref() {

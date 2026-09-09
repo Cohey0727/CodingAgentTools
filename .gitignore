@@ -1,4 +1,4 @@
-# Every API key lives here (configs.json only references them)
+# Every API key lives here (configs.jsonc only references them)
 /.env
 /.env.bak
 
