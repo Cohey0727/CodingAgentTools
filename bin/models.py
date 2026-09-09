@@ -580,13 +580,18 @@ def check(doc):
             taken[filed] = name
 
 
+# Words a provider may be named that cannot be searched for: they are ordinary
+# shell or English, and every file says them for unrelated reasons.
+UNSEARCHABLE = {"local", "default", "small", "main", "command", "name", "exec"}
+
+
 def vocabulary(doc):
     """Every concrete name configs.jsonc owns — what no other file may contain.
 
     Built from the file itself, so adding a provider or renaming a variable
     changes what the style check forbids without touching the check.
     """
-    words = set()
+    words = set(doc["providers"])
     for agent_name, agent in doc["agents"].items():
         launch = agent.get("launch") or {}
         words.update(
@@ -610,7 +615,7 @@ def vocabulary(doc):
                 words.add(filed)
     # Role tags and agent names are deliberately generic ("default", "small"):
     # they name a slot, not a vendor, and every file may say them.
-    generic = known_tags(doc) | set(doc["agents"])
+    generic = known_tags(doc) | set(doc["agents"]) | UNSEARCHABLE
     # A name shorter than this cannot be searched for without matching prose.
     return "\n".join(sorted(w for w in words - generic if len(w) >= 4))
 

@@ -1,0 +1,9 @@
+# Words bin/style-check.sh may find in a given file, and why.
+# Format: <path><TAB><word>[,<word>...]
+#
+# An exemption is per word, not per file: a model id or an endpoint appearing in
+# one of these files is still refused.
+
+# Selects which providers review; holds no provider knowledge — the model id and
+# the provider prefix come from configs.jsonc through bin/model-ref.sh.
+skills/fusion-review/llms.json	deepseek,glm
