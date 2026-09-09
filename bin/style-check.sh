@@ -8,8 +8,12 @@
 # Comments count. A comment naming a model goes stale the moment configs.jsonc
 # changes, and it teaches the next reader the wrong place to look.
 #
-# A line that genuinely has to carry one ends with "style-check: allow"; a file
-# that may name a provider to SELECT it lists that word in .style-check-allow.
+# A provider NAME is refused only in this repo's own machinery. A skill config
+# names a provider to select one as a reviewer or a target; that is its job, and
+# it holds no provider knowledge — the model id and the endpoint still come from
+# configs.jsonc. Everything else in the vocabulary is refused everywhere.
+#
+# A line that genuinely has to carry one ends with "style-check: allow".
 
 set -uo pipefail
 
@@ -21,34 +25,30 @@ source "$ROOT/bin/common.sh"
 # commit has to be refused too. Documentation may name providers; it describes
 # them, so it is not scanned.
 scanned() {
-  local paths=('bin/*' 'Makefile' 'lefthook.yml' 'opencode/*' '.claude/*.json' \
-               'skills/**/*.json' 'skills/**/SKILL.md')
+  tracked_and_staged 'bin/*' 'Makefile' 'lefthook.yml' 'opencode/*' '.claude/*.json' \
+    'skills/**/*.json' 'skills/**/SKILL.md'
+}
+
+# This repo's own machinery, where a provider may not even be named.
+machinery() {
+  tracked_and_staged 'bin/*' 'Makefile' 'lefthook.yml' 'opencode/*'
+}
+
+tracked_and_staged() {
   {
-    git -C "$ROOT" ls-files -- "${paths[@]}"
-    git -C "$ROOT" diff --cached --name-only --diff-filter=A -- "${paths[@]}"
+    git -C "$ROOT" ls-files -- "$@"
+    git -C "$ROOT" diff --cached --name-only --diff-filter=A -- "$@"
   } | sort -u | grep -v -E '^bin/opencode-lean-prompt\.md$'
 }
 
 vocabulary=$("$PYTHON" "$ROOT/bin/models.py" vocabulary) || exit 1
 [ -n "$vocabulary" ] || exit 0
 
-allowed() { # <file> <word> — listed in .style-check-allow?
-  local list="$ROOT/.style-check-allow" path words
-  [ -f "$list" ] || return 1
-  while IFS=$'\t' read -r path words; do
-    case $path in ''|'#'*) continue ;; esac
-    [ "$path" = "$1" ] || continue
-    case ",$words," in *",$2,"*) return 0 ;; esac
-  done < "$list"
-  return 1
-}
-
-report() { # <file> <word> <grep output>
+report() { # <file> <grep output>
   local hit
   while IFS= read -r hit; do
     [ -n "$hit" ] || continue
     case $hit in *'style-check: allow'*) continue ;; esac
-    allowed "$1" "$2" && continue
     printf '%s\t%s\n' "$1" "${hit%%:*}"
   done
 }
@@ -61,19 +61,23 @@ while IFS= read -r word; do
   [ -n "$word" ] || continue
   while IFS= read -r file; do
     [ -f "$ROOT/$file" ] || continue
-    report "$file" "$word" < <(grep -Fn -- "$word" "$ROOT/$file" 2>/dev/null) >> "$hits"
+    report "$file" < <(grep -Fn -- "$word" "$ROOT/$file" 2>/dev/null) >> "$hits"
   done < <(scanned)
 done <<<"$vocabulary"
 
-# A provider named too briefly to grep for on its own is still refused where it
-# is used as a value — quoted, or on the right of an assignment.
-while IFS= read -r short; do
-  [ -n "$short" ] || continue
-  [ "${#short}" -lt 4 ] || continue
+# Provider names, in the machinery only. A name too brief to grep for on its own
+# is still refused where it is used as a value — quoted, or after "=".
+while IFS= read -r name; do
+  [ -n "$name" ] || continue
+  case $name in local|default|small|main|command|exec|name) continue ;; esac
   while IFS= read -r file; do
     [ -f "$ROOT/$file" ] || continue
-    report "$file" "$short" < <(grep -En -- "[\"'=]${short}([^A-Za-z0-9_-]|\$)" "$ROOT/$file" 2>/dev/null) >> "$hits"
-  done < <(scanned)
+    if [ "${#name}" -lt 4 ]; then
+      report "$file" < <(grep -En -- "[\"'=]${name}([^A-Za-z0-9_-]|\$)" "$ROOT/$file" 2>/dev/null)
+    else
+      report "$file" < <(grep -Fn -- "$name" "$ROOT/$file" 2>/dev/null)
+    fi >> "$hits"
+  done < <(machinery)
 done < <("$PYTHON" "$ROOT/bin/models.py" providers)
 
 # One line per offending line, however many words it matched.

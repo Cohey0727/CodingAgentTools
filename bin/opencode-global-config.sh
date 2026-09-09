@@ -18,17 +18,9 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+LEAN_PROMPT="$ROOT/bin/opencode-lean-prompt.md"
 # shellcheck disable=SC1090
 source "$ROOT/bin/common.sh"
-
-AGENT=$(basename "${BASH_SOURCE[0]}" -global-config.sh)
-settings_resolve "$AGENT"
-LEAN_PROMPT="$ROOT/$S_LEAN_PROMPT"
-
-# Two providers resolving to one OpenCode id would silently merge into a single
-# block, and only a whole-file check can see that. `make setup` runs it too, but
-# this generator is also a target of its own.
-models_check || exit 1
 
 OUT=$(opencode_global_config_path)
 CONFIG_DIR=$(dirname "$OUT")
@@ -40,36 +32,27 @@ if [ -f "$OUT" ] && ! generated_here "$OUT"; then
   exit 1
 fi
 
-registered_provider() { # <provider> — key resolves, and its schema files it somewhere?
-  ( models_resolve "$1" "$AGENT" && [ -n "$M_API_KEY" ] && [ -n "$M_PROVIDER_ID" ] )
-}
-
-# Every provider whose key resolves and that asks to be registered here.
+# Every provider whose key resolves to something.
 providers=()
 while IFS= read -r provider; do
   [ -n "$provider" ] || continue
-  if registered_provider "$provider"; then providers+=("$provider"); fi
+  if configured_provider "$provider"; then providers+=("$provider"); fi
 done < <(provider_names)
 
 if [ "${#providers[@]}" -eq 0 ]; then
-  echo "opencode-global: no provider to register." >&2
-  echo "  run 'make setup' to add a key, or check that some provider in" >&2
-  echo "  configs.jsonc does not set schema.resolve to a blank one." >&2
+  echo "opencode-global: no provider has a key yet — run 'make setup' first." >&2
   exit 1
 fi
 
 # The provider the session's model / small_model start on.
 default_provider=$(default_provider "${providers[@]}")
 
-# A model is named "<the id the agent files the provider under>/<model>", and
-# that id follows the provider's schema.
 default_models=$(
-  models_resolve "$default_provider" "$AGENT"
-  printf '%s\n%s\n%s' "$M_PROVIDER_ID" "$M_MAIN_MODEL" "$M_SMALL_MODEL"
+  models_resolve "$default_provider"
+  printf '%s\n%s' "$M_DEFAULT_MODEL" "$M_SMALL_MODEL"
 )
-default_id=$(sed -n 1p <<<"$default_models")
-model="$default_id/$(sed -n 2p <<<"$default_models")"
-small_model="$default_id/$(sed -n 3p <<<"$default_models")"
+model="$default_provider-anthropic/$(head -1 <<<"$default_models")"
+small_model="$default_provider-anthropic/$(tail -n +2 <<<"$default_models")"
 
 # The secrets dir is fully managed here: wipe it, then write the current set so
 # a provider whose key was emptied leaves no stale copy behind.
@@ -82,14 +65,14 @@ opencode_header_ref() { # <name> -> {file:...} reference for the provider in sco
 }
 
 lean_provider() { # <provider> — does configs.jsonc ask for the lean agent?
-  ( models_resolve "$1" "$AGENT"; [ "$M_LEAN" = true ] )
+  ( models_resolve "$1"; [ "$M_OPENCODE_LEAN" = true ] )
 }
 
 entries=()
 agents=()
 for provider in "${providers[@]}"; do
   entries+=("$(
-    models_resolve "$provider" "$AGENT"
+    models_resolve "$provider"
     printf '%s' "$M_API_KEY" > "$TOKENS_DIR/$provider.token"
     chmod 600 "$TOKENS_DIR/$provider.token"
     while IFS= read -r name; do
@@ -102,7 +85,7 @@ for provider in "${providers[@]}"; do
   if lean_provider "$provider"; then
     cp "$LEAN_PROMPT" "$TOKENS_DIR/$provider.prompt.md"
     agents+=("$(
-      models_resolve "$provider" "$AGENT"
+      models_resolve "$provider"
       opencode_agent_json "$provider" "$TOKENS_DIR/$provider.prompt.md"
     )")
   fi

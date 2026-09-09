@@ -1,123 +1,11 @@
 // Every provider: its endpoint, the models it serves, and the tags naming the
 // slot each model fills. "${NAME}" and "${NAME:-fallback}" resolve from the
 // .env beside this file, so no secret is written here. Fields: see README.
-//
-// "agents" is what each CLI is fed. Nothing about a CLI or a provider is
-// decided in bin/ — these values are the whole of it. In this section {name},
-// {base_url} and {schema_id} stand for the provider being written.
 {
   "start_provider": "glm",
-
-  "agents": {
-
-    "claude": {
-      "install_url": "https://docs.anthropic.com/claude-code",
-      "command": "claude{name}",
-      "stale_commands": ["pi{name}", "open{name}"],
-
-      // What the generated launcher runs, and the variables it hands it. Every
-      // name the CLI reads is here; the launcher itself knows none of them.
-      "launch": {
-        "exec": "claude",
-        "token_var": "ANTHROPIC_AUTH_TOKEN",
-        "base_url_var": "ANTHROPIC_BASE_URL",
-        "headers_var": "ANTHROPIC_CUSTOM_HEADERS",
-        "auto_compact_window_var": "CLAUDE_CODE_AUTO_COMPACT_WINDOW",
-        // Cleared before exec: set, it would shadow the token variable above.
-        "unset_vars": ["ANTHROPIC_API_KEY"],
-        // Also accepted when reading a file this repo did not write, where the
-        // key and the headers were not yet spelled the way this agent reads them.
-        "token_var_aliases": ["API_TOKEN"],
-        "headers_var_aliases": ["HEADERS"]
-      },
-
-      // Each of Claude Code's model variables, and the tags it follows, most
-      // specific first. A variable with no tag of its own follows the roles.
-      "slots": {
-        "ANTHROPIC_MODEL":                ["default"],
-        "ANTHROPIC_DEFAULT_OPUS_MODEL":   ["ANTHROPIC_DEFAULT_OPUS_MODEL", "default"],
-        "ANTHROPIC_DEFAULT_SONNET_MODEL": ["ANTHROPIC_DEFAULT_SONNET_MODEL", "default"],
-        "ANTHROPIC_DEFAULT_FABLE_MODEL":  ["ANTHROPIC_DEFAULT_FABLE_MODEL", "default"],
-        "ANTHROPIC_DEFAULT_HAIKU_MODEL":  ["small", "default"],
-        "CLAUDE_CODE_SUBAGENT_MODEL":     ["CLAUDE_CODE_SUBAGENT_MODEL", "small", "default"]
-      },
-
-      "auto_compact_window_from": "ANTHROPIC_MODEL"
-    },
-
-    "opencode": {
-      "install_url": "https://opencode.ai",
-      // Run by `make setup` to write this agent's global config.
-      "generator": "bin/opencode-global-config.sh",
-      "model_tag": "default",
-      "small_model_tag": "small",
-
-      // One entry per model in the generated block. Placeholders are the
-      // model's own fields; a value that is exactly one placeholder keeps its
-      // type. "keyed_by" makes the collection an object rather than an array.
-      "model_entry": {
-        "keyed_by": "{id}",
-        "indent": 8,
-        "inline": true,
-        "value": { "limit": { "context": "{context_window}", "output": "{max_tokens}" } }
-      },
-
-      // What a provider's "schema": { "resolve": ... } selects.
-      "schemas": {
-        "local": {
-          "id": "{name}-anthropic",
-          "npm": "@ai-sdk/anthropic",
-          // The AI SDK appends "/messages", BASE_URL is the form that gets
-          // "/v1/messages" — so the two meet at BASE_URL plus "/v1".
-          "base_url": "{base_url}/v1",
-          "declare_models": true
-        },
-        "models.dev": { "id": "{schema_id}", "declare_models": false },
-        "none": null
-      },
-
-      "lean": {
-        "prompt": "bin/opencode-lean-prompt.md",
-        // Only tools OpenCode registers may be listed: denying one it does not
-        // know takes edit and write down with it.
-        "disabled_tools": ["skill", "task", "todowrite", "webfetch"]
-      }
-    },
-
-    "pi": {
-      "install_url": "https://pi.dev",
-      "generator": "bin/pi-global-models.sh",
-      "model_tag": "default",
-      "api": "anthropic-messages",
-
-      // pi has no registry to resolve a catalog from, so every schema but
-      // "none" declares the models below.
-      "schemas": {
-        "local":      { "id": "{name}", "declare_models": true },
-        "models.dev": { "id": "{name}", "declare_models": true },
-        "none":       null
-      },
-
-      "model_entry": {
-        "indent": 8,
-        "inline": false,
-        "value": {
-          "id": "{id}",
-          "reasoning": "{reasoning}",
-          "input": "{input}",
-          "contextWindow": "{context_window}",
-          "maxTokens": "{max_tokens}"
-        }
-      },
-
-      "packages": { "npm:@realvendex/pi-loop": "/loop", "npm:pi-goal": "/goal" }
-    }
-  },
-
   "providers": {
 
     "deepseek": {
-      "schema": { "resolve": "local" },
       "API_KEY": "${DEEPSEEK_API_KEY}",
       "BASE_URL": "${DEEPSEEK_BASE_URL:-https://api.deepseek.com/anthropic}",
 
@@ -139,7 +27,6 @@
     },
 
     "glm": {
-      "schema": { "resolve": "local" },
       "API_KEY": "${GLM_API_KEY}",
       "BASE_URL": "${GLM_BASE_URL:-https://api.z.ai/api/anthropic}",
 
@@ -161,7 +48,6 @@
     },
 
     "kimi": {
-      "schema": { "resolve": "local" },
       "API_KEY": "${KIMI_API_KEY}",
       "BASE_URL": "${KIMI_BASE_URL:-https://api.kimi.com/coding}",
 
@@ -185,7 +71,6 @@
     },
 
     "mimo": {
-      "schema": { "resolve": "local" },
       "API_KEY": "${MIMO_API_KEY}",
       "BASE_URL": "${MIMO_BASE_URL:-https://token-plan-sgp.xiaomimimo.com/anthropic}",
 
@@ -209,7 +94,6 @@
     },
 
     "minimax": {
-      "schema": { "resolve": "local" },
       "API_KEY": "${MINIMAX_API_KEY}",
       "BASE_URL": "${MINIMAX_BASE_URL:-https://api.minimax.io/anthropic}",
 
@@ -233,7 +117,6 @@
     },
 
     "local": {
-      "schema": { "resolve": "local" },
       // llama-server takes no auth, but the CLIs require a non-empty value.
       "API_KEY": "${LOCAL_API_KEY:-local}",
       "BASE_URL": "${LOCAL_BASE_URL:-http://127.0.0.1:11301}",
@@ -256,7 +139,6 @@
     },
 
     "gtr": {
-      "schema": { "resolve": "local" },
       // llama-server takes no auth unless started with --api-key, but the CLIs
       // require a non-empty value.
       "API_KEY": "${GTR_API_KEY:-gtr}",

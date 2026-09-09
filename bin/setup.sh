@@ -7,11 +7,12 @@
 # configs.jsonc lists every provider and refers to its secrets as "${NAME}";
 # the .env beside it holds those values and is the only file with a key in it.
 # At a prompt, pressing Enter with no input keeps whatever is already set.
-# Keys still sitting in the old per-provider .env files are carried over
-# first. Then one launcher per provider per agent that names a command is
-# generated into $BIN_DIR (default ~/.local/bin) from the template in bin/, the
-# packages each agent lists are installed into its settings, and every provider
-# whose key resolves is registered in the generated global configs.
+# Keys still sitting in the old providers/<name>/.env files are carried over
+# first. Then a claude<name> launcher per provider is generated into $BIN_DIR
+# (default ~/.local/bin) from the template in bin/, the pi packages in
+# $PI_PACKAGES are installed into pi's user settings, and every provider whose
+# key resolves is registered in pi's global models.json and OpenCode's global
+# config.
 
 set -euo pipefail
 
@@ -29,23 +30,20 @@ source "$ROOT/bin/ui.sh"
 
 discover_providers() { provider_names; }
 
-launcher_agents() { # -> every agent whose configs.jsonc block names a command
-  local a
-  while IFS= read -r a; do
-    [ -n "$a" ] || continue
-    ( settings_resolve "$a" && [ -n "$S_COMMAND_TEMPLATE" ] ) && printf '%s\n' "$a"
-  done < <(agent_names)
+provider_launcher() { # <provider> -> "claude<x>"
+  provider_command "$1"
 }
 
-# Any agent resolves the fields below identically, so the first one answers.
-any_agent() { agent_names | head -1; }
+provider_stale_launchers() { # <provider> -> commands earlier versions installed
+  provider_stale_commands "$1"
+}
 
 api_key_var() { # <provider> -> the .env variable its API_KEY points at
-  ( models_resolve "$1" "$(any_agent)" && printf '%s' "$M_API_KEY_VAR" )
+  ( models_resolve "$1" && printf '%s' "$M_API_KEY_VAR" )
 }
 
 current_token() { # <provider> -> its resolved key, maybe ""
-  ( models_resolve "$1" "$(any_agent)" 2>/dev/null && printf '%s' "$M_API_KEY" )
+  ( models_resolve "$1" 2>/dev/null && printf '%s' "$M_API_KEY" )
 }
 
 api_key_url() { # <provider> -> the signup URL commented above its variable in
@@ -125,13 +123,14 @@ sync_env_keys() { # append variables added to .env.example since .env was writte
   rm -f "$tmp"
 }
 
-# A .env written before this repo kept one file per provider, under whatever
-# names that agent's launch block lists as aliases. Values still sitting there
-# are moved into the single .env, once, and only into variables still empty.
-raw_headers() { # <old .env> <variable name> -> that variable's value, one
-                # "Name: Value" per line, quotes removed and $(...) unevaluated
-  awk -v key="^$2=" '
-    !started && $0 ~ key { started = 1; quotes = 0; sub(key, "") }
+# The layout before configs.jsonc kept one .env per provider, holding the key as
+# API_TOKEN and any extra headers as "Name: Value" lines in HEADERS. Values
+# still sitting there are moved into the single .env, once, and only into
+# variables that are still empty.
+raw_headers() { # <old provider .env> -> its HEADERS value, one "Name: Value" per
+                # line, quotes removed and any $(...) left unevaluated
+  awk '
+    !started && /^HEADERS=/ { started = 1; quotes = 0; sub(/^HEADERS=/, "") }
     started {
       quotes += gsub(/"/, "")
       print
@@ -141,32 +140,22 @@ raw_headers() { # <old .env> <variable name> -> that variable's value, one
 }
 
 migrate_provider_envs() {
-  local dir provider file token headers name value target moved=0 agent pattern
+  local dir provider file token headers name value target moved=0
   [ -d "$ROOT/providers" ] || return 0
-  # The names a key may be written under are the launch token variable and its
-  # aliases, both from configs.jsonc.
-  agent=$(launcher_agents | head -1)
-  [ -n "$agent" ] || return 0
-  settings_resolve "$agent"
-  pattern="^($(printf '%s' "$S_TOKEN_VARS" | tr ' ' '|'))=.+"
   for dir in "$ROOT"/providers/*/; do
     provider=$(basename "$dir")
     file="$dir.env"
     [ -f "$file" ] || continue
     provider_names | grep -qx "$provider" || continue
-    models_resolve "$provider" "$(any_agent)" || continue
+    models_resolve "$provider" || continue
 
-    token=$(grep -E "$pattern" "$file" | head -1 | cut -d= -f2- || true)
+    token=$(grep -E '^(API_TOKEN|ANTHROPIC_AUTH_TOKEN)=.+' "$file" | head -1 | cut -d= -f2- || true)
     if [ -n "$M_API_KEY_VAR" ] && [ -n "$token" ] && [ -z "$(env_value "$M_API_KEY_VAR")" ]; then
       set_env_var "$M_API_KEY_VAR" "$token"
       moved=$((moved + 1))
     fi
 
-    headers=''
-    for name in $S_HEADERS_VARS; do
-      headers=$(raw_headers "$file" "$name")
-      [ -n "$headers" ] && break
-    done
+    headers=$(raw_headers "$file")
     [ -n "$headers" ] || continue
     while IFS= read -r name; do
       [ -n "$name" ] || continue
@@ -206,7 +195,7 @@ cleanup_tty() {
 draw_item() { # <index>
   local i=$1 mark cmd tok
   if [ "${CHECKED[$i]}" = 1 ]; then mark="${GRN}x${RST}"; else mark=' '; fi
-  cmd=$(provider_command "${ITEMS[$i]}" "$(launcher_agents | head -1)")
+  cmd=$(provider_launcher "${ITEMS[$i]}")
   tok=$(current_token "${ITEMS[$i]}")
   printf '\033[2K\r'
   if [ "$i" = "$CURSOR" ]; then
@@ -317,7 +306,7 @@ prompt_token() { # <provider>
     printf '  %s⚠ %s is empty — needed for the %s header%s\n' \
       "$YLW" "${hint%%	*}" "${hint#*	}" "$RST"
   done < <(
-    models_resolve "$p" "$(any_agent)"
+    models_resolve "$p"
     while IFS= read -r name; do
       [ -n "$name" ] || continue
       v=$(header_var "$name")
@@ -328,10 +317,9 @@ prompt_token() { # <provider>
 
 # ------------------------------------------------------------- installation
 
-install_one() { # <provider> <command> <template> <agent>
-  local p=$1 cmd=$2 template=$3 agent=$4 bin
+install_one() { # <provider> <command> <template>
+  local p=$1 cmd=$2 template=$3 bin
   sed -e 's|@@PROVIDER@@|'"$p"'|g' \
-    -e 's|@@AGENT@@|'"$agent"'|g' \
     -e 's|@@COMMON@@|'"$COMMON"'|g' \
     "$template" > "$BIN_DIR/$cmd"
   chmod +x "$BIN_DIR/$cmd"
@@ -345,58 +333,52 @@ install_one() { # <provider> <command> <template> <agent>
   fi
 }
 
-install_launcher() { # <provider> — one command per agent that names one.
-                     # Commands earlier versions generated go away.
-  local p=$1 cmd agent
-  while IFS= read -r agent; do
-    [ -n "$agent" ] || continue
-    install_one "$p" "$(provider_command "$p" "$agent")" "$TEMPLATE" "$agent"
-    for cmd in $(provider_stale_commands "$p" "$agent"); do
-      if [ -f "$BIN_DIR/$cmd" ] && grep -qE '^PROVIDER(_DIR)?="' "$BIN_DIR/$cmd"; then
-        rm -f "$BIN_DIR/$cmd"
-        printf '  %s• removed %s%s\n' "$DIM" "$BIN_DIR/$cmd" "$RST"
-      fi
-    done
-  done < <(launcher_agents)
+install_launcher() { # <provider> — the claude<name> command. Commands earlier
+                     # versions generated for the provider go away.
+  local p=$1 cmd
+  install_one "$p" "$(provider_launcher "$p")" "$TEMPLATE"
+  for cmd in $(provider_stale_launchers "$p"); do
+    if [ -f "$BIN_DIR/$cmd" ] && grep -qE '^PROVIDER(_DIR)?="' "$BIN_DIR/$cmd"; then
+      rm -f "$BIN_DIR/$cmd"
+      printf '  %s• removed %s%s\n' "$DIM" "$BIN_DIR/$cmd" "$RST"
+    fi
+  done
 }
 # pi resolves packages from its user settings, so one install covers every
 # provider.
-install_agent_packages() { # every "<source>=<command>" an agent lists in configs.jsonc
-  local agent spec src cmd
-  while IFS= read -r agent; do
-    [ -n "$agent" ] || continue
-    ( settings_resolve "$agent" && [ -n "$S_PACKAGES" ] ) || continue
-    settings_resolve "$agent"
-    section "installing $agent packages"
-    if ! command -v "$agent" >/dev/null 2>&1; then
-      printf '  %s⚠%s %s\n' "$YLW" "$RST" \
-        "skipped — '$agent' is not on your PATH. Install it, then re-run."
-      continue
+install_pi_packages() {
+  local spec src cmd
+  section 'installing pi packages'
+  if ! command -v pi >/dev/null 2>&1; then
+    printf '  %s⚠%s %s\n' "$YLW" "$RST" \
+      "skipped — 'pi' is not on your PATH. Install it (https://pi.dev), then re-run."
+    return 0
+  fi
+  # shellcheck disable=SC2086  # word-splitting PI_PACKAGES is intended
+  for spec in $PI_PACKAGES; do
+    src=$(pi_package_source "$spec")
+    cmd=$(pi_package_command "$spec")
+    if pi install "$src" >/dev/null 2>&1; then
+      printf '  %s✔%s %s%-26s%s %s%-6s%s\n' \
+        "$GRN" "$RST" "$B" "$src" "$RST" "$CYN" "$cmd" "$RST"
+    else
+      printf '  %s⚠%s %s%-26s%s %sfailed — run '\''pi install %s'\'' by hand%s\n' \
+        "$YLW" "$RST" "$B" "$src" "$RST" "$YLW" "$src" "$RST"
     fi
-    # shellcheck disable=SC2086  # word-splitting the package list is intended
-    for spec in $S_PACKAGES; do
-      src=$(pi_package_source "$spec")
-      cmd=$(pi_package_command "$spec")
-      if "$agent" install "$src" >/dev/null 2>&1; then
-        printf '  %s✔%s %s%-26s%s %s%-6s%s\n' \
-          "$GRN" "$RST" "$B" "$src" "$RST" "$CYN" "$cmd" "$RST"
-      else
-        printf '  %s⚠%s %s%-26s%s %sfailed — run '\''%s install %s'\'' by hand%s\n' \
-          "$YLW" "$RST" "$B" "$src" "$RST" "$YLW" "$agent" "$src" "$RST"
-      fi
-    done
-  done < <(agent_names)
+  done
 }
 
 check_environment() {
-  local agent
   echo
-  while IFS= read -r agent; do
-    [ -n "$agent" ] || continue
-    settings_resolve "$agent"
-    command -v "$S_EXEC" >/dev/null 2>&1 && continue
-    warn "'$S_EXEC' is not on your PATH — what this repo generates for it goes unused${S_INSTALL_URL:+ ($S_INSTALL_URL)}."
-  done < <(agent_names)
+  if ! command -v claude >/dev/null 2>&1; then
+    warn "'claude' is not on your PATH — install Claude Code first."
+  fi
+  if ! command -v opencode >/dev/null 2>&1; then
+    warn "'opencode' is not on your PATH — the generated global config needs OpenCode (https://opencode.ai)."
+  fi
+  if ! command -v pi >/dev/null 2>&1; then
+    warn "'pi' is not on your PATH — the generated models.json needs the pi coding agent (https://pi.dev)."
+  fi
   case ":$PATH:" in
     *":$BIN_DIR:"*) ;;
     *)
@@ -410,7 +392,7 @@ check_environment() {
 # -------------------------------------------------------------------- main
 
 main() {
-  local providers=() all=() p i tok agent
+  local providers=() all=() p i tok
 
   banner
 
@@ -466,19 +448,17 @@ main() {
     install_launcher "$p"
   done
 
-  install_agent_packages
+  install_pi_packages
 
-  # Which agents get a generated global config, and what writes it, is theirs
-  # to declare in configs.jsonc.
-  while IFS= read -r agent; do
-    [ -n "$agent" ] || continue
-    settings_resolve "$agent"
-    [ -n "$S_GENERATOR" ] || continue
-    section "generating global $agent config"
-    if ! "$ROOT/$S_GENERATOR"; then
-      printf '  %s⚠ skipped — set a key and re-run%s\n' "$YLW" "$RST"
-    fi
-  done < <(agent_names)
+  section 'generating global pi models.json'
+  if ! "$ROOT/bin/pi-global-models.sh"; then
+    printf '  %s⚠ skipped — set a key and re-run%s\n' "$YLW" "$RST"
+  fi
+
+  section 'generating global OpenCode config'
+  if ! "$ROOT/bin/opencode-global-config.sh"; then
+    printf '  %s⚠ skipped — set a key and re-run%s\n' "$YLW" "$RST"
+  fi
 
   check_environment
 }

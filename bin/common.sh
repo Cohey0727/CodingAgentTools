@@ -54,15 +54,22 @@ opencode_tokens_dir() { # -> per-provider secret files the generated config refe
   printf '%s/claude-compatibles' "$(opencode_config_dir)"
 }
 
-default_provider() { # <configured provider>... -> the one to start on. Falls
-                     # back to the first, so a checkout whose start_provider has
-                     # no key still gets a working one.
-  local p
+default_provider() { # <configured provider>... -> the one to start on. The name
+                     # is configs.jsonc's "start_provider"; falling back to the
+                     # first configured one keeps a keyless checkout working.
+  local p want
+  want="${DEFAULT_PROVIDER:-$("$PYTHON" "$MODELS_PY" start-provider)}"
   for p in "$@"; do
-    [ "$p" = "$S_START_PROVIDER" ] && { printf '%s' "$p"; return 0; }
+    [ "$p" = "$want" ] && { printf '%s' "$p"; return 0; }
   done
   printf '%s' "$1"
 }
+
+# pi packages `make setup` installs, as "<source>=<slash command>" pairs. pi
+# keeps its core small and ships no loop of its own: /loop repeats a prompt
+# until a stop condition, /goal drives an objective across turns. Override to
+# install a different set: PI_PACKAGES="npm:pi-reactor=/reactor" make setup
+PI_PACKAGES="${PI_PACKAGES:-npm:@realvendex/pi-loop=/loop npm:pi-goal=/goal}"
 
 pi_agent_dir() { # -> pi's agent directory: settings, auth, models, packages
   printf '%s' "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
@@ -105,34 +112,24 @@ env_value() { # <variable name> [<fallback>] -> its value from the .env, or the
 
 # ------------------------------------------------------------------- models
 
-models_resolve() { # <provider> <agent> — set the M_* variables from configs.jsonc
+models_resolve() { # <provider> — set the M_* variables from configs.jsonc
   local resolved
   resolved=$(
     set -a
     # shellcheck disable=SC1090
     [ -f "$ENV_FILE" ] && . "$ENV_FILE"
     set +a
-    "$PYTHON" "$MODELS_PY" sh "$1" "$2"
+    "$PYTHON" "$MODELS_PY" sh "$1"
   ) || return 1
   eval "$resolved"
 }
 
-settings_resolve() { # <agent> — set the S_* variables from configs.jsonc
-  local resolved
-  resolved=$("$PYTHON" "$MODELS_PY" settings "$1") || return 1
-  eval "$resolved"
-}
-
-models_check() { # validate the whole of configs.jsonc, print nothing on success
-  "$PYTHON" "$MODELS_PY" check
+models_check() { # [<provider>] — validate configs.jsonc, print nothing on success
+  "$PYTHON" "$MODELS_PY" check ${1:+"$1"}
 }
 
 models_tags() { # <provider> -> "<id><tab><tag>,<tag>" per model
   "$PYTHON" "$MODELS_PY" tags "$1"
-}
-
-agent_names() { # -> one agent name per line, in configs.jsonc order
-  "$PYTHON" "$MODELS_PY" agents
 }
 
 provider_names() { # -> one provider name per line, in configs.jsonc order
@@ -143,16 +140,20 @@ provider_env_vars() { # -> "<provider><tab><var><tab><what>" per reference
   "$PYTHON" "$MODELS_PY" env-vars
 }
 
-provider_command() { # <provider> <agent> -> the launcher command it installs
-  ( models_resolve "$1" "$2" && printf '%s' "$M_COMMAND" )
+provider_command() { # <provider> -> the launcher command, "claude<name>"
+  ( models_resolve "$1" && printf '%s' "$M_COMMAND" )
 }
 
-provider_stale_commands() { # <provider> <agent> -> commands earlier versions
-                            # installed for it; setup and uninstall remove them
-  ( models_resolve "$1" "$2" && printf '%s' "$M_STALE_COMMANDS" )
+provider_stale_commands() { # <provider> -> commands earlier versions installed
+                            # for it; setup and uninstall remove them
+  ( models_resolve "$1" && printf 'pi%s open%s' "$M_NAME" "$M_NAME" )
 }
 
-require_key() { # <launcher name> — fail fast on a key that resolved to nothing
+configured_provider() { # <provider> — valid, and its API_KEY resolves to something?
+  ( models_resolve "$1" && [ -n "$M_API_KEY" ] )
+}
+
+require_settings() { # <launcher name> — fail fast on a key that resolved to nothing
   if [ -z "$M_API_KEY" ]; then
     echo "$1: API_KEY for '$M_NAME' is empty" >&2
     if [ -n "$M_API_KEY_VAR" ]; then
@@ -198,7 +199,7 @@ header_var() { header_field "$1" var; }
 header_fallback() { header_field "$1" fallback; }
 header_value() { header_field "$1" value; }
 
-custom_headers() { # -> the "Name: Value" lines the launch headers_var takes
+claude_custom_headers() { # -> the "Name: Value" lines ANTHROPIC_CUSTOM_HEADERS takes
   local name out=''
   while IFS= read -r name; do
     [ -n "$name" ] || continue
@@ -247,14 +248,18 @@ $(headers_json "$3")
   cat <<EOF
     "$id": {
       "baseUrl": "$M_BASE_URL",
-      "api": "$M_API",
+      "api": "anthropic-messages",
       "apiKey": "$api_key",
 ${headers}      "models": [
-$M_MODELS_JSON
+$M_PI_MODELS_JSON
       ]
     }
 EOF
 }
+
+# Tools a lean agent drops. Only names OpenCode actually registers may appear
+# here: denying a tool it does not know takes edit and write down with it.
+OPENCODE_LEAN_DISABLED_TOOLS="skill task todowrite webfetch"
 
 opencode_agent_json() { # <provider> <prompt file> — the lean agent for a provider
                         # whose server is too slow to prefill the stock request.
@@ -262,48 +267,49 @@ opencode_agent_json() { # <provider> <prompt file> — the lean agent for a prov
                         # outright, and the denied tools are dropped from the
                         # request rather than merely refused.
   local name=$1 prompt=$2 tools='' t
-  # shellcheck disable=SC2086  # word-splitting the tool list is intended
-  for t in $S_LEAN_DISABLED_TOOLS; do
+  for t in $OPENCODE_LEAN_DISABLED_TOOLS; do
     tools="$tools${tools:+, }\"$t\": false"
   done
   cat <<EOF
     "$name": {
       "description": "$name with a short prompt and core tools only",
       "mode": "primary",
-      "model": "$M_PROVIDER_ID/$M_MAIN_MODEL",
+      "model": "$(opencode_provider_id "$name")/$M_DEFAULT_MODEL",
       "prompt": "{file:$prompt}",
       "tools": { $tools }
     }
 EOF
 }
 
+opencode_provider_id() { # <provider> -> the id OpenCode files it under
+  printf '%s-anthropic' "$1"
+}
+
 opencode_provider_json() { # <provider> <apiKey reference> [<header ref fn>] — one
-                           # provider block, filed under M_PROVIDER_ID. What the
-                           # block carries is the schema the provider selected:
-                           # a registry that already knows it needs only the
-                           # credential. The key and the header values are only
-                           # ever referenced ({file:...}) either way.
-  local name=$1 api_key=$2 headers='' declared=''
+                           # provider block, id "<name>-anthropic". The AI SDK
+                           # Anthropic provider appends "/messages" to its
+                           # baseURL, while BASE_URL is the Claude Code form that
+                           # gets "/v1/messages" appended — so baseURL is
+                           # BASE_URL plus "/v1". The key and the header values
+                           # are only ever referenced ({file:...}).
+  local name=$1 api_key=$2 headers=''
   if [ -n "${3:-}" ] && [ -n "$M_HEADERS" ]; then
     headers=",
         \"headers\": {
 $(headers_json "$3")
         }"
   fi
-  if [ "$M_DECLARE_MODELS" = true ]; then
-    declared="      \"npm\": \"$M_NPM\",
-      \"name\": \"$name\",
-"
-  fi
   cat <<EOF
-    "$M_PROVIDER_ID": {
-${declared}      "options": {$( [ -n "$M_SDK_BASE_URL" ] && printf '
-        "baseURL": "%s",' "$M_SDK_BASE_URL")
+    "$(opencode_provider_id "$name")": {
+      "npm": "@ai-sdk/anthropic",
+      "name": "$name",
+      "options": {
+        "baseURL": "$M_BASE_URL/v1",
         "apiKey": "$api_key"$headers
-      }$( [ "$M_DECLARE_MODELS" = true ] && printf ',
+      },
       "models": {
-%s
-      }' "$M_MODELS_JSON")
+$M_OPENCODE_MODELS_JSON
+      }
     }
 EOF
 }
