@@ -318,8 +318,8 @@ and pi all read through `bin/models.py`:
       "defaults": { "context_window": 1000000, "max_tokens": 384000, "reasoning": true, "input": ["text"] },
       "claude": { "env": { "CLAUDE_CODE_EFFORT_LEVEL": "max" } },
       "models": [
-        { "id": "deepseek-v4-pro",   "tags": ["default"] },
-        { "id": "deepseek-v4-flash", "tags": ["small"] }
+        { "id": "deepseek-v4-pro", "tags": ["default"] },
+        { "id": "deepseek-flash",  "tags": ["small"] }
       ]
     }
   }

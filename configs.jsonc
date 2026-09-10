@@ -20,9 +20,7 @@
 
       "models": [
         { "id": "deepseek-v4-pro", "tags": ["default"] },
-        { "id": "deepseek-v4-flash", "tags": ["small"] },
-        { "id": "deepseek-v4-flash-vision-exp", "input": ["text", "image"] },
-        { "id": "deepseek-v4.1-flash-expires-on-0910" }
+        { "id": "deepseek-flash", "tags": ["small"] }
       ]
     },
 
