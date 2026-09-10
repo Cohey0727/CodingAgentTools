@@ -11,8 +11,8 @@
 # first. Then a claude<name> launcher per provider is generated into $BIN_DIR
 # (default ~/.local/bin) from the template in bin/, the pi packages in
 # $PI_PACKAGES are installed into pi's user settings, and every provider whose
-# key resolves is registered in pi's global models.json and OpenCode's global
-# config.
+# key resolves is registered in the global config of every agent CLI that has
+# no launcher — one generator each, listed in $GLOBAL_GENERATORS.
 
 set -euo pipefail
 
@@ -58,31 +58,8 @@ api_key_url() { # <provider> -> the signup URL commented above its variable in
   ' "$ENV_EXAMPLE"
 }
 
-quote_env_value() { # <value> -> it, double-quoted when bash would not take it bare
-  case $1 in
-    ''|*[[:space:]\"\'\$\\]*) printf '"%s"' "${1//\"/\\\"}" ;;
-    *) printf '%s' "$1" ;;
-  esac
-}
-
 set_env_var() { # <variable> <value> — rewrite its line in .env, or append one
-  local var=$1 value=$2 tmp line found=0
-  touch "$ENV_FILE"
-  chmod 600 "$ENV_FILE"
-  tmp=$(mktemp "${ENV_FILE}.XXXXXX")
-  while IFS= read -r line || [ -n "$line" ]; do
-    if [ "${line%%=*}" = "$var" ] && [ "$line" != "${line#*=}" ]; then
-      printf '%s=%s\n' "$var" "$(quote_env_value "$value")"
-      found=1
-    else
-      printf '%s\n' "$line"
-    fi
-  done < "$ENV_FILE" > "$tmp"
-  if [ "$found" = 0 ]; then
-    printf '%s=%s\n' "$var" "$(quote_env_value "$value")" >> "$tmp"
-  fi
-  chmod 600 "$tmp"
-  mv "$tmp" "$ENV_FILE"
+  env_file_set "$ENV_FILE" "$1" "$2"
 }
 
 # ------------------------------------------------------------------ the .env
@@ -369,16 +346,24 @@ install_pi_packages() {
 }
 
 check_environment() {
+  local cmd where
   echo
   if ! command -v claude >/dev/null 2>&1; then
     warn "'claude' is not on your PATH — install Claude Code first."
   fi
-  if ! command -v opencode >/dev/null 2>&1; then
-    warn "'opencode' is not on your PATH — the generated global config needs OpenCode (https://opencode.ai)."
-  fi
-  if ! command -v pi >/dev/null 2>&1; then
-    warn "'pi' is not on your PATH — the generated models.json needs the pi coding agent (https://pi.dev)."
-  fi
+  # A generated config is inert until the CLI that reads it is installed, so
+  # each missing one is named with where to get it.
+  while IFS='|' read -r cmd where; do
+    [ -n "$cmd" ] || continue
+    command -v "$cmd" >/dev/null 2>&1 && continue
+    warn "'$cmd' is not on your PATH — its generated config needs $where"
+  done <<'AGENTS'
+opencode|OpenCode (https://opencode.ai)
+pi|the pi coding agent (https://pi.dev)
+crush|Crush (https://github.com/charmbracelet/crush)
+reasonix|Reasonix (https://github.com/esengine/DeepSeek-Reasonix)
+codewhale|Codewhale (https://codewhale.net)
+AGENTS
   case ":$PATH:" in
     *":$BIN_DIR:"*) ;;
     *)
@@ -392,7 +377,7 @@ check_environment() {
 # -------------------------------------------------------------------- main
 
 main() {
-  local providers=() all=() p i tok
+  local providers=() all=() p i tok generator
 
   banner
 
@@ -450,15 +435,12 @@ main() {
 
   install_pi_packages
 
-  section 'generating global pi models.json'
-  if ! "$ROOT/bin/pi-global-models.sh"; then
-    printf '  %s⚠ skipped — set a key and re-run%s\n' "$YLW" "$RST"
-  fi
-
-  section 'generating global OpenCode config'
-  if ! "$ROOT/bin/opencode-global-config.sh"; then
-    printf '  %s⚠ skipped — set a key and re-run%s\n' "$YLW" "$RST"
-  fi
+  for generator in $GLOBAL_GENERATORS; do
+    section "generating global ${generator%%-*} config"
+    if ! "$ROOT/bin/$generator.sh"; then
+      printf '  %s⚠ skipped — set a key and re-run%s\n' "$YLW" "$RST"
+    fi
+  done
 
   check_environment
 }

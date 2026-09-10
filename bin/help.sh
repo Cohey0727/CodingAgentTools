@@ -13,11 +13,14 @@ banner
 
 section 'targets'
 target 'make setup' 'both halves: the provider wizard, then the skill symlinks'
-target 'make setup-providers' 'pick providers, paste tokens, install launchers and the pi / OpenCode configs'
+target 'make setup-providers' 'pick providers, paste tokens, install launchers and every global config'
 target 'make setup-skills' 'link skills/, agents/, AGENTS.md and opencode/ into every agent CLI'
 target 'make list' 'every provider, skill, subagent and OpenCode extension, with its install status'
 target 'make pi-global' "re-generate pi's global models.json from configs.jsonc"
 target 'make opencode-global' "re-generate OpenCode's global config from configs.jsonc"
+target 'make crush-global' "re-generate Crush's global config from configs.jsonc"
+target 'make reasonix-global' "re-generate Reasonix's global config from configs.jsonc"
+target 'make codewhale-global' "re-generate Codewhale's global config from configs.jsonc"
 target 'make uninstall' 'remove the launchers, generated configs and symlinks this repo installed'
 target 'make help' 'this screen'
 

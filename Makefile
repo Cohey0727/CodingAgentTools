@@ -8,7 +8,8 @@ COMMON        := $(ROOT)/bin/common.sh
 # Every provider target acts on every provider in configs.jsonc.
 PROVIDER_LIST := $(shell . $(ROOT)/bin/common.sh && provider_names)
 
-.PHONY: setup setup-providers setup-skills list uninstall help pi-global opencode-global check hooks
+.PHONY: setup setup-providers setup-skills list uninstall help pi-global opencode-global \
+	crush-global reasonix-global codewhale-global check hooks
 
 # Both halves of the repo: the provider wizard first (it prompts), then the
 # skill symlinks. SKIP_BANNER keeps it to a single banner.
@@ -17,7 +18,7 @@ setup: setup-providers
 
 # Interactive wizard: checkbox provider picker, per-provider API token
 # prompts (Enter keeps the current token), launcher install, pi package
-# install, pi / OpenCode global configs, PATH checks.
+# install, one global config per agent CLI, PATH checks.
 setup-providers:
 	@BIN_DIR="$(BIN_DIR)" "$(ROOT)/bin/setup.sh"
 
@@ -51,15 +52,13 @@ uninstall:
 			rm -f "$(BIN_DIR)/$$cmd" && echo "  Removed $(BIN_DIR)/$$cmd"; \
 		done; \
 	done
-	@. "$(COMMON)"; out=$$(pi_global_models_path); \
-		if generated_here "$$out"; then \
-			rm -f "$$out" && echo "  Removed $$out"; \
-		fi
-	@. "$(COMMON)"; out=$$(opencode_global_config_path); \
+	@. "$(COMMON)"; for out in $$(generated_config_paths); do \
 		if generated_here "$$out"; then \
 			rm -f "$$out" && echo "  Removed $$out"; \
 		fi; \
-		rm -rf "$$(opencode_tokens_dir)" && echo "  Removed $$(opencode_tokens_dir)"
+	done
+	@. "$(COMMON)"; rm -rf "$$(opencode_tokens_dir)" \
+		&& echo "  Removed $$(opencode_tokens_dir)"
 	@if command -v pi >/dev/null 2>&1; then \
 		. "$(COMMON)"; \
 		for spec in $$PI_PACKAGES; do \
@@ -73,15 +72,23 @@ uninstall:
 	@echo "  Note: .env is left in place. Delete it manually if no longer needed."
 	@"$(ROOT)/bin/skills-uninstall.sh"
 
-# Re-generate pi's global models.json from configs.jsonc (there are no pi<name>
-# launchers); `make setup` does this too.
+# One target per agent CLI that has no launcher: each writes that CLI's own
+# global config from configs.jsonc, so a bare `pi`, `opencode`, `crush`,
+# `reasonix` or `codewhale` lists every provider. `make setup` runs them all.
 pi-global:
 	@"$(ROOT)/bin/pi-global-models.sh"
 
-# Register every provider from configs.jsonc in OpenCode's global config, so a
-# bare `opencode` (there are no open<name> launchers) lists them all.
 opencode-global:
 	@"$(ROOT)/bin/opencode-global-config.sh"
+
+crush-global:
+	@"$(ROOT)/bin/crush-global-config.sh"
+
+reasonix-global:
+	@"$(ROOT)/bin/reasonix-global-config.sh"
+
+codewhale-global:
+	@"$(ROOT)/bin/codewhale-global-config.sh"
 
 help:
 	@"$(ROOT)/bin/help.sh"

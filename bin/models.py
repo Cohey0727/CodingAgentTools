@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve configs.jsonc into the values Claude Code, OpenCode and pi need.
+"""Resolve configs.jsonc into the values every agent CLI this repo writes for needs.
 
 configs.jsonc at the repo root holds every provider: its endpoint, the models it
 serves, and the tags that say which slot each model fills. In any string,
@@ -297,6 +297,27 @@ def opencode_models_json(config):
     )
 
 
+def model_rows(config):
+    """One line per model: id, context window, max tokens, reasoning, input kinds.
+
+    The fields are separated by US (\x1f) so a generator can read them back with
+    `read` without an empty one shifting the rest. Every agent CLI spells a model
+    differently; this is the material each of their generators formats.
+    """
+    return "\n".join(
+        "\x1f".join(
+            (
+                model["id"],
+                str(model["context_window"]),
+                str(model["max_tokens"]),
+                "true" if model["reasoning"] else "false",
+                ",".join(model["input"]),
+            )
+        )
+        for model in config["models"]
+    )
+
+
 def shell(config):
     slots = config["slots"]
     values = {
@@ -326,6 +347,7 @@ def shell(config):
         "M_OPENCODE_LEAN": "true" if config["lean"] else "false",
         "M_OPENCODE_MODELS_JSON": opencode_models_json(config),
         "M_PI_MODELS_JSON": pi_models_json(config),
+        "M_MODEL_ROWS": model_rows(config),
         "M_MODEL_IDS": " ".join(model["id"] for model in config["models"]),
     }
     for slot in CLAUDE_SLOTS:

@@ -1,8 +1,8 @@
 # CodingAgentTools
 
-> Run Claude Code, OpenCode and pi on Anthropic-compatible LLM backends (DeepSeek · GLM · Kimi · your own llama.cpp) — one repo, one `make setup`, one `configs.jsonc` driving all three CLIs, and the skills and global instruction file all three share.
+> Run Claude Code, OpenCode, pi, Crush, Reasonix and Codewhale on Anthropic-compatible LLM backends (DeepSeek · GLM · Kimi · your own llama.cpp) — one repo, one `make setup`, one `configs.jsonc` driving all six CLIs, and the skills and global instruction file they share.
 
-One repo that installs a `claude<name>` launcher command per provider and generates the pi and OpenCode configs covering every provider — [Claude Code](https://docs.anthropic.com/claude-code), [OpenCode](https://opencode.ai) and the [pi coding agent](https://pi.dev), all against Anthropic-compatible backends:
+One repo that installs a `claude<name>` launcher command per provider and generates the global config of five more CLIs covering every provider — [Claude Code](https://docs.anthropic.com/claude-code), [OpenCode](https://opencode.ai), the [pi coding agent](https://pi.dev), [Crush](https://github.com/charmbracelet/crush), [Reasonix](https://github.com/esengine/DeepSeek-Reasonix) and [Codewhale](https://codewhale.net), all against Anthropic-compatible backends:
 
 | Provider | Command | Endpoint | Flagship model |
 |----------|----------|----------|----------------|
@@ -12,19 +12,19 @@ One repo that installs a `claude<name>` launcher command per provider and genera
 | Local (llama.cpp) | `claudelocal` | `http://127.0.0.1:11301` | `default` |
 | gtr (llama.cpp behind Cloudflare) | `claudegtr` | `https://gtr-llama.spaghetti-monster.com` | `default` |
 
-OpenCode and pi have no per-provider command: `make setup` writes every provider into their global configs, so a bare `opencode` gets them all under `/models` and a bare `pi` under `/model`.
+Only Claude Code gets a per-provider command. The other five have no launcher: `make setup` writes every provider into their global configs, so a bare `opencode` gets them all under `/models`, a bare `pi` under `/model`, and `crush`, `reasonix` and `codewhale` each start with the whole set.
 
 Kimi runs that flagship as its 1M-context variant under Claude Code (`kimi-k3[1m]`); the other CLIs take the id their own catalog lists.
 
-Each provider exposes a native Anthropic-compatible endpoint, so there is no proxy or translation layer — just environment variables. That holds for the local one too: `llama-server` answers `/v1/messages` in the Anthropic shape. The generated pi and OpenCode configs run against the very same endpoint and token, and every model any of the three can reach is declared in one place: `configs.jsonc` at the repo root, in git, with [tags](#tags) naming the slot each model fills. It holds no secret — an API key is written there as `${DEEPSEEK_API_KEY}` and read from the single gitignored `.env` beside it.
+Each provider exposes a native Anthropic-compatible endpoint, so there is no proxy or translation layer — just environment variables. That holds for the local one too: `llama-server` answers `/v1/messages` in the Anthropic shape. Every generated config runs against the very same endpoint and token, and every model any of them can reach is declared in one place: `configs.jsonc` at the repo root, in git, with [tags](#tags) naming the slot each model fills. It holds no secret — an API key is written there as `${DEEPSEEK_API_KEY}` and read from the single gitignored `.env` beside it.
 
 > **Note:** every launcher command is `claude<name>`. Bare provider names are deliberately avoided — `kimi`, for one, is Moonshot's own CLI.
 
-> **Note:** Kimi has two endpoints. The default `https://api.kimi.com/coding` is for the **coding subscription plan**. For **pay-as-you-go (metered) billing**, switch `BASE_URL` to `https://api.moonshot.ai/anthropic` in `providers/kimi/.env`.
+> **Note:** Kimi has two endpoints. The default `https://api.kimi.com/coding` is for the **coding subscription plan**. For **pay-as-you-go (metered) billing**, switch `KIMI_BASE_URL` to `https://api.moonshot.ai/anthropic` in `.env`.
 
-> **Note:** Local is not a hosted service — it points at a `llama-server` on your own machine, which serves the Anthropic shape on `/v1/messages`. Here that server is LlamaGate (`~/Workspace/LlamaGate`): `just start` brings it up on `127.0.0.1:11301`, `just profiles` lists the models it can load and `just start <profile>` swaps to one. There is no account and no key, so `API_TOKEN` is a placeholder the CLIs merely require to be non-empty. Both llama.cpp providers use the fixed model id `default`: llama-server answers with whatever it has loaded and ignores the requested name, so swapping the model on the server needs no edit here. Keep `CONTEXT_WINDOW` at or below the server's `--ctx-size`.
+> **Note:** Local is not a hosted service — it points at a `llama-server` on your own machine, which serves the Anthropic shape on `/v1/messages`. Here that server is LlamaGate (`~/Workspace/LlamaGate`): `just start` brings it up on `127.0.0.1:11301`, `just profiles` lists the models it can load and `just start <profile>` swaps to one. There is no account and no key, so its `API_KEY` is a placeholder the CLIs merely require to be non-empty. Both llama.cpp providers use the fixed model id `default`: llama-server answers with whatever it has loaded and ignores the requested name, so swapping the model on the server needs no edit here. Keep `context_window` at or below the server's `--ctx-size`.
 
-> **Note:** gtr is a `llama-server` on another machine, published through a Cloudflare tunnel and gated by Cloudflare Access. Requests without Access credentials get a 302 to the login page, so `HEADERS` in `providers/gtr/.env` has to carry an Access service token (`CF-Access-Client-Id` / `CF-Access-Client-Secret`) — the comments in the file show both that and the short-lived `cloudflared access token` variant. Like Local, `API_TOKEN` is only a placeholder unless `llama-server` runs with `--api-key`.
+> **Note:** gtr is a `llama-server` on another machine, published through a Cloudflare tunnel and gated by Cloudflare Access. Requests without Access credentials get a 302 to the login page, so its `REQUEST_HEADERS` carry an Access service token (`CF-Access-Client-Id` / `CF-Access-Client-Secret`), whose values come from `.env` — where a short-lived `cloudflared access token` can stand in for a stored one. Like Local, its `API_KEY` is only a placeholder unless `llama-server` runs with `--api-key`.
 
 The other half of the repo is what those CLIs run *with*: the skills under `skills/` and the single global instruction file `AGENTS.md`, symlinked into every CLI's config directory by the same `make setup` — see [Skills and global instructions](#skills-and-global-instructions).
 
@@ -49,6 +49,9 @@ bin/opencode-plugin.template     # OpenCode plugin shim; @@IMPL@@ baked in at se
 bin/setup.sh                     # provider wizard: pick providers, paste tokens, install (`make setup-providers`)
 bin/pi-global-models.sh          # registers every provider in pi's global models.json (`make pi-global`)
 bin/opencode-global-config.sh    # registers every provider in OpenCode's global config (`make opencode-global`)
+bin/crush-global-config.sh       # registers every provider in Crush's global crushrc (`make crush-global`)
+bin/reasonix-global-config.sh    # registers every provider in Reasonix's global config.toml (`make reasonix-global`)
+bin/codewhale-global-config.sh   # registers every provider in Codewhale's global config.toml (`make codewhale-global`)
 bin/skills-common.sh             # where skills, subagents, AGENTS.md and the OpenCode extensions are installed
 bin/skills-setup.sh              # links them there (`make setup-skills`)
 bin/skills-list.sh               # their install status (part of `make list`)
@@ -56,7 +59,7 @@ bin/skills-uninstall.sh          # removes only the symlinks pointing back here 
 bin/list.sh                      # everything this repo manages (`make list`)
 bin/help.sh                      # target overview (`make help`)
 docs/migrations/                 # upgrade notes for existing checkouts
-Makefile                         # setup / setup-providers / setup-skills / list / uninstall / pi-global / opencode-global / help
+Makefile                         # setup / setup-providers / setup-skills / list / uninstall / <agent>-global / help
 ```
 
 Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; adding a skill is a new `skills/<name>/SKILL.md` and a `make setup-skills`. An OpenCode slash command is a new `opencode/command/<name>.md`, and a plugin a new `opencode/plugin/<name>.js` exporting `plugin({ tool })` — same `make setup-skills`.
@@ -67,7 +70,7 @@ Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; addi
 - [Claude Code](https://docs.anthropic.com/claude-code) (`claude` on your PATH)
 - [OpenCode](https://opencode.ai) (`opencode` on your PATH) — only OpenCode itself; it gets no launcher, just the generated config. Not bundled by this repo; install it first:
   ```bash
-  brew install sst/tap/opencode          # macOS (Homebrew)
+  brew install anomalyco/tap/opencode          # macOS (Homebrew)
   # or
   npm install -g opencode-ai
   # or
@@ -78,6 +81,26 @@ Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; addi
   curl -fsSL https://pi.dev/install.sh | sh
   ```
   (the older `@mariozechner/pi-coding-agent` package is deprecated and resolves environment references differently)
+- [Crush](https://github.com/charmbracelet/crush) (`crush` on your PATH) — optional, and like the two above it gets a generated config rather than a launcher:
+  ```bash
+  brew install charmbracelet/tap/crush   # macOS (Homebrew)
+  # or
+  npm install -g @charmland/crush
+  ```
+- [Reasonix](https://github.com/esengine/DeepSeek-Reasonix) (`reasonix` on your PATH) — optional:
+  ```bash
+  npm install -g reasonix
+  # or
+  brew install esengine/reasonix/reasonix
+  ```
+- [Codewhale](https://codewhale.net) (`codewhale` on your PATH) — optional:
+  ```bash
+  curl -fsSL https://codewhale.net/install.sh | sh
+  ```
+
+Every one of these is optional. A generator writes its config whether or not the
+CLI is installed, and `make setup` says which of them it could not find on your
+PATH.
 - An API key for whichever provider(s) you use
 
 ## Setup
@@ -93,8 +116,8 @@ One interactive wizard does everything:
 3. `configs.jsonc` is validated before anything is written; `.env` is created from `.env.example` if missing (`chmod 600`), gets any variables added to `.env.example` since, and picks up keys still sitting in the old `providers/<name>/.env` files
 4. One command per provider is generated in `~/.local/bin` — `claude<name>`, with the provider name baked in
 5. The pi packages that add [`/loop` and `/goal`](#loops-in-pi) are installed once into pi's user settings (`~/.pi/agent/settings.json`)
-6. Every provider whose key resolves is registered in pi's global `~/.pi/agent/models.json` (the key stays in `.env`, read back by a shell command at request time) and in OpenCode's global config (`~/.config/opencode/opencode.json`) — every model in `configs.jsonc`, not just the tagged ones; both start on [the default provider](#default-provider), and in OpenCode's case its token is copied to `~/.config/opencode/claude-compatibles/` (chmod 600) and only referenced from the config
-7. You get a warning if `~/.local/bin`, `claude`, `opencode` or `pi` is missing from your PATH
+6. Every provider whose key resolves is registered in the global config of every CLI that has no launcher — [one generator each](#generated-configs) — with every model in `configs.jsonc`, not just the tagged ones, and all of them starting on [the default provider](#default-provider)
+7. You get a warning if `~/.local/bin` or any of the CLIs those configs are for is missing from your PATH
 8. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode` ([details below](#skills-and-global-instructions))
 
 To rotate a token, pick up new settings or add a provider later, just re-run `make setup`. `make setup-providers` and `make setup-skills` each run one half on its own; only the provider half prompts.
@@ -114,14 +137,17 @@ and [2026-09-09 — providers/ 廃止と configs.jsonc への集約](docs/migrat
 | Target | What it does |
 |--------|--------------|
 | `make setup` | Both halves: the provider wizard, then the skill, `AGENTS.md` and OpenCode extension install |
-| `make setup-providers` | The wizard above only: tokens, `.env` upkeep, launcher install, pi packages, pi and OpenCode global configs |
+| `make setup-providers` | The wizard above only: tokens, `.env` upkeep, launcher install, pi packages, and every global config |
 | `make setup-skills` | The shared assets only: `skills/`, `agents/`, `AGENTS.md` and `opencode/` into every agent CLI |
 | `make check` | Validate `configs.jsonc`, then refuse any concrete name outside it (see `CLAUDE.md`). What the pre-commit hook runs |
 | `make hooks` | Install the lefthook pre-commit hook that runs `make check` |
 | `make list` | Every provider with its command, endpoint and models with their tags, then every skill, subagent and OpenCode extension with its install status |
 | `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from `configs.jsonc`, and set the startup model in `~/.pi/agent/settings.json` — run it after changing a model or endpoint |
 | `make opencode-global` | Re-generate OpenCode's global config from `configs.jsonc` — run it after editing it |
-| `make uninstall` | Remove the installed launchers (including the `pi<name>` / `open<name>` ones earlier versions installed), the packages each agent lists, the global `models.json` / OpenCode config / token files this repo wrote, the symlinks pointing back into this repo and the plugin shims generated from it. Provider `.env` files are left alone |
+| `make crush-global` | Re-generate Crush's global `~/.config/crush/crushrc` from `configs.jsonc` |
+| `make reasonix-global` | Re-generate Reasonix's global `~/.reasonix/config.toml`, and the keys it reads from `~/.reasonix/.env` |
+| `make codewhale-global` | Re-generate Codewhale's global `~/.codewhale/config.toml`, and the keys it reads from `~/.codewhale/.env` |
+| `make uninstall` | Remove the installed launchers (including the `pi<name>` / `open<name>` ones earlier versions installed), the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo and the plugin shims generated from it. The `.env` is left alone |
 | `make help` | The target list above, on the terminal |
 
 ## Usage
@@ -134,6 +160,9 @@ claudegtr         # Claude Code on gtr (llama.cpp behind Cloudflare)
 
 opencode          # OpenCode — every configured provider is in /models
 pi                # pi — every configured provider is in /model
+crush             # Crush — every configured provider is in its model picker
+reasonix          # Reasonix — every configured provider is in /model
+codewhale         # Codewhale — every configured provider is in its model picker
 ```
 
 Arguments pass through to `claude` verbatim, `--model` included — so a launcher
@@ -166,6 +195,22 @@ opencode --model glm-anthropic/glm-5.3     # or pick at launch time
 ```
 
 Note `small_model` — the model OpenCode names a session with, and its only use for one — stays at the default even after you switch the main model via `/models`.
+
+Crush, Reasonix and Codewhale work the same way — no per-provider command, one
+generated global config each:
+
+```bash
+crush                                      # starts on the large slot: the default provider's model
+reasonix                                   # starts on default_model in ~/.reasonix/config.toml
+codewhale                                  # starts on default_text_model in ~/.codewhale/config.toml
+```
+
+Crush has two model slots rather than a free choice per session — `large` is
+what the interactive agent runs on, `small` what it delegates cheap work to —
+and the generated `crushrc` points them at the default provider's `default` and
+`small` models. Naming a model it does not know is not an error there: Crush
+silently falls back to a model of its own choosing and writes that correction
+back to disk, so a hand-edit that misspells one is easy to miss.
 
 ### Default provider
 
@@ -324,7 +369,7 @@ nothing else.
 
 | Tag | Fills |
 |-----|-------|
-| `default` | `ANTHROPIC_MODEL`, the opus / sonnet / fable slots, and the model OpenCode and pi start on |
+| `default` | `ANTHROPIC_MODEL`, the opus / sonnet / fable slots, and the model every generated config starts on |
 | `small` | `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL`, and the model OpenCode titles sessions with |
 
 Only Claude Code has more than one model slot, and each of its slots is an
@@ -342,7 +387,7 @@ There is no tag for `ANTHROPIC_MODEL` or `ANTHROPIC_DEFAULT_HAIKU_MODEL`: those
 two *are* `default` and `small`, and a second name for them would only be a
 second way to say the same thing.
 
-OpenCode and pi get **every** model in the file — they pick between them in the
+Every CLI but Claude Code gets **every** model in the file — they pick between them in the
 session (`/models`, `/model`), so there is nothing per-model to declare for
 them. `default` and `small` are what they start on.
 
@@ -365,7 +410,7 @@ on only one model, and an unknown tag is an error rather than a label —
 | Field | Meaning |
 |-------|---------|
 | `id` | **Required.** The id sent to the provider |
-| `tags` | Which slots this model fills. Omit it to offer the model in OpenCode and pi without giving it a Claude Code slot |
+| `tags` | Which slots this model fills. Omit it to offer the model in the other CLIs without giving it a Claude Code slot |
 | `context_window`, `max_tokens` | **Required.** pi writes them into its generated `models.json` (it otherwise assumes 128k / 16k and caps each request at `max_tokens`/3), and Claude Code takes the main model's `context_window` as its auto-compact window |
 | `reasoning`, `input` | Whether the model supports extended thinking (default `true`) and what it accepts (`["text"]` or `["text", "image"]`) |
 | `claude_id` | The id to send when the caller is Claude Code, for a variant only it understands — Kimi uses it for the 1M-context `[1m]` form. Defaults to `id` |
@@ -375,80 +420,96 @@ set it itself.
 
 ### Provider fields
 
-The key in `providers` is the provider's name. What it becomes — the launcher
-suffix, the id an agent files it under — is templated in [`agents`](#agents),
-not fixed here.
+The key in `providers` is the provider's name. It is what the launcher command
+ends in, what each generated config files the provider under, and what
+`make list` prints.
 
 | Field | Meaning |
 |-------|---------|
 | `API_KEY` | **Required.** A `${VAR}` reference to the key |
 | `BASE_URL` | **Required.** The provider's Anthropic-compatible endpoint, as `${VAR:-default}` so `.env` can route it elsewhere |
-| `REQUEST_HEADERS` | Extra request headers as a `{ "Name": "value" }` object, sent by all three CLIs — e.g. a Cloudflare Access service token in front of a self-hosted server. A value written as `${VAR}` is referenced, never copied into a generated config |
-| `<agent>.command` | The launcher command, when the agent's own `command` template is not wanted |
-| `<agent>.args` | Default options prepended to every launch of that command (word-split; your arguments come after them) |
-| `<agent>.env` | Extra environment exported to the agent as-is |
-| `<agent>.auto_compact_window` | Overrides the model's `context_window` as that agent's compaction threshold |
-| `schema.resolve` | **Required.** Which of the agent's [`schemas`](#schema-resolution) supplies this provider's catalog |
-| `schema.id` | The id an outside registry knows the provider by. Required when the selected schema's `id` template contains `{schema_id}` |
-| `<agent>.lean` | `true` gives the provider [a lean agent of its own](#lean-agents) |
-| `<agent>.context_window`, `<agent>.max_tokens` | Cap every model's limits for that agent. These are the window a session may grow into before it is compacted, so a backend too slow to prefill its full context sets them lower — `gtr` does |
+| `REQUEST_HEADERS` | Extra request headers as a `{ "Name": "value" }` object, sent by every CLI — e.g. a Cloudflare Access service token in front of a self-hosted server. A value written as `${VAR}` is referenced wherever the CLI's format can express a reference |
+| `primary` | `true` on at most one provider — the one every generated config starts on |
+| `claude.command` | The launcher command, when `claude<name>` is not wanted |
+| `claude.args` | Default options prepended to every launch of that command (word-split; your arguments come after them) |
+| `claude.env` | Extra environment exported to Claude Code as-is |
+| `claude.auto_compact_window` | Overrides the main model's `context_window` as Claude Code's compaction threshold |
+| `schema` | Where OpenCode takes this provider's catalog from — see [Schema resolution](#schema-resolution). `local` (the default) declares it here; `models.dev` writes only the key and lets that registry supply the rest |
+| `schema_id` | The id that registry knows the provider by. Defaults to the provider's name |
+| `opencode.lean` | `true` gives the provider [a lean agent of its own](#lean-agents) |
+| `opencode.context_window`, `opencode.max_tokens` | Cap every model's limits for OpenCode. These are the window a session may grow into before it is compacted, so a backend too slow to prefill its full context sets them lower — `gtr` does |
 
-### Agents
+Everything else about a CLI — the command it execs, the variables it reads, the
+shape of its config — is that CLI's own generator's business, not a provider's;
+see [Generated configs](#generated-configs).
 
-`agents` is every CLI this repo writes for. Nothing under `bin/` decides
-anything about one: not the command it execs, not the variables it reads, not
-the package that talks to it, not the shape of its config. All of it is here,
-and a provider block picks from it by the agent's own name.
+### Generated configs
 
-| Field | Meaning |
-|-------|---------|
-| `command` | Template for the launcher installed per provider, e.g. `claude{name}` |
-| `stale_commands` | Templates earlier versions installed; `make setup` and `make uninstall` remove them |
-| `launch.exec` | What the launcher runs |
-| `launch.token_var`, `launch.base_url_var`, `launch.headers_var` | The variables that carry the key, the endpoint and the extra headers |
-| `launch.auto_compact_window_var` | The variable carrying the compaction threshold |
-| `launch.unset_vars` | Cleared last, so nothing inherited shadows what was exported |
-| `slots` | Each model variable the agent reads, and the tags it follows, most specific first |
-| `auto_compact_window_from` | The slot whose `context_window` becomes the threshold |
-| `model_tag`, `small_model_tag` | The tags naming the model a session starts on, and the small one |
-| `schemas` | Named ways to write a provider — see below |
-| `model_entry` | One model as this agent's config spells it; `{id}` and the other model fields are the placeholders, `keyed_by` makes the collection an object |
-| `lean.prompt`, `lean.disabled_tools` | What [a lean agent](#lean-agents) replaces and drops |
-| `api` | The protocol name the agent's config wants |
-| `packages` | `"<source>": "<slash command>"` pairs installed into that agent's settings |
+Claude Code is the only CLI here that gets a command per provider. Every other
+one reads a single global config, and this repo writes it: one generator under
+`bin/`, one `make <agent>-global` target, and no CLI's shape leaking into
+another's. `make setup` runs every one of them.
 
-Inside `agents`, `{name}` is the provider being written, `{base_url}` its
-`BASE_URL` and `{schema_id}` its `schema.id`. `${VAR}` still means the
-environment, so the two never collide.
+| CLI | Generator | What it writes |
+|-----|-----------|----------------|
+| pi | `bin/pi-global-models.sh` | `~/.pi/agent/models.json`, and `defaultProvider` / `defaultModel` in `settings.json` |
+| OpenCode | `bin/opencode-global-config.sh` | `~/.config/opencode/opencode.json`, and one key file per provider under `claude-compatibles/` |
+| Crush | `bin/crush-global-config.sh` | `~/.config/crush/crushrc` |
+| Reasonix | `bin/reasonix-global-config.sh` | `~/.reasonix/config.toml`, and the keys it names in `~/.reasonix/.env` |
+| Codewhale | `bin/codewhale-global-config.sh` | `~/.codewhale/config.toml`, at 600 — it is the one that holds the keys |
+
+Every one of those files opens with a line naming the target that rewrites it.
+A file at that path without the line is never touched: the generator says so and
+stops, so a config written by hand survives.
+
+**How a key reaches each of them.** `configs.jsonc` holds a reference, never a
+key, and each generator carries that as far as its CLI's format allows:
+
+- **a command run when the value is needed** — pi and Crush. `!bash -c '…'` in
+  pi's `models.json`, `$(bash -c '…')` in a `crushrc`, both reading the `.env`
+  through `bin/common.sh`. Nothing is copied, so a rotated key needs no re-run.
+- **a reference to a file this repo writes at 600** — OpenCode's
+  `{file:…}`, under `~/.config/opencode/claude-compatibles/`.
+- **the name of a variable the CLI resolves itself** — Reasonix, whose config
+  takes an `api_key_env` and reads the value only from the `.env` in its own
+  directory. The config still holds no key; the value is copied into that `.env`
+  at 600, and a rotated key does need a re-run.
+- **the key itself, in a file at 600** — Codewhale, and only because it offers
+  nothing else: its `api_key_env` is resolved from the process environment
+  alone, so a reference there works only for someone who has already exported
+  the variable, and every provider would otherwise be unusable. Its
+  `config.toml` is created at 600 before a byte is written to it.
+
+Request headers follow the same order, and where a CLI has no way to express a
+reference for a header value, the provider is left out of that config rather
+than have its secret written into one — the generator names which and why. That
+is why `gtr`, whose Cloudflare Access token travels in a header, reaches every
+CLI here except Reasonix.
 
 ### Schema resolution
 
 A provider's *catalog* — the package that talks to it, the endpoint it lives at,
-the models it serves and each model's limits — has to come from somewhere. Each
-agent names the ways it will take one in `schemas`, and every provider picks one
-by name in `schema.resolve`. There is no default: a provider says which.
+the models it serves and each model's limits — has to come from somewhere. Only
+OpenCode will take one from outside, and `schema` on the provider says whether
+it does:
 
 ```jsonc
-"opencode": {
-  "schemas": {
-    "local":      { "id": "{name}-anthropic", "npm": "@ai-sdk/anthropic",
-                    "base_url": "{base_url}/v1", "declare_models": true },
-    "models.dev": { "id": "{schema_id}", "declare_models": false },
-    "none":       null
-  }
-}
+"schema": "models.dev",
+"schema_id": "zai-coding-plan"
 ```
 
-A schema's `id` is what the agent files the provider under, and the prefix every
-reference to its models carries. `declare_models` writes the provider's models
-into the block; without it the agent is left to resolve them, which is what
-[models.dev](https://models.dev) does for OpenCode. `null` writes nothing at all,
-so the provider is reachable only through its launcher — an agent's launcher
-needs no catalog, just the endpoint, the key and the tags.
+`local`, the default, declares the provider in full: the package, the endpoint
+and every model below it. `models.dev` writes only the key and lets
+[that registry](https://models.dev) supply the rest, against whichever endpoint
+it lists; `schema_id` is the name the registry knows the provider by, and
+defaults to the provider's own.
 
-Two providers may not resolve to the same id for one agent — they would silently
-merge into a single block — so `make setup` and the generators refuse the file
-if they do.
+The other generated configs do not have the choice, and do not need it. pi,
+Crush, Reasonix and Codewhale each declare the provider where it is: the
+Anthropic endpoint `BASE_URL` names, with the models from `configs.jsonc` and
+the limits each one carries. Crush and Codewhale ship catalogs of their own and
+merge an entry into whichever of theirs has the same id, so a provider declared
+here is filed under an id of its own to stay out of the way.
 
 **What an outside registry costs.** It lists one endpoint per provider, the one
 it considers primary, and for most providers that is their OpenAI-compatible
@@ -480,8 +541,9 @@ is sourced by bash, so a value can be computed at use time:
 GTR_CF_ACCESS_TOKEN="$(cloudflared access token --app=https://gtr-llama.example.com)"
 ```
 
-`claude<name>` evaluates it on every launch and pi on every request; OpenCode
-reads a copy taken when `make opencode-global` ran.
+`claude<name>` evaluates it on every launch, and pi and Crush on every request.
+OpenCode, Reasonix and Codewhale read a copy taken when their generator last
+ran, so a rotated key needs `make setup` again for those three.
 
 ## How it works
 
@@ -523,6 +585,33 @@ the generated ones — and a file this repo did not generate is never touched
 (first-line marker). The `local` provider shows up whenever its placeholder
 token is set; picking it while `llama-server` is down fails that one request
 and nothing else.
+
+`crush`, `reasonix` and `codewhale` get no launcher either, and each generator
+writes the whole of that CLI's config from the same resolved values:
+
+- **Crush** — `~/.config/crush/crushrc`, which is bash: one `provider add` per
+  provider with `--type anthropic` and `BASE_URL` as it stands (Crush's client
+  appends `v1/messages` itself, so a `/v1` added here would land on
+  `/v1/v1/messages`), one `model add` per model carrying its window, output cap
+  and both capability flags, then `model large` / `model small` pointing at the
+  default provider's two. The key and every header value go in as
+  `$(bash -c '…')`, run by Crush when it reads the file. Naming a model no
+  `model add` declared is not an error there — Crush substitutes one of its own
+  and writes the correction back — so the generator emits every `model add`
+  before the two selections.
+- **Reasonix** — `~/.reasonix/config.toml`: a `[[providers]]` entry per provider
+  with `kind = "anthropic"`, the model list, and `model_overrides` giving each
+  model the window and output cap `configs.jsonc` gives it. The entry names an
+  `api_key_env` rather than a key, and Reasonix resolves that name from the
+  `.env` in its own directory and nowhere else — not this repo's, not the
+  surrounding shell — so the generator writes the value there at 600.
+- **Codewhale** — `~/.codewhale/config.toml`, at 600: one
+  `[providers.<name>-anthropic]` table declaring `kind = "openai-compatible"`
+  alongside `wire = "anthropic-messages"` — the first says the entry is none of
+  its own catalog's, the second which protocol the endpoint actually speaks —
+  and one `[[custom_models]]` entry per model, whose `base_url` has to match its
+  provider's. It is the one config here that carries the keys, for the reason
+  under [Generated configs](#generated-configs).
 
 ### Lean agents
 
@@ -585,11 +674,19 @@ One file is the source of truth; each CLI gets it under the name it expects:
 | `~/.claude/CLAUDE.md` | Claude Code — it does not read `AGENTS.md` itself |
 | `~/.pi/agent/AGENTS.md` | pi |
 | `~/.codex/AGENTS.md` | Codex |
+| `~/.config/crush/CRUSH.md` | Crush |
 
 Per-project files need no such trick: pi reads a directory's `AGENTS.md` or its
 `CLAUDE.md`, whichever is there. OpenCode takes global instructions from the
 `instructions` array in `~/.config/opencode/opencode.jsonc` instead — point it
 at this repo's `AGENTS.md` if you want them there too.
+
+Reasonix gets no link. It reads `~/.reasonix/AGENTS.md`, but opens it through a
+root confined to `~/.reasonix` and drops any symlink resolving outside it — a
+link would be ignored without a word. Copy the file there if you want it, and
+remember it is then a copy. Codewhale is left out for the same kind of reason:
+where it takes global instructions from is its `instructions` setting, not a
+path this repo can link into.
 
 ### Skills and subagents
 
@@ -659,7 +756,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 **`'opencode' is not on your PATH — install OpenCode first`** — the generated config is only read by OpenCode itself, which this repo does not install. See [Requirements](#requirements):
 ```bash
-brew install sst/tap/opencode   # or: npm install -g opencode-ai
+brew install anomalyco/tap/opencode   # or: npm install -g opencode-ai
 ```
 
 **`opencode` lists none of the providers** — the config is generated, not read live. Run `make opencode-global` (or `make setup`) and check `opencode models`. A key rotated in `.env` also needs the re-run: the config references the copy under `~/.config/opencode/claude-compatibles/`.
@@ -681,6 +778,40 @@ Install `@earendil-works/pi-coding-agent`.
 live. Run `make pi-global` (or `make setup`) and check `/model`. A
 `~/.pi/agent/models.json` this repo did not write is left alone (first-line
 marker): merge it by hand or move it aside.
+
+**`'crush' / 'reasonix' / 'codewhale' is not on your PATH`** — each of those
+configs is only read by its own CLI, and this repo installs none of them. See
+[Requirements](#requirements). The config is written either way, so installing
+the CLI later needs no re-run.
+
+**Crush starts on a model you did not pick** — Crush does not fail on a
+`model large` / `model small` naming something it cannot find; it substitutes a
+model of its own and writes that back into its config. Re-run
+`make crush-global` to put the choice back, and check `configs.jsonc` still tags
+a `default` and a `small`.
+
+**Reasonix says a provider has no key** — its keys do not come from this repo's
+`.env`. The generated `config.toml` names a variable, and Reasonix reads that
+name only from `~/.reasonix/.env`, which `make reasonix-global` writes at 600. A
+key rotated here needs that re-run.
+
+**A provider is missing from `~/.reasonix/config.toml`** — a provider whose
+`REQUEST_HEADERS` carry a secret is left out on purpose: Reasonix sends header
+values exactly as written, so registering `gtr` would mean writing its
+Cloudflare Access token into a config file. The generator names the provider and
+the reason on stderr. Add it by hand if you want it.
+
+**Global instructions do not reach Reasonix** — `~/.reasonix/AGENTS.md` cannot
+be a symlink to this repo: Reasonix opens it through a root confined to
+`~/.reasonix` and silently ignores anything resolving outside. Copy `AGENTS.md`
+there, and re-copy it when it changes. Skills are not affected — Reasonix
+follows those symlinks and reads `~/.agents/skills` like the others.
+
+**`~/.codewhale/config.toml` contains the API keys** — deliberately, and the
+file is created at 600 before anything is written to it. Codewhale resolves an
+`api_key_env` from the process environment alone, so the alternative is a config
+that works only in a shell that already exported every provider's variable. See
+[Generated configs](#generated-configs).
 
 **`API_KEY for '<name>' is empty`** — the message names the `.env` variable to
 set. Re-run `make setup`, or edit `.env` directly.
@@ -730,3 +861,6 @@ Where each provider's key comes from:
 - [Kimi / Moonshot AI Platform](https://platform.moonshot.ai/docs)
 - [OpenCode: Config](https://opencode.ai/docs/config/) / [Providers](https://opencode.ai/docs/providers/)
 - [pi: Custom models](https://pi.dev/docs/latest/models) / [Providers](https://pi.dev/docs/latest/providers) / [DeepSeek's pi integration guide](https://api-docs.deepseek.com/quick_start/agent_integrations/pi_mono/)
+- [Crush: Configuration](https://github.com/charmbracelet/crush/blob/main/docs/config/README.md) — the `crushrc` builtins and the legacy JSON form
+- [Reasonix: config paths](https://github.com/esengine/DeepSeek-Reasonix/blob/main-v2/docs/CONFIG_PATHS.md) / [reasonix.example.toml](https://github.com/esengine/DeepSeek-Reasonix/blob/main-v2/reasonix.example.toml)
+- [Codewhale: Configuration](https://github.com/Hmbown/Codewhale/blob/main/docs/CONFIGURATION.md) / [Providers](https://github.com/Hmbown/Codewhale/blob/main/docs/PROVIDERS.md)
