@@ -15,7 +15,7 @@ The file is JSON with // line comments allowed.
   models.py tags <provider>     "<id><tab><tag>,<tag>" per model
   models.py providers           one provider name per line
   models.py primary             the provider marked "primary", if any
-  models.py opencode-overrides  the top-level opencode.overrides, as JSON
+  models.py opencode-merge      the OpenCode config on stdin, opencode.overrides merged in
   models.py env-vars            every "${NAME}" the file references, with its provider
 """
 
@@ -147,7 +147,7 @@ def load_file():
 
 
 def opencode_overrides():
-    """The top-level opencode.overrides: OpenCode's opencode.jsonc, as it stands."""
+    """The top-level opencode.overrides, laid over the generated OpenCode config last."""
     where = f"{CONFIGS}: opencode"
     raw = load_root().get("opencode") or {}
     if not isinstance(raw, dict):
@@ -157,6 +157,17 @@ def opencode_overrides():
     if not isinstance(overrides, dict):
         raise ConfigError(f"{where}: overrides must be an object")
     return overrides
+
+
+def deep_merge(base, overrides):
+    """base with overrides laid over it: objects merge key by key, anything else is replaced."""
+    merged = dict(base)
+    for key, value in overrides.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
 
 
 def primary_provider():
@@ -405,7 +416,7 @@ def env_vars():
 def main(argv):
     action = argv[1] if len(argv) > 1 else ""
     argument = argv[2] if len(argv) > 2 else ""
-    if action not in ("sh", "check", "tags", "providers", "env-vars", "primary", "opencode-overrides", "vocabulary"):
+    if action not in ("sh", "check", "tags", "providers", "env-vars", "primary", "opencode-merge", "vocabulary"):
         print(__doc__.strip(), file=sys.stderr)
         return 2
     try:
@@ -413,8 +424,9 @@ def main(argv):
             print("\n".join(load_file()))
         elif action == "primary":
             print(primary_provider())
-        elif action == "opencode-overrides":
-            print(json.dumps(opencode_overrides(), indent=2, ensure_ascii=False))
+        elif action == "opencode-merge":
+            config = json.loads(strip_comments(sys.stdin.read()))
+            print(json.dumps(deep_merge(config, opencode_overrides()), indent=2, ensure_ascii=False))
         elif action == "vocabulary":
             print(vocabulary())
         elif action == "env-vars":

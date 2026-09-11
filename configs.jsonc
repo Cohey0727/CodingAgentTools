@@ -2,8 +2,8 @@
 // slot each model fills. "${NAME}" and "${NAME:-fallback}" resolve from the
 // .env beside this file, so no secret is written here. Fields: see README.
 {
-  // Written as it stands to OpenCode's opencode.jsonc, which OpenCode reads
-  // after the generated opencode.json, so a key here wins.
+  // Deep-merged, key by key, into the generated opencode.json last, so a key
+  // here wins.
   "opencode": {
     "overrides": {
       "model": "opencode-go/deepseek-v4.1-flash",

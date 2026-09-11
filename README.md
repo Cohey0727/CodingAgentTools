@@ -226,7 +226,7 @@ Every generated global config starts on whichever provider is marked `primary` i
 
 At most one provider may say so. When none does, or it has no token, the first configured one wins instead, so a fresh checkout still gets a working one. It sets OpenCode's `model` and `small_model`, and pi's `defaultProvider` / `defaultModel`. A launcher has no such setting: each one pins the provider baked into it.
 
-OpenCode can start somewhere else. `make opencode-global` writes the top-level `opencode.overrides` in `configs.jsonc` to `~/.config/opencode/opencode.jsonc` as it stands. OpenCode reads that file after the generated `opencode.json`, so its keys win. That is how OpenCode starts on a model of OpenCode Go, which comes in through `/connect` and is not a provider here:
+OpenCode can start somewhere else. `make opencode-global` deep-merges the top-level `opencode.overrides` in `configs.jsonc` into the generated `opencode.json` last, key by key, so its keys win. That is how OpenCode starts on a model of OpenCode Go, which comes in through `/connect` and is not a provider here:
 
 ```jsonc
 "opencode": {
@@ -464,7 +464,7 @@ another's. `make setup` runs every one of them.
 | CLI | Generator | What it writes |
 |-----|-----------|----------------|
 | pi | `bin/pi-global-models.sh` | `~/.pi/agent/models.json`, and `defaultProvider` / `defaultModel` in `settings.json` |
-| OpenCode | `bin/opencode-global-config.sh` | `~/.config/opencode/opencode.json`, one key file per provider under `claude-compatibles/`, and `opencode.jsonc` from `opencode.overrides` |
+| OpenCode | `bin/opencode-global-config.sh` | `~/.config/opencode/opencode.json` with `opencode.overrides` merged in last, and one key file per provider under `claude-compatibles/` |
 | Crush | `bin/crush-global-config.sh` | `~/.config/crush/crushrc` |
 | Reasonix | `bin/reasonix-global-config.sh` | `~/.reasonix/config.toml`, and the keys it names in `~/.reasonix/.env` |
 | Codewhale | `bin/codewhale-global-config.sh` | `~/.codewhale/config.toml`, at 600 — it is the one that holds the keys |
