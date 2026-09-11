@@ -418,55 +418,35 @@ EOF
 }
 
 opencode_provider_id() { # -> the id OpenCode files the resolved provider under.
-                         # A registry-resolved one has to use that registry's own
-                         # name; a locally declared one takes a suffix so it does
-                         # not collide with the registry entry of the same name.
-  case $M_SCHEMA in
-    models.dev) printf '%s' "$M_SCHEMA_ID" ;;
-    *) printf '%s-anthropic' "$M_NAME" ;;
-  esac
+                         # The suffix keeps it apart from any provider of the
+                         # same name in OpenCode's own catalog, whose definition
+                         # would otherwise be merged into this one.
+  printf '%s-anthropic' "$M_NAME"
 }
 
-opencode_provider_json() { # <provider> <apiKey reference> [<header ref fn>] — one
-                           # provider block. The key and the header values are
-                           # only ever referenced ({file:...}).
-  local name=$1 api_key=$2 headers=''
-  if [ -n "${3:-}" ] && [ -n "$M_HEADERS" ]; then
+# The heading every provider from configs.jsonc shares in OpenCode's model
+# dialog, which groups by display name. OpenCode's own services keep headings of
+# their own, and the dialog pins OpenCode Zen to the top.
+OPENCODE_PROVIDER_HEADING="Subscriptions"
+
+opencode_provider_json() { # <apiKey reference> [<header ref fn>] — one provider
+                           # block. The key and the header values are only ever
+                           # referenced ({file:...}).
+  local api_key=$1 headers=''
+  if [ -n "${2:-}" ] && [ -n "$M_HEADERS" ]; then
     headers=",
         \"headers\": {
-$(headers_json "$3")
+$(headers_json "$2")
         }"
   fi
 
-  # models.dev already knows this provider: naming its id is enough for OpenCode
-  # to pull the package, the endpoint and every model from that registry, so the
-  # only thing missing is the credential. The endpoint is then the one the
-  # registry lists, which is usually the provider's OpenAI-compatible route
-  # rather than the Anthropic one BASE_URL points at.
-  if [ "$M_SCHEMA" = models.dev ]; then
-    # The registry supplies the package, the endpoint and its own catalogue; the
-    # models declared here are merged on top, so a provider can offer one the
-    # registry does not carry.
-    cat <<EOF
-    "$(opencode_provider_id)": {
-      "options": {
-        "apiKey": "$api_key"$headers
-      },
-      "models": {
-$M_OPENCODE_MODELS_JSON
-      }
-    }
-EOF
-    return 0
-  fi
-
-  # Declared here in full. The AI SDK Anthropic provider appends "/messages" to
-  # its baseURL, while BASE_URL is the Claude Code form that gets "/v1/messages"
-  # appended — so baseURL is BASE_URL plus "/v1".
+  # The AI SDK Anthropic provider appends "/messages" to its baseURL, while
+  # BASE_URL is the Claude Code form that gets "/v1/messages" appended — so
+  # baseURL is BASE_URL plus "/v1".
   cat <<EOF
     "$(opencode_provider_id)": {
       "npm": "@ai-sdk/anthropic",
-      "name": "$name",
+      "name": "$OPENCODE_PROVIDER_HEADING",
       "options": {
         "baseURL": "$M_BASE_URL/v1",
         "apiKey": "$api_key"$headers

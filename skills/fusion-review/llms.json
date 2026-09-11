@@ -16,7 +16,7 @@
       "label": "DeepSeek (opencode)",
       "enabled": true,
       "schema": "stdin",
-      "command": "opencode run --model deepseek/deepseek-flash --agent plan",
+      "command": "opencode run --model deepseek-anthropic/deepseek-flash --agent plan",
       "timeout_ms": 1200000,
       "notes": "--agent plan で read-only"
     },
@@ -25,7 +25,7 @@
       "label": "Zhipu AI GLM (opencode)",
       "enabled": true,
       "schema": "stdin",
-      "command": "opencode run --model zai-coding-plan/glm-5.3-flash --agent plan",
+      "command": "opencode run --model glm-anthropic/glm-5.3-flash --agent plan",
       "timeout_ms": 1200000,
       "notes": "--agent plan で read-only"
     }

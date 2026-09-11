@@ -2,7 +2,7 @@
 # Register every configured provider in OpenCode's global config
 # (`make opencode-global`). OpenCode has no launcher in this repo: a bare
 # `opencode` reads the generated ~/.config/opencode/opencode.json, and /models
-# lists every provider.
+# lists every provider under one heading, apart from OpenCode's own services.
 #
 # Everything comes from configs.jsonc. The config itself carries no secret: each
 # key and header value is referenced as {file:...} pointing at a copy this
@@ -47,7 +47,7 @@ fi
 # The provider the session's model / small_model start on.
 default_provider=$(default_provider "${providers[@]}")
 
-# The prefix is the id the provider is filed under, which follows its schema.
+# The prefix is the id the provider is filed under in OpenCode.
 default_models=$(
   models_resolve "$default_provider"
   printf '%s\n%s\n%s' "$(opencode_provider_id)" "$M_DEFAULT_MODEL" "$M_SMALL_MODEL"
@@ -82,7 +82,7 @@ for provider in "${providers[@]}"; do
       printf '%s' "$(header_value "$name")" > "$TOKENS_DIR/$provider.$name.header"
       chmod 600 "$TOKENS_DIR/$provider.$name.header"
     done < <(header_names)
-    opencode_provider_json "$provider" "{file:$TOKENS_DIR/$provider.token}" opencode_header_ref
+    opencode_provider_json "{file:$TOKENS_DIR/$provider.token}" opencode_header_ref
   )")
   if lean_provider "$provider"; then
     cp "$LEAN_PROMPT" "$TOKENS_DIR/$provider.prompt.md"

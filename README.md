@@ -14,7 +14,7 @@ One repo that installs a `claude<name>` launcher command per provider and genera
 
 Only Claude Code gets a per-provider command. The other five have no launcher: `make setup` writes every provider into their global configs, so a bare `opencode` gets them all under `/models`, a bare `pi` under `/model`, and `crush`, `reasonix` and `codewhale` each start with the whole set.
 
-Kimi runs that flagship as its 1M-context variant under Claude Code (`kimi-k3[1m]`); the other CLIs take the id their own catalog lists.
+Kimi runs that flagship as its 1M-context variant under Claude Code (`kimi-k3[1m]`); the other CLIs send the plain `kimi-k3`.
 
 Each provider exposes a native Anthropic-compatible endpoint, so there is no proxy or translation layer — just environment variables. That holds for the local one too: `llama-server` answers `/v1/messages` in the Anthropic shape. Every generated config runs against the very same endpoint and token, and every model any of them can reach is declared in one place: `configs.jsonc` at the repo root, in git, with [tags](#tags) naming the slot each model fills. It holds no secret — an API key is written there as `${DEEPSEEK_API_KEY}` and read from the single gitignored `.env` beside it.
 
@@ -130,7 +130,8 @@ mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/mig
 [2026-09-05 — OpenCode の lean エージェント](docs/migrations/2026-09-05-opencode-lean-agent.md),
 [2026-09-08 — claude-code-settings の統合](docs/migrations/2026-09-08-merge-claude-code-settings.md),
 [2026-09-08 — OpenCode の `/goal`](docs/migrations/2026-09-08-opencode-goal.md),
-and [2026-09-09 — providers/ 廃止と configs.jsonc への集約](docs/migrations/2026-09-09-configs-jsonc.md).
+[2026-09-09 — providers/ 廃止と configs.jsonc への集約](docs/migrations/2026-09-09-configs-jsonc.md),
+and [2026-09-11 — OpenCode の Subscriptions 見出し](docs/migrations/2026-09-11-opencode-subscriptions.md).
 
 ### Make targets
 
@@ -187,7 +188,7 @@ pi --model glm/glm-5.3                     # or pick at launch time
 
 Both generators start you on the same provider, `glm` by default; see [Default provider](#default-provider). For pi that means `defaultProvider` / `defaultModel` in `~/.pi/agent/settings.json`, the two keys Ctrl+S in `/model` writes — so a re-run replaces a pick you saved there. The rest of that file is left as it is. Writing them needs `python3`; without it the two keys are skipped and pi starts wherever it was.
 
-OpenCode has no `open<name>` commands. `make setup` (and `make opencode-global`) write every provider that has a token into the global `~/.config/opencode/opencode.json`, so a bare `opencode` starts with all of them and `/models` switches mid-session:
+OpenCode has no `open<name>` commands. `make setup` (and `make opencode-global`) write every provider that has a token into the global `~/.config/opencode/opencode.json`, so a bare `opencode` starts with all of them and `/models` switches mid-session — every one of them under a single **Subscriptions** heading, apart from OpenCode's own Zen and Go (see [OpenCode's model dialog](#opencodes-model-dialog)):
 
 ```bash
 opencode                                   # starts on the default provider's model
@@ -434,8 +435,6 @@ ends in, what each generated config files the provider under, and what
 | `claude.args` | Default options prepended to every launch of that command (word-split; your arguments come after them) |
 | `claude.env` | Extra environment exported to Claude Code as-is |
 | `claude.auto_compact_window` | Overrides the main model's `context_window` as Claude Code's compaction threshold |
-| `schema` | Where OpenCode takes this provider's catalog from — see [Schema resolution](#schema-resolution). `local` (the default) declares it here; `models.dev` writes only the key and lets that registry supply the rest |
-| `schema_id` | The id that registry knows the provider by. Defaults to the provider's name |
 | `opencode.lean` | `true` gives the provider [a lean agent of its own](#lean-agents) |
 | `opencode.context_window`, `opencode.max_tokens` | Cap every model's limits for OpenCode. These are the window a session may grow into before it is compacted, so a backend too slow to prefill its full context sets them lower — `gtr` does |
 
@@ -486,48 +485,36 @@ than have its secret written into one — the generator names which and why. Tha
 is why `gtr`, whose Cloudflare Access token travels in a header, reaches every
 CLI here except Reasonix.
 
-### Schema resolution
+### OpenCode's model dialog
 
-A provider's *catalog* — the package that talks to it, the endpoint it lives at,
-the models it serves and each model's limits — has to come from somewhere. Only
-OpenCode will take one from outside, and `schema` on the provider says whether
-it does:
+OpenCode's `/models` lists models under one heading per provider display name,
+pins OpenCode Zen to the top and orders the rest by name. The generated config
+gives every provider in `configs.jsonc` the same display name, so they share one
+heading, and each model's own display name carries its provider:
 
-```jsonc
-"schema": "models.dev",
-"schema_id": "zai-coding-plan"
+```
+OpenCode Zen          OpenCode's own, from /connect
+OpenCode Go           OpenCode's own, from /connect
+Subscriptions         everything in configs.jsonc
+  deepseek · deepseek-v4-pro
+  glm · glm-5.3
+  kimi · kimi-k3
+  local · default
 ```
 
-`local`, the default, declares the provider in full: the package, the endpoint
-and every model below it. `models.dev` writes only the key and lets
-[that registry](https://models.dev) supply the rest, against whichever endpoint
-it lists; `schema_id` is the name the registry knows the provider by, and
-defaults to the provider's own.
+Nothing under Subscriptions comes from OpenCode's own catalog (models.dev). Each
+provider is declared in full against the Anthropic endpoint `BASE_URL` names —
+the route its `claude<name>` launcher uses — with exactly the models listed in
+`configs.jsonc`. It is filed under `<name>-anthropic`, and the suffix is what
+keeps it apart from a provider of the same name in that catalog, whose
+definition OpenCode would otherwise merge into it. Crush and Codewhale ship
+catalogs that merge the same way, so their generators use the same kind of id.
 
-The other generated configs do not have the choice, and do not need it. pi,
-Crush, Reasonix and Codewhale each declare the provider where it is: the
-Anthropic endpoint `BASE_URL` names, with the models from `configs.jsonc` and
-the limits each one carries. Crush and Codewhale ship catalogs of their own and
-merge an entry into whichever of theirs has the same id, so a provider declared
-here is filed under an id of its own to stay out of the way.
-
-**What an outside registry costs.** It lists one endpoint per provider, the one
-it considers primary, and for most providers that is their OpenAI-compatible
-route rather than the Anthropic `BASE_URL` above — DeepSeek resolves to
-`@ai-sdk/openai-compatible` at `api.deepseek.com`, Z.AI to `api.z.ai/api/paas/v4`,
-while `kimi-for-coding` is registered as `@ai-sdk/anthropic`. So
-that agent and the launcher stop sharing a route, models the registry does not
-carry disappear, and a model tagged for a slot that the registry lacks leaves the
-generated reference pointing at nothing.
-
-What it does not cost is speed. Against DeepSeek both routes were measured at
-0.017 s per output token (medians over 8 alternating runs of an identical 8.5K
-prompt, `deepseek-v4-flash`), TTFT 0.78 s on the OpenAI route against 0.85 s on
-the Anthropic one, and both hit the same prompt cache — 8,448 cached tokens
-either way, so the Anthropic route is a shim over the same backend. Reasoning
-survives on both. The one genuine difference is accounting: the Anthropic route
-reports cached tokens outside `input_tokens`, the OpenAI route inside
-`prompt_tokens`, which is what an agent's cost and context readouts display.
+OpenCode Zen and OpenCode Go are OpenCode's own services: `/connect` stores their
+key in OpenCode's `auth.json`, and nothing here generates them. They serve some
+of the same model ids as the providers here, so the heading, not the id, says
+whose quota a request draws on. The prompt footer prints the model with its
+heading — `glm · glm-5.3 Subscriptions` against `GLM-5.3 OpenCode Go`.
 
 ### `.env`
 
@@ -571,7 +558,8 @@ every provider that has a token into the global
 `~/.config/opencode/opencode.json` — the same `<name>-anthropic` custom
 `@ai-sdk/anthropic` providers, `baseURL` set to `<BASE_URL>/v1` (the AI SDK
 appends `/messages`, landing on the same `/v1/messages` route Claude Code
-uses), so `/models` lists every model in every provider's `models.json`. Tokens
+uses), each named `Subscriptions` and each model labelled `<name> · <model>`, so
+`/models` lists every model in `configs.jsonc` under that one heading. Tokens
 stay out of the file: each entry's `apiKey` is a `{file:...}` reference to a
 per-provider key file under `~/.config/opencode/claude-compatibles/`
 (chmod 600) written from the `.env` at the same time — `.env` stays the single
