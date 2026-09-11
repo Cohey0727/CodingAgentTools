@@ -427,7 +427,7 @@ main() {
     prompt_token "$p"
   done
 
-  section 'installing launchers'
+  section 'installing claude code compatibles'
   mkdir -p "$BIN_DIR"
   for p in "${providers[@]}"; do
     install_launcher "$p"
