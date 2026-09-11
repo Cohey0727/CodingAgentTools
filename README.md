@@ -186,7 +186,7 @@ pi                                         # starts on the default provider's mo
 pi --model glm/glm-5.3                     # or pick at launch time
 ```
 
-Both generators start you on the same provider, `glm` by default; see [Default provider](#default-provider). For pi that means `defaultProvider` / `defaultModel` in `~/.pi/agent/settings.json`, the two keys Ctrl+S in `/model` writes — so a re-run replaces a pick you saved there. The rest of that file is left as it is. Writing them needs `python3`; without it the two keys are skipped and pi starts wherever it was.
+Both generators start you on the same provider; see [Default provider](#default-provider). For pi that means `defaultProvider` / `defaultModel` in `~/.pi/agent/settings.json`, the two keys Ctrl+S in `/model` writes — so a re-run replaces a pick you saved there. The rest of that file is left as it is. Writing them needs `python3`; without it the two keys are skipped and pi starts wherever it was.
 
 OpenCode has no `open<name>` commands. `make setup` (and `make opencode-global`) write every provider that has a token into the global `~/.config/opencode/opencode.json`, so a bare `opencode` starts with all of them and `/models` switches mid-session — every one of them under a single **Subscriptions** heading, apart from OpenCode's own Zen and Go (see [OpenCode's model dialog](#opencodes-model-dialog)):
 
@@ -224,7 +224,7 @@ Every generated global config starts on whichever provider is marked `primary` i
 }
 ```
 
-At most one provider may say so. When it has no token the first configured one wins instead, so a fresh checkout still gets a working one. It sets OpenCode's `model` and `small_model`, and pi's `defaultProvider` / `defaultModel`. A launcher has no such setting: each one pins the provider baked into it.
+At most one provider may say so. When none does, or it has no token, the first configured one wins instead, so a fresh checkout still gets a working one. It sets OpenCode's `model` and `small_model`, and pi's `defaultProvider` / `defaultModel`. A launcher has no such setting: each one pins the provider baked into it.
 
 OpenCode can start somewhere else. `make opencode-global` writes the top-level `opencode.overrides` in `configs.jsonc` to `~/.config/opencode/opencode.jsonc` as it stands. OpenCode reads that file after the generated `opencode.json`, so its keys win. That is how OpenCode starts on a model of OpenCode Go, which comes in through `/connect` and is not a provider here:
 
