@@ -51,7 +51,7 @@ CLAUDE_SLOTS = {
 }
 
 MODEL_KEYS = {"id", "claude_id", "tags", "context_window", "max_tokens", "reasoning", "input"}
-PROVIDER_KEYS = {"API_KEY", "BASE_URL", "REQUEST_HEADERS", "primary", "defaults", "claude", "opencode", "models"}
+PROVIDER_KEYS = {"label", "API_KEY", "BASE_URL", "REQUEST_HEADERS", "primary", "defaults", "claude", "opencode", "models"}
 CLAUDE_KEYS = {"command", "args", "env", "auto_compact_window"}
 OPENCODE_KEYS = {"lean", "context_window", "max_tokens"}
 
@@ -162,6 +162,10 @@ def load(name):
         raise ConfigError(f"{where}: must be an object")
     _check_keys(where, raw, PROVIDER_KEYS)
 
+    label = raw.get("label", name)
+    if not isinstance(label, str) or not label:
+        raise ConfigError(f"{where}: label must be a non-empty string")
+
     base_url = expand(raw.get("BASE_URL") or "").rstrip("/")
     if not base_url:
         raise ConfigError(f"{where}: BASE_URL is required")
@@ -235,6 +239,7 @@ def load(name):
     api_key_var, api_key_fallback = sole_reference(raw.get("API_KEY") or "")
     return {
         "name": name,
+        "label": label,
         "api_key": expand(raw.get("API_KEY") or ""),
         "api_key_var": api_key_var,
         "api_key_fallback": api_key_fallback,
@@ -271,16 +276,16 @@ def pi_models_json(config):
 def opencode_models_json(config):
     """The "models" object body of an OpenCode provider block, indented to fit.
 
-    Every provider shares one heading in OpenCode's model dialog, so the model's
-    display name is what carries the provider. OpenCode compacts a session once
-    it fills the context, so opencode.context_window caps the window a
+    Every provider shares one heading in OpenCode's model dialog, so each model's
+    display name leads with the provider's label. OpenCode compacts a session
+    once it fills the context, so opencode.context_window caps the window a
     conversation may grow into — not the endpoint's capacity.
     """
     context_cap = config["opencode_context_window"]
     output_cap = config["opencode_max_tokens"]
     return ",\n".join(
         f'        "{model["id"]}": {{'
-        f' "name": {json.dumps(config["name"] + " · " + model["id"], ensure_ascii=False)},'
+        f' "name": {json.dumps(config["label"] + " " + model["id"], ensure_ascii=False)},'
         f' "limit": {{ "context": {context_cap or model["context_window"]},'
         f' "output": {output_cap or model["max_tokens"]} }} }}'
         for model in config["models"]

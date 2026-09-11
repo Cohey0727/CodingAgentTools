@@ -427,6 +427,7 @@ ends in, what each generated config files the provider under, and what
 
 | Field | Meaning |
 |-------|---------|
+| `label` | The provider's name in OpenCode's model dialog, where it leads each model's name (`Z.AI glm-5.3`). Defaults to the provider's name |
 | `API_KEY` | **Required.** A `${VAR}` reference to the key |
 | `BASE_URL` | **Required.** The provider's Anthropic-compatible endpoint, as `${VAR:-default}` so `.env` can route it elsewhere |
 | `REQUEST_HEADERS` | Extra request headers as a `{ "Name": "value" }` object, sent by every CLI — e.g. a Cloudflare Access service token in front of a self-hosted server. A value written as `${VAR}` is referenced wherever the CLI's format can express a reference |
@@ -490,16 +491,16 @@ CLI here except Reasonix.
 OpenCode's `/models` lists models under one heading per provider display name,
 pins OpenCode Zen to the top and orders the rest by name. The generated config
 gives every provider in `configs.jsonc` the same display name, so they share one
-heading, and each model's own display name carries its provider:
+heading, and each model's display name leads with its provider's `label`:
 
 ```
 OpenCode Zen          OpenCode's own, from /connect
 OpenCode Go           OpenCode's own, from /connect
 Subscriptions         everything in configs.jsonc
-  deepseek · deepseek-v4-pro
-  glm · glm-5.3
-  kimi · kimi-k3
-  local · default
+  DeepSeek deepseek-v4-pro
+  Z.AI glm-5.3
+  kimi kimi-k3
+  local default
 ```
 
 Nothing under Subscriptions comes from OpenCode's own catalog (models.dev). Each
@@ -514,7 +515,7 @@ OpenCode Zen and OpenCode Go are OpenCode's own services: `/connect` stores thei
 key in OpenCode's `auth.json`, and nothing here generates them. They serve some
 of the same model ids as the providers here, so the heading, not the id, says
 whose quota a request draws on. The prompt footer prints the model with its
-heading — `glm · glm-5.3 Subscriptions` against `GLM-5.3 OpenCode Go`.
+heading — `Z.AI glm-5.3 Subscriptions` against `GLM-5.3 OpenCode Go`.
 
 ### `.env`
 
@@ -558,7 +559,7 @@ every provider that has a token into the global
 `~/.config/opencode/opencode.json` — the same `<name>-anthropic` custom
 `@ai-sdk/anthropic` providers, `baseURL` set to `<BASE_URL>/v1` (the AI SDK
 appends `/messages`, landing on the same `/v1/messages` route Claude Code
-uses), each named `Subscriptions` and each model labelled `<name> · <model>`, so
+uses), each named `Subscriptions` and each model named `<label> <model>`, so
 `/models` lists every model in `configs.jsonc` under that one heading. Tokens
 stay out of the file: each entry's `apiKey` is a `{file:...}` reference to a
 per-provider key file under `~/.config/opencode/claude-compatibles/`

@@ -7,9 +7,9 @@ OpenCode の `/models` で、自分で契約したエンドポイントと、Ope
 OpenCode Zen          OpenCode のサービス。/connect で入れる
 OpenCode Go           OpenCode のサービス。/connect で入れる
 Subscriptions         configs.jsonc の全 provider
-  deepseek · deepseek-v4-pro
-  glm · glm-5.3
-  kimi · kimi-k3
+  DeepSeek deepseek-v4-pro
+  Z.AI glm-5.3
+  kimi kimi-k3
   ...
 ```
 
@@ -55,4 +55,5 @@ opencode models | grep -- -anthropic/
 ```
 
 `/models` を開き、configs.jsonc のモデルがすべて **Subscriptions** の下に
-`<provider> · <model>` で並んでいること。
+`<label> <model>` で並んでいること。`label` は configs.jsonc の provider の
+表示名で、書かなければ provider 名になる。

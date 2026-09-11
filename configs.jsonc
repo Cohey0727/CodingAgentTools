@@ -5,6 +5,7 @@
   "providers": {
 
     "deepseek": {
+      "label": "DeepSeek",
       "API_KEY": "${DEEPSEEK_API_KEY}",
       "BASE_URL": "${DEEPSEEK_BASE_URL:-https://api.deepseek.com/anthropic}",
 
@@ -24,6 +25,7 @@
     },
 
     "glm": {
+      "label": "Z.AI",
       "primary": true,
       "API_KEY": "${GLM_API_KEY}",
       "BASE_URL": "${GLM_BASE_URL:-https://api.z.ai/api/anthropic}",
