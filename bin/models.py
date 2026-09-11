@@ -15,6 +15,7 @@ The file is JSON with // line comments allowed.
   models.py tags <provider>     "<id><tab><tag>,<tag>" per model
   models.py providers           one provider name per line
   models.py primary             the provider marked "primary", if any
+  models.py opencode-overrides  the top-level opencode.overrides, as JSON
   models.py env-vars            every "${NAME}" the file references, with its provider
 """
 
@@ -54,6 +55,7 @@ MODEL_KEYS = {"id", "claude_id", "tags", "context_window", "max_tokens", "reason
 PROVIDER_KEYS = {"label", "API_KEY", "BASE_URL", "REQUEST_HEADERS", "primary", "defaults", "claude", "opencode", "models"}
 CLAUDE_KEYS = {"command", "args", "env", "auto_compact_window"}
 OPENCODE_KEYS = {"lean", "context_window", "max_tokens"}
+OPENCODE_ROOT_KEYS = {"overrides"}
 
 REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
 
@@ -126,7 +128,7 @@ def _int(where, value, key):
     return value
 
 
-def load_file():
+def load_root():
     try:
         raw = json.loads(strip_comments(CONFIGS.read_text()))
     except FileNotFoundError:
@@ -137,7 +139,24 @@ def load_file():
         raise ConfigError(f"{CONFIGS}: top level must be an object with a \"providers\" object")
     if not raw["providers"]:
         raise ConfigError(f"{CONFIGS}: providers is empty")
-    return raw["providers"]
+    return raw
+
+
+def load_file():
+    return load_root()["providers"]
+
+
+def opencode_overrides():
+    """The top-level opencode.overrides: OpenCode's opencode.jsonc, as it stands."""
+    where = f"{CONFIGS}: opencode"
+    raw = load_root().get("opencode") or {}
+    if not isinstance(raw, dict):
+        raise ConfigError(f"{where}: must be an object")
+    _check_keys(where, raw, OPENCODE_ROOT_KEYS)
+    overrides = raw.get("overrides") or {}
+    if not isinstance(overrides, dict):
+        raise ConfigError(f"{where}: overrides must be an object")
+    return overrides
 
 
 def primary_provider():
@@ -386,7 +405,7 @@ def env_vars():
 def main(argv):
     action = argv[1] if len(argv) > 1 else ""
     argument = argv[2] if len(argv) > 2 else ""
-    if action not in ("sh", "check", "tags", "providers", "env-vars", "primary", "vocabulary"):
+    if action not in ("sh", "check", "tags", "providers", "env-vars", "primary", "opencode-overrides", "vocabulary"):
         print(__doc__.strip(), file=sys.stderr)
         return 2
     try:
@@ -394,6 +413,8 @@ def main(argv):
             print("\n".join(load_file()))
         elif action == "primary":
             print(primary_provider())
+        elif action == "opencode-overrides":
+            print(json.dumps(opencode_overrides(), indent=2, ensure_ascii=False))
         elif action == "vocabulary":
             print(vocabulary())
         elif action == "env-vars":
@@ -402,6 +423,7 @@ def main(argv):
             for name in load_file():
                 load(name)
             primary_provider()
+            opencode_overrides()
         elif not argument:
             print(f"models.py {action}: a provider name is required", file=sys.stderr)
             return 2

@@ -14,6 +14,10 @@
 # prompt with a short one and drops the tools a small self-hosted model has no
 # use for. The session starts on that agent when the provider is also the
 # default one.
+#
+# configs.jsonc's top-level opencode.overrides is written as it stands to
+# opencode.jsonc beside the config. OpenCode reads that file after opencode.json,
+# so its keys win over the generated ones.
 
 set -euo pipefail
 
@@ -23,14 +27,19 @@ LEAN_PROMPT="$ROOT/bin/opencode-lean-prompt.md"
 source "$ROOT/bin/common.sh"
 
 OUT=$(opencode_global_config_path)
+OVERRIDES_OUT=$(opencode_overrides_path)
 CONFIG_DIR=$(dirname "$OUT")
 TOKENS_DIR=$(opencode_tokens_dir)
 
-if [ -f "$OUT" ] && ! generated_here "$OUT"; then
-  echo "opencode-global: $OUT already exists and was not generated here." >&2
-  echo "  merge it by hand, or move it aside and re-run 'make opencode-global'." >&2
-  exit 1
-fi
+for out in "$OUT" "$OVERRIDES_OUT"; do
+  if [ -f "$out" ] && ! generated_here "$out"; then
+    echo "opencode-global: $out already exists and was not generated here." >&2
+    echo "  merge it by hand, or move it aside and re-run 'make opencode-global'." >&2
+    exit 1
+  fi
+done
+
+overrides=$("$PYTHON" "$MODELS_PY" opencode-overrides)
 
 # Every provider whose key resolves to something.
 providers=()
@@ -128,3 +137,6 @@ mkdir -p "$CONFIG_DIR"
 } > "$OUT"
 
 echo "  Wrote $OUT (${#entries[@]} providers, ${#agents[@]} lean agents, default $model)"
+
+printf '%s\n%s\n' "$OPENCODE_GLOBAL_MARKER" "$overrides" > "$OVERRIDES_OUT"
+echo "  Wrote $OVERRIDES_OUT"

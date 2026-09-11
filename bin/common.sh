@@ -63,6 +63,11 @@ opencode_global_config_path() { # -> the opencode.json `make opencode-global` wr
   printf '%s/opencode.json' "$(opencode_config_dir)"
 }
 
+opencode_overrides_path() { # -> the opencode.jsonc `make opencode-global` writes
+                            # from configs.jsonc's opencode.overrides
+  printf '%s/opencode.jsonc' "$(opencode_config_dir)"
+}
+
 opencode_tokens_dir() { # -> per-provider secret files the generated config references
   printf '%s/claude-compatibles' "$(opencode_config_dir)"
 }
@@ -76,10 +81,11 @@ crush-global-config
 reasonix-global-config
 codewhale-global-config"
 
-# The path each of those owns, in the same order. Named here rather than in the
+# The paths those write, in the same order. Named here rather than in the
 # Makefile so uninstall removes them all without spelling any of them out.
 GENERATED_CONFIG_PATHS="pi_global_models_path
 opencode_global_config_path
+opencode_overrides_path
 crush_global_config_path
 reasonix_global_config_path
 codewhale_global_config_path"
