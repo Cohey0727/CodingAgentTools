@@ -499,8 +499,8 @@ OpenCode Go           OpenCode's own, from /connect
 Subscriptions         everything in configs.jsonc
   DeepSeek deepseek-v4-pro
   Z.AI glm-5.3
-  kimi kimi-k3
-  local default
+  Moonshot kimi-k3
+  Local default
 ```
 
 Nothing under Subscriptions comes from OpenCode's own catalog (models.dev). Each

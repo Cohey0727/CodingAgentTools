@@ -9,7 +9,7 @@ OpenCode Go           OpenCode のサービス。/connect で入れる
 Subscriptions         configs.jsonc の全 provider
   DeepSeek deepseek-v4-pro
   Z.AI glm-5.3
-  kimi kimi-k3
+  Moonshot kimi-k3
   ...
 ```
 

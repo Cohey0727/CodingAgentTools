@@ -48,6 +48,7 @@
     },
 
     "kimi": {
+      "label": "Moonshot",
       "API_KEY": "${KIMI_API_KEY}",
       "BASE_URL": "${KIMI_BASE_URL:-https://api.kimi.com/coding}",
 
@@ -71,6 +72,7 @@
     },
 
     "local": {
+      "label": "Local",
       // llama-server takes no auth, but the CLIs require a non-empty value.
       "API_KEY": "${LOCAL_API_KEY:-local}",
       "BASE_URL": "${LOCAL_BASE_URL:-http://127.0.0.1:11301}",
@@ -93,6 +95,7 @@
     },
 
     "gtr": {
+      "label": "GTR9",
       // llama-server takes no auth unless started with --api-key, but the CLIs
       // require a non-empty value.
       "API_KEY": "${GTR_API_KEY:-gtr}",
