@@ -119,8 +119,6 @@
       "claude": { "env": { "CLAUDE_CODE_EFFORT_LEVEL": "low" } },
 
       "opencode": {
-        "lean": true,
-
         // The window a session may grow into before OpenCode compacts it, not
         // the server's capacity: this server needs minutes to prefill more.
         "context_window": 16384,
