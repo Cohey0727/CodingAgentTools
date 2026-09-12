@@ -39,6 +39,7 @@ const USAGE = `/loop <task>                   repeat the task every turn until d
 /loop --until "TEXT" <task>    stop when a reply contains TEXT
 /loop --until-stable 2 <task>  stop when the same reply repeats
 /loop --timeout 30m <task>     stop after 30 minutes
+/loop --every 5m <task>        wait 5 minutes between turns
 /loop                          show the current loop
 /loop pause | resume | clear   control it`
 
@@ -130,12 +131,13 @@ function parseArguments(raw) {
   let until = []
   let untilStable = null
   let timeoutMs = null
+  let everyMs = null
   while (rest.length) {
     const [flag, ...tail] = rest
     const [name, inline] = flag.includes("=")
       ? [flag.slice(0, flag.indexOf("=")), flag.slice(flag.indexOf("=") + 1)]
       : [flag, null]
-    if (name !== "--max" && name !== "--until" && name !== "--until-stable" && name !== "--timeout") break
+    if (name !== "--max" && name !== "--until" && name !== "--until-stable" && name !== "--timeout" && name !== "--every") break
 
     const value = inline ?? tail[0]
     if (value === undefined) return { action: "error", message: `${name} needs a value` }
@@ -152,14 +154,15 @@ function parseArguments(raw) {
     } else {
       const parsed = parseDuration(value)
       if (parsed === null) return { action: "error", message: `not a duration (30s, 5m, 1h): ${value}` }
-      timeoutMs = parsed
+      if (name === "--every") everyMs = parsed
+      else timeoutMs = parsed
     }
     rest = inline ? tail : tail.slice(1)
   }
 
   const task = rest.join(" ").trim()
   if (!task) return { action: "error", message: "no task given" }
-  return { action: "set", task, max, until, untilStable, timeoutMs }
+  return { action: "set", task, max, until, untilStable, timeoutMs, everyMs }
 }
 
 // ------------------------------------------------------------------ display
@@ -176,6 +179,8 @@ function formatDuration(ms) {
 
 function budgetLine(state) {
   const parts = [`iteration ${state.iteration} of ${state.max}`]
+  if (state.everyMs) parts.push(`every ${formatDuration(state.everyMs)}`)
+  if (state.status === "active" && state.nextAt && state.nextAt > Date.now()) parts.push(`next in ${formatDuration(state.nextAt - Date.now())}`)
   if (state.deadline) parts.push(`${formatDuration(Math.max(0, state.deadline - Date.now()))} left`)
   if (state.until.length) parts.push(state.until.map((text) => `"${text}"`).join(" or "))
   if (state.untilStable) parts.push(`stable ${state.untilStable}`)
@@ -257,9 +262,66 @@ export const plugin = ({ tool }) => async ({ client }) => {
     } catch {}
   }
 
+  // --every waits out the interval with one timer per session. Timers live in
+  // the opencode process, and `busy` keeps a due timer from cutting into a turn
+  // that is already running — the next idle picks the loop back up instead.
+  const timers = new Map()
+  const busy = new Set()
+
+  const clearTimer = (sessionID) => {
+    const timer = timers.get(sessionID)
+    if (timer) clearTimeout(timer)
+    timers.delete(sessionID)
+  }
+
   const stop = async (sessionID, state, status, reason) => {
+    clearTimer(sessionID)
     writeState(sessionID, { ...state, status, reason, updatedAt: Date.now() })
     await toast(`${status}${reason ? ` — ${reason}` : ""}`, status === "complete" ? "success" : "warning")
+  }
+
+  const dispatch = async (sessionID, state) => {
+    const next = {
+      ...state,
+      iteration: state.iteration + 1,
+      nextAt: state.everyMs ? Date.now() + state.everyMs : null,
+      updatedAt: Date.now(),
+    }
+    writeState(sessionID, next)
+    busy.add(sessionID)
+    try {
+      await client.session.promptAsync({
+        path: { id: sessionID },
+        body: { parts: [{ type: "text", text: continuePrompt(next) }] },
+      })
+    } catch (error) {
+      await stop(sessionID, next, "paused", `could not continue: ${error?.message ?? error}`)
+    }
+  }
+
+  const fire = async (sessionID) => {
+    const state = readState(sessionID)
+    if (!state || state.status !== "active" || state.runtime !== RUNTIME) return
+    if (busy.has(sessionID)) return
+    if (state.deadline && Date.now() >= state.deadline) {
+      await stop(sessionID, state, "timeout", `time budget reached (${formatDuration(state.timeoutMs)})`)
+      return
+    }
+    if (state.iteration >= state.max) {
+      await stop(sessionID, state, "budget", `turn limit reached (${state.max})`)
+      return
+    }
+    await dispatch(sessionID, state)
+  }
+
+  const armTimer = (sessionID, delayMs) => {
+    clearTimer(sessionID)
+    const timer = setTimeout(() => {
+      timers.delete(sessionID)
+      void fire(sessionID)
+    }, Math.max(0, delayMs))
+    timer.unref?.()
+    timers.set(sessionID, timer)
   }
 
   // A control subcommand still costs a turn, and that turn ends in an idle
@@ -308,6 +370,7 @@ export const plugin = ({ tool }) => async ({ client }) => {
         async execute(args, ctx) {
           const state = readState(ctx.sessionID)
           if (!state || state.status !== "active") return "No loop is active in this session; nothing to finish."
+          clearTimer(ctx.sessionID)
           writeState(ctx.sessionID, { ...state, status: args.status, summary: args.summary, updatedAt: Date.now() })
           await toast(`${args.status}: ${args.summary}`, args.status === "complete" ? "success" : "warning")
           return `Loop marked ${args.status}. The session will stop repeating the task on its own.`
@@ -346,6 +409,7 @@ export const plugin = ({ tool }) => async ({ client }) => {
             return
           }
           const paused = writeState(sessionID, { ...state, status: "paused", reason: "paused by the user", updatedAt: Date.now() })
+          clearTimer(sessionID)
           await toast("paused")
           reply(ackPrompt("The user paused the loop. Stop repeating the task.", paused))
           return
@@ -381,6 +445,7 @@ export const plugin = ({ tool }) => async ({ client }) => {
         }
 
         case "clear": {
+          clearTimer(sessionID)
           dropState(sessionID)
           await toast("cleared")
           reply(ackPrompt("The user cleared the loop. Stop repeating the task.", null))
@@ -406,7 +471,9 @@ export const plugin = ({ tool }) => async ({ client }) => {
             until: parsed.until,
             untilStable: parsed.untilStable ?? 0,
             timeoutMs: parsed.timeoutMs,
+            everyMs: parsed.everyMs,
             deadline: parsed.timeoutMs ? Date.now() + parsed.timeoutMs : null,
+            nextAt: parsed.everyMs ? Date.now() + parsed.everyMs : null,
             replies: [],
             runtime: RUNTIME,
             skipNextIdle: false,
@@ -414,6 +481,7 @@ export const plugin = ({ tool }) => async ({ client }) => {
             createdAt: Date.now(),
             updatedAt: Date.now(),
           })
+          clearTimer(sessionID)
           await toast(`active — ${budgetLine(next)}`, "success")
           reply(startPrompt(next))
           return
@@ -427,9 +495,16 @@ export const plugin = ({ tool }) => async ({ client }) => {
         if (info?.role === "assistant") lastAssistant.set(info.sessionID, info)
         return
       }
+      if (event.type === "session.status") {
+        const { sessionID, status } = event.properties
+        if (status?.type === "idle") busy.delete(sessionID)
+        else busy.add(sessionID)
+        return
+      }
       if (event.type !== "session.idle") return
 
       const sessionID = event.properties.sessionID
+      busy.delete(sessionID)
       const state = readState(sessionID)
       if (!state || state.status !== "active") return
 
@@ -481,23 +556,23 @@ export const plugin = ({ tool }) => async ({ client }) => {
         return
       }
 
-      const next = {
+      const withTurn = {
         ...state,
-        iteration: state.iteration + 1,
         replies,
         lastTurn: last?.id ?? null,
         updatedAt: Date.now(),
       }
 
-      writeState(sessionID, next)
-      try {
-        await client.session.promptAsync({
-          path: { id: sessionID },
-          body: { parts: [{ type: "text", text: continuePrompt(next) }] },
-        })
-      } catch (error) {
-        await stop(sessionID, next, "paused", `could not continue: ${error?.message ?? error}`)
+      // --every: this turn is accounted for, but the next one is not due yet.
+      // Waiting here rather than in the model is what makes the interval; a
+      // manual turn that lands in the gap runs first and re-arms the timer.
+      if (withTurn.everyMs && withTurn.nextAt && Date.now() < withTurn.nextAt) {
+        writeState(sessionID, withTurn)
+        armTimer(sessionID, withTurn.nextAt - Date.now())
+        return
       }
+
+      await dispatch(sessionID, withTurn)
     },
   }
 }
