@@ -118,7 +118,7 @@ One interactive wizard does everything:
 5. The pi packages that add [`/loop` and `/goal`](#loops-in-pi) are installed once into pi's user settings (`~/.pi/agent/settings.json`)
 6. Every provider whose key resolves is registered in the global config of every CLI that has no launcher — [one generator each](#generated-configs) — with every model in `configs.jsonc`, not just the tagged ones, and all of them starting on [the default provider](#default-provider)
 7. You get a warning if `~/.local/bin` or any of the CLIs those configs are for is missing from your PATH
-8. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode` ([details below](#skills-and-global-instructions))
+8. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/loop`](#loops-in-opencode) and [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode` ([details below](#skills-and-global-instructions))
 
 To rotate a token, pick up new settings or add a provider later, just re-run `make setup`. `make setup-providers` and `make setup-skills` each run one half on its own; only the provider half prompts.
 
@@ -131,7 +131,8 @@ mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/mig
 [2026-09-08 — claude-code-settings の統合](docs/migrations/2026-09-08-merge-claude-code-settings.md),
 [2026-09-08 — OpenCode の `/goal`](docs/migrations/2026-09-08-opencode-goal.md),
 [2026-09-09 — providers/ 廃止と configs.jsonc への集約](docs/migrations/2026-09-09-configs-jsonc.md),
-and [2026-09-11 — OpenCode の Subscriptions 見出し](docs/migrations/2026-09-11-opencode-subscriptions.md).
+[2026-09-11 — OpenCode の Subscriptions 見出し](docs/migrations/2026-09-11-opencode-subscriptions.md),
+and [2026-09-13 — OpenCode の `/loop`](docs/migrations/2026-09-13-opencode-loop.md).
 
 ### Make targets
 
@@ -268,6 +269,52 @@ pairs — an empty command just leaves the label off:
 > curated. Both packages above are third-party npm packages — read the source
 > before trusting them with an unattended loop, and prefer a container or a
 > throwaway checkout for autopilot runs.
+
+### Loops in OpenCode
+
+OpenCode runs one turn per message, so `/loop` is this repo's own, like
+`/goal`: `opencode/command/loop.md` is the slash command and
+`opencode/plugin/loop.js` the repetition behind it, both installed by
+`make setup-skills`. It gives OpenCode what `npm:@realvendex/pi-loop` gives pi —
+one prompt, run again on every turn until the model says it is done or a stop
+condition is met:
+
+```
+/loop fix the failing tests, one failure at a time
+/loop --until "all tests pass" run the suite and fix what fails
+/loop --until-stable 2 summarise src/parser, then report nothing left to do
+/loop --max 5 evaluate the options and pick one
+/loop --timeout 30m keep working through the queue
+/loop                         show the current loop
+/loop pause | resume | clear  control it
+```
+
+Flags come before the task. Every turn carries the same task, and the
+continuation tells the model to check what the previous turn actually produced
+before acting again — the user is not there to answer questions. The loop ends
+when
+
+- the model calls the `loop_finish` tool — `complete` with the evidence, or
+  `blocked` with what would unblock it. That tool is the only way the model can
+  end the loop itself
+- a reply contains an `--until "TEXT"`, the same reply comes back
+  `--until-stable N` times in a row, or a `--timeout` runs out
+- the budget runs out: `--max` (40 by default)
+- you run `/loop pause` or `/loop clear`
+- the turn was aborted or errored, or opencode was restarted — a loop from an
+  earlier process is paused rather than resumed behind your back, and
+  `/loop resume` picks it up
+
+Loop state is one JSON file per session under `~/.local/share/opencode-loop/`,
+pruned after 30 days like the goal's. A session runs one continuation loop at a
+time: `/loop` refuses to start while a goal is active and `/goal` refuses while
+a loop is, so two of them cannot take turns spending tokens in the same session.
+
+> **Note:** like a goal, an active loop keeps the model working on its own, and
+> the continuation turns run tools like any other turn. OpenCode still asks for
+> permission unless you started it with `--auto` — the pairing to be careful
+> with is `--auto` plus an open-ended task. `opencode --pure` starts without any
+> external plugin, this one included.
 
 ### Goals in OpenCode
 

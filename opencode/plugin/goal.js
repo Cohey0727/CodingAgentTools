@@ -21,10 +21,9 @@ import path from "node:path"
 
 const COMMAND = "goal"
 
-const STATE_DIR = path.join(
-  process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share"),
-  "opencode-goal",
-)
+const DATA_HOME = process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share")
+const STATE_DIR = path.join(DATA_HOME, "opencode-goal")
+const LOOP_STATE_DIR = path.join(DATA_HOME, "opencode-loop")
 
 // A goal only auto-continues under the process that started it. Reopening an
 // old session after a restart finds a foreign runtime id and pauses instead,
@@ -43,6 +42,18 @@ const USAGE = `/goal <objective>              start pursuing an objective
 // ------------------------------------------------------------------- state
 
 const statePath = (sessionID) => path.join(STATE_DIR, `${sessionID}.json`)
+
+// /loop and /goal both continue a session on idle. Two owners would take turns
+// spending tokens on each other's behalf, so neither starts while the other is
+// active; this reads the state file the loop plugin writes.
+function loopIsActive(sessionID) {
+  try {
+    const state = JSON.parse(fs.readFileSync(path.join(LOOP_STATE_DIR, `${sessionID}.json`), "utf8"))
+    return state.status === "active"
+  } catch {
+    return false
+  }
+}
 
 function readState(sessionID) {
   try {
@@ -288,6 +299,11 @@ export const plugin = ({ tool }) => async ({ client }) => {
             reply(ackPrompt("The user asked to resume the goal.", state))
             return
           }
+          if (loopIsActive(sessionID)) {
+            await toast("a loop is active in this session", "warning")
+            reply(ackPrompt("The user asked to resume the goal, but a loop is active in this session. One session runs one continuation loop at a time; the loop must be paused or cleared first.", state))
+            return
+          }
           // A goal that stopped on its budget resumes with a fresh window;
           // one that was paused picks up where it left off.
           const spent = state.turns >= state.maxTurns || (state.tokenBudget && state.tokensUsed >= state.tokenBudget)
@@ -314,6 +330,11 @@ export const plugin = ({ tool }) => async ({ client }) => {
         }
 
         case "set": {
+          if (loopIsActive(sessionID)) {
+            await toast("a loop is active in this session", "warning")
+            reply(ackPrompt("The user tried to set a goal, but a loop is active in this session. One session runs one continuation loop at a time; the loop must be paused or cleared first.", state))
+            return
+          }
           const next = writeState(sessionID, {
             objective: parsed.objective,
             status: "active",
