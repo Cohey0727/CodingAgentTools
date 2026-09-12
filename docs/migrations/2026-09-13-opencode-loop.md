@@ -14,7 +14,9 @@ pi には `npm:@realvendex/pi-loop` があるが OpenCode には同等のもの�
   `/loop` を横取りして task と停止条件を保存し、`session.idle` ごとに継続
   プロンプトを `client.session.promptAsync` で送る。モデル側の終了手段は
   `loop_finish` ツールだけ。`--every 5m` はプロセス内の `setTimeout` で間隔を
-  空ける（`session.status` が busy の間は送らず、次の idle に回す）。
+  空ける（`session.status` が busy の間は送らず、次の idle に回す）。`--every`
+  は先頭の時間表記（`/loop 5m <task>`）で省略できる。時間は `s/m/h/d` と
+  `2h30m` の複合表記に対応。
 
 使い方と停止条件は README の
 [Loops in OpenCode](../../README.md#loops-in-opencode) にある。

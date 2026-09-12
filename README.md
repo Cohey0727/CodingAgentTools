@@ -284,19 +284,21 @@ condition is met:
 /loop --until "all tests pass" run the suite and fix what fails
 /loop --until-stable 2 summarise src/parser, then report nothing left to do
 /loop --max 5 evaluate the options and pick one
-/loop --every 5m check the deploy status
+/loop 5m check the deploy status
 /loop --timeout 30m keep working through the queue
 /loop                         show the current loop
 /loop pause | resume | clear  control it
 ```
 
-Flags come before the task. Every turn carries the same task, and the
-continuation tells the model to check what the previous turn actually produced
-before acting again — the user is not there to answer questions. `--every` runs
-the first turn at once and then leaves the session idle until the interval has
-passed; the wait is a timer in the opencode process, and a turn already running
-when it comes due finishes first (`/loop status` shows `every 5m · next in 3m`).
-The loop ends when
+Flags come before the task, and a duration there is the interval —
+`/loop 5m <task>` is `/loop --every 5m <task>`. Durations use `s`, `m`, `h` and
+`d`, and may be compound: `30s`, `2h30m`, `1d`. Every turn carries the same
+task, and the continuation tells the model to check what the previous turn
+actually produced before acting again — the user is not there to answer
+questions. `--every` runs the first turn at once and then leaves the session
+idle until the interval has passed; the wait is a timer in the opencode
+process, and a turn already running when it comes due finishes first
+(`/loop status` shows `every 5m · next in 3m`). The loop ends when
 
 - the model calls the `loop_finish` tool — `complete` with the evidence, or
   `blocked` with what would unblock it. That tool is the only way the model can

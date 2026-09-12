@@ -40,6 +40,7 @@ const USAGE = `/loop <task>                   repeat the task every turn until d
 /loop --until-stable 2 <task>  stop when the same reply repeats
 /loop --timeout 30m <task>     stop after 30 minutes
 /loop --every 5m <task>        wait 5 minutes between turns
+/loop 5m <task>                shorthand for --every 5m
 /loop                          show the current loop
 /loop pause | resume | clear   control it`
 
@@ -86,11 +87,24 @@ function pruneState() {
 
 // ------------------------------------------------------------------ parsing
 
+/**
+ * A duration is one or more `<number><unit>` segments with units s, m, h and
+ * d, so `30s`, `5m`, `2h30m` and `1d` all work and nothing else does — a task
+ * that starts with something duration-shaped like `5x` stays part of the task.
+ */
 function parseDuration(raw) {
-  const match = /^(\d+(?:\.\d+)?)([smh])$/i.exec(raw ?? "")
-  if (!match) return null
-  const scale = { s: 1e3, m: 6e4, h: 36e5 }[match[2].toLowerCase()]
-  return Math.round(Number(match[1]) * scale)
+  const text = (raw ?? "").trim()
+  const pattern = /(\d+(?:\.\d+)?)([smhd])/gi
+  const scale = { s: 1e3, m: 6e4, h: 36e5, d: 864e5 }
+  let total = 0
+  let end = 0
+  let match
+  while ((match = pattern.exec(text))) {
+    if (match.index !== end) return null
+    end += match[0].length
+    total += Number(match[1]) * scale[match[2].toLowerCase()]
+  }
+  return end === text.length && total > 0 ? Math.round(total) : null
 }
 
 function parseCount(raw, min) {
@@ -132,6 +146,14 @@ function parseArguments(raw) {
   let untilStable = null
   let timeoutMs = null
   let everyMs = null
+
+  // A leading duration is the omitted --every: `/loop 5m <task>`.
+  const leading = parseDuration(rest[0])
+  if (leading !== null) {
+    everyMs = leading
+    rest = rest.slice(1)
+  }
+
   while (rest.length) {
     const [flag, ...tail] = rest
     const [name, inline] = flag.includes("=")
@@ -153,7 +175,7 @@ function parseArguments(raw) {
       untilStable = parsed
     } else {
       const parsed = parseDuration(value)
-      if (parsed === null) return { action: "error", message: `not a duration (30s, 5m, 1h): ${value}` }
+      if (parsed === null) return { action: "error", message: `not a duration (30s, 5m, 2h30m, 1d): ${value}` }
       if (name === "--every") everyMs = parsed
       else timeoutMs = parsed
     }
