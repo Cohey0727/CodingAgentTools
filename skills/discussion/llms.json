@@ -1,0 +1,52 @@
+{
+  "schemas": {
+    "stdin": "任意コマンド。`command` をそのまま実行し、stdin にプロンプト・stdout に回答"
+  },
+  "llms": [
+    {
+      "name": "deepseek-go",
+      "label": "DeepSeek V4.1 Flash (OpenCode Go)",
+      "enabled": true,
+      "schema": "stdin",
+      "command": "opencode run --model opencode-go/deepseek-v4.1-flash --agent plan",
+      "timeout_ms": 1200000,
+      "notes": "--agent plan で read-only"
+    },
+    {
+      "name": "muse-spark",
+      "label": "Meta Muse Spark 1.3 (Command Code)",
+      "enabled": true,
+      "schema": "stdin",
+      "command": "opencode run --model commandcode-openai/meta/muse-spark-1.3 --agent plan",
+      "timeout_ms": 1200000,
+      "notes": "--agent plan で read-only"
+    },
+    {
+      "name": "glm-flash-go",
+      "label": "Zhipu AI GLM-5.3 Flash (OpenCode Go)",
+      "enabled": true,
+      "schema": "stdin",
+      "command": "opencode run --model opencode-go/glm-5.3-flash --agent plan",
+      "timeout_ms": 1200000,
+      "notes": "--agent plan で read-only"
+    },
+    {
+      "name": "deepseek",
+      "label": "DeepSeek (直接契約)",
+      "enabled": false,
+      "schema": "stdin",
+      "command": "opencode run --model deepseek-anthropic/deepseek-flash --agent plan",
+      "timeout_ms": 1200000,
+      "notes": "--agent plan で read-only"
+    },
+    {
+      "name": "glm",
+      "label": "Zhipu AI GLM (直接契約)",
+      "enabled": false,
+      "schema": "stdin",
+      "command": "opencode run --model glm-anthropic/glm-5.3-flash --agent plan",
+      "timeout_ms": 1200000,
+      "notes": "--agent plan で read-only"
+    }
+  ]
+}
