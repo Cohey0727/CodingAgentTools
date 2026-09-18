@@ -79,6 +79,7 @@ interface Totals {
 	cost: number;
 	assistantMessages: number;
 	toolCalls: number;
+	cacheHit: number | null; // share of the latest request's prompt served from cache
 }
 
 const fmtTokens = (n: number) => (n < 1000 ? `${n}` : n < 1_000_000 ? `${(n / 1000).toFixed(1)}k` : `${(n / 1_000_000).toFixed(2)}M`);
@@ -148,7 +149,7 @@ export default function dashboard(pi: ExtensionAPI) {
 		const key = `${branch.length}|${name ?? ""}`;
 		if (snapshot && key === snapshotKey) return snapshot;
 
-		const totals: Totals = { input: 0, output: 0, cacheRead: 0, cost: 0, assistantMessages: 0, toolCalls: 0 };
+		const totals: Totals = { input: 0, output: 0, cacheRead: 0, cost: 0, assistantMessages: 0, toolCalls: 0, cacheHit: null };
 		let goal: Topic | null = null;
 		let goalSeen = false;
 		let firstPrompt: Topic | null = null;
@@ -168,7 +169,9 @@ export default function dashboard(pi: ExtensionAPI) {
 			const msg = entry.message;
 			if (msg.role === "assistant") {
 				const m = msg as AssistantMessage;
-				totals.input += m.usage.input + m.usage.cacheRead + m.usage.cacheWrite;
+				const prompt = m.usage.input + m.usage.cacheRead + m.usage.cacheWrite;
+				if (totals.assistantMessages === 0 && prompt > 0) totals.cacheHit = m.usage.cacheRead / prompt;
+				totals.input += prompt;
 				totals.output += m.usage.output;
 				totals.cacheRead += m.usage.cacheRead;
 				totals.cost += m.usage.cost.total;
@@ -315,7 +318,11 @@ export default function dashboard(pi: ExtensionAPI) {
 					}
 
 					const t = getTotals(c);
-					parts.push(th.fg("dim", `↑${fmtTokens(t.input)} ↓${fmtTokens(t.output)}`) + (t.cost > 0 ? th.fg("dim", ` $${t.cost.toFixed(3)}`) : ""));
+					parts.push(
+						th.fg("dim", `↑${fmtTokens(t.input)} ↓${fmtTokens(t.output)}`) +
+							(t.cacheHit !== null ? th.fg("dim", ` CH ${Math.round(t.cacheHit * 100)}%`) : "") +
+							(t.cost > 0 ? th.fg("dim", ` $${t.cost.toFixed(3)}`) : ""),
+					);
 
 					const tps = liveTps();
 					if (tps !== null) {
@@ -412,6 +419,7 @@ export default function dashboard(pi: ExtensionAPI) {
 			}
 			const t = getTotals(c);
 			lines.push(kv("sent", th.fg("text", fmtTokens(t.input)) + th.fg("dim", ` (${fmtTokens(t.cacheRead)} from cache)`)));
+			if (t.cacheHit !== null) lines.push(kv("cache hit", th.fg("text", `${Math.round(t.cacheHit * 100)}%`) + th.fg("dim", " last request")));
 			lines.push(kv("received", th.fg("text", fmtTokens(t.output))));
 			lines.push(kv("cost", t.cost > 0 ? th.fg("text", `$${t.cost.toFixed(4)}`) : th.fg("dim", "not reported")));
 			const tps = liveTps();
