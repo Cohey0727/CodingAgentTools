@@ -9,12 +9,12 @@
 # At a prompt, pressing Enter with no input keeps whatever is already set.
 # Keys still sitting in the old providers/<name>/.env files are carried over
 # first. Then pi is updated, the pi packages in $PI_PACKAGES are installed into
-# pi's user settings and pi's model catalogs are refreshed, DeepSeek Harness and Command Code are installed with npm, the
-# OpenCode plugins in $OPENCODE_PLUGINS are installed with `opencode plugin -g`
-# — each of those upgraded to its latest version when already there — and
-# every provider whose key resolves is
+# pi's user settings and pi's model catalogs are refreshed, DeepSeek Harness and
+# Command Code are installed with npm — each of those upgraded to its latest
+# version when already there — and every provider whose key resolves is
 # registered in the global config of every agent CLI — one generator each,
-# listed in $GLOBAL_GENERATORS.
+# listed in $GLOBAL_GENERATORS. Last, the OpenCode plugins in $OPENCODE_PLUGINS
+# are installed or upgraded with `opencode plugin -g`.
 
 set -euo pipefail
 
@@ -382,16 +382,24 @@ install_npm_cli() { # <command> <package> <display name> <Node.js requirement>
   fi
 }
 
-# OpenCode TUI plugins are installed with `opencode plugin -g`, which records
-# them in ~/.config/opencode/tui.json and leaves the generated opencode.json
-# alone. --force replaces an installed one with the latest version.
-OPENCODE_PLUGINS='oc-tps'
+# OpenCode plugins are installed with `opencode plugin -g`, which records a TUI
+# plugin in ~/.config/opencode/tui.json and a server plugin in opencode.json.
+# The server ones are listed in opencode.overrides.plugin in configs.jsonc too,
+# so the generated opencode.json keeps them and this only finds them there.
+# Without that file, `opencode plugin` would write an opencode.jsonc beside it,
+# so this runs after the generators. --force replaces an installed one with the
+# latest version.
+OPENCODE_PLUGINS='oc-tps @slkiser/opencode-quota @tarquinen/opencode-dcp opencode-handoff'
 
 install_opencode_plugins() {
   local module
   section 'installing OpenCode plugins'
   if ! command -v opencode >/dev/null 2>&1; then
     warn "skipped — 'opencode' is not on your PATH. Install it (https://opencode.ai), then re-run."
+    return 0
+  fi
+  if ! generated_here "$(opencode_global_config_path)"; then
+    warn "skipped — there is no generated opencode.json yet. Set a key and re-run."
     return 0
   fi
   for module in $OPENCODE_PLUGINS; do
@@ -478,7 +486,6 @@ main() {
   install_pi_packages
   install_npm_cli dsh "$DSH_PACKAGE" 'DeepSeek Harness' '^22.19.0 or >=24.0.0'
   install_npm_cli cmd "$COMMAND_CODE_PACKAGE" 'Command Code' '>=22'
-  install_opencode_plugins
 
   for generator in $GLOBAL_GENERATORS; do
     section "generating global ${generator%%-*} config"
@@ -486,6 +493,8 @@ main() {
       printf '  %s⚠ skipped — set a key and re-run%s\n' "$YLW" "$RST"
     fi
   done
+
+  install_opencode_plugins
 
   check_environment
 }

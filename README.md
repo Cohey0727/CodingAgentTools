@@ -116,8 +116,8 @@ One interactive wizard does everything:
 1. Check the providers you want (arrows + Space, Enter to confirm — providers that already have a token are pre-checked)
 2. Paste each API token — an empty answer keeps the existing token
 3. `configs.jsonc` is validated before anything is written; `.env` is created from `.env.example` if missing (`chmod 600`), gets any variables added to `.env.example` since, and picks up keys still sitting in the old `providers/<name>/.env` files
-4. pi itself is updated, the [pi packages](#pi-packages) that add `/loop`, `/goal`, MCP and subagents are installed into pi's user settings (`~/.pi/agent/settings.json`), and pi's model catalogs are refreshed, DeepSeek Harness and Command Code are installed with `npm install -g <package>@latest`, and the OpenCode TUI plugin [`oc-tps`](https://github.com/Tarquinen/oc-tps) is installed with `opencode plugin -g --force` when `opencode` is on your PATH (it lands in `~/.config/opencode/tui.json`, not in the generated `opencode.json`). Anything of these already installed is upgraded to its latest version, so re-running `make setup` is also how you update them
-5. Every provider whose key resolves is registered in the global config of every CLI — [one generator each](#generated-configs) — with every model in `configs.jsonc`, not just the tagged ones, and all of them starting on [the default provider](#default-provider). pi also gets the keys OpenCode's `/connect` holds, for [Zen and Go](#usage)
+4. pi itself is updated, the [pi packages](#pi-packages) that add `/loop`, `/goal`, MCP and subagents are installed into pi's user settings (`~/.pi/agent/settings.json`), and pi's model catalogs are refreshed, and DeepSeek Harness and Command Code are installed with `npm install -g <package>@latest`. Anything of these already installed is upgraded to its latest version, so re-running `make setup` is also how you update them
+5. Every provider whose key resolves is registered in the global config of every CLI — [one generator each](#generated-configs) — with every model in `configs.jsonc`, not just the tagged ones, and all of them starting on [the default provider](#default-provider). pi also gets the keys OpenCode's `/connect` holds, for [Zen and Go](#usage). Then the [OpenCode plugins](#opencode-plugins-from-npm) are installed or upgraded with `opencode plugin -g --force` when `opencode` is on your PATH
 6. You get a warning if any of the CLIs those configs are for is missing from your PATH
 7. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/loop`](#loops-in-opencode) and [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode`, and pi gets its [dashboard](#pi-dashboard) in `~/.pi/agent/extensions` ([details below](#skills-and-global-instructions))
 
@@ -256,6 +256,19 @@ pi works the same way. `make pi-global` deep-merges the top-level `pi.overrides`
 ```
 
 Anything else OpenCode's config takes goes there too, written in OpenCode's own form. The permission policy does: `"permission": "allow"` runs every tool without an approval prompt, so a session never stops to ask. Its MCP servers do — today the [Playwright MCP](https://github.com/microsoft/playwright-mcp), started on the persistent profile `~/playwright/profiles/default` so a login survives restarts. OpenCode expands `{env:HOME}` in the command itself, so the same entry works on every machine. Chrome locks a profile to one browser, so while another agent drives that profile, OpenCode's Playwright cannot start one. `opencode mcp list` shows whether it connected.
+
+### OpenCode plugins from npm
+
+`make setup` installs four community plugins into OpenCode:
+
+| Plugin | Adds |
+|--------|------|
+| [`oc-tps`](https://github.com/Tarquinen/oc-tps) | Live tokens per second and time to first token in the session prompt |
+| [`@slkiser/opencode-quota`](https://github.com/slkiser/opencode-quota) | The quota left on OpenCode Go and other subscriptions in the sidebar, `/quota`, and token reports such as `/tokens_today` |
+| [`@tarquinen/opencode-dcp`](https://github.com/Opencode-DCP/opencode-dynamic-context-pruning) | A `compress` tool the model uses to summarize finished parts of a session, and pruning of repeated or failed tool calls. Its settings are in `~/.config/opencode/dcp.jsonc`, written on first run |
+| [`opencode-handoff`](https://github.com/joshuadavidthomas/opencode-handoff) | `/handoff <goal>` drafts a prompt that continues the work in a new session, and `read_session` reads the old one back |
+
+A plugin has a server half, listed under `plugin` in `opencode.json`, and a TUI half, listed under `plugin` in `~/.config/opencode/tui.json`. The server halves are in `opencode.overrides.plugin` in `configs.jsonc`, so `make opencode-global` keeps them. `make setup` then runs `opencode plugin -g --force` for every plugin in `OPENCODE_PLUGINS` in `bin/setup.sh`. That registers the TUI halves and replaces each installed plugin with its latest version. A new plugin with a server half goes in both lists.
 
 ### pi packages
 

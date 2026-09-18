@@ -11,6 +11,10 @@
 
       "permission": "allow",
 
+      // OpenCode fetches an unpinned plugin from npm at every start. The TUI
+      // half of a plugin is registered in tui.json by `make setup` instead.
+      "plugin": ["@slkiser/opencode-quota", "@tarquinen/opencode-dcp", "opencode-handoff"],
+
       "mcp": {
         // The persistent profile keeps logins across restarts. Chrome locks a
         // profile to one browser, so only one agent can drive it at a time.
