@@ -440,25 +440,18 @@ route_id() { # [<api>] -> "<provider>-<api>", the id every generated config file
 }
 
 pi_provider_json() { # <apiKey reference> [<header ref fn>] — one models.json
-                     # provider block for the resolved route. HEADERS are
-                     # included when a reference function is given. pi's
-                     # Anthropic client appends /v1/messages itself; its OpenAI
-                     # one appends only /chat/completions.
-  local api_key=$1 headers='' base_url api
+                     # provider block for the resolved provider. HEADERS are
+                     # included when a reference function is given. Each model
+                     # carries its own API and base URL.
+  local api_key=$1 headers=''
   if [ -n "${2:-}" ] && [ -n "$M_HEADERS" ]; then
     headers="      \"headers\": {
 $(headers_json "$2")
       },
 "
   fi
-  case $M_API in
-    anthropic) api=anthropic-messages; base_url=$M_BASE_URL ;;
-    openai) api=openai-completions; base_url=$M_BASE_URL/v1 ;;
-  esac
   cat <<EOF
-    "$(route_id)": {
-      "baseUrl": "$base_url",
-      "api": "$api",
+    "$M_PI_ID": {
       "apiKey": "$api_key",
 ${headers}      "models": [
 $M_PI_MODELS_JSON

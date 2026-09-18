@@ -11,7 +11,8 @@ file carries references to secrets rather than secrets, and an endpoint can ship
 a default that .env overrides.
 
 A provider whose models speak more than one API is registered once per API: a
-route is a provider narrowed to the models of one API.
+route is a provider narrowed to the models of one API. pi alone takes the API
+per model, so it gets the whole provider as one entry.
 
 The file is JSON with // line comments allowed.
 
@@ -40,6 +41,10 @@ ROLE_TAGS = ("default", "small")
 
 # "anthropic" is POST <BASE_URL>/v1/messages, "openai" POST <BASE_URL>/v1/chat/completions.
 APIS = ("anthropic", "openai")
+
+# pi's name for each API, and what it needs after BASE_URL: its Anthropic client
+# appends /v1/messages itself, its OpenAI one only /chat/completions.
+PI_APIS = {"anthropic": ("anthropic-messages", ""), "openai": ("openai-completions", "/v1")}
 
 MODEL_KEYS = {"id", "api", "tags", "context_window", "max_tokens", "reasoning", "input"}
 PROVIDER_KEYS = {"label", "API_KEY", "BASE_URL", "REQUEST_HEADERS", "api", "primary", "defaults", "opencode", "models"}
@@ -302,11 +307,23 @@ def route_models(config, api):
     return [model for model in config["models"] if model["api"] == api]
 
 
-def pi_models_json(models):
+def pi_id(config):
+    """The id pi files a provider under, which /model prints beside each model.
+
+    It is the label OpenCode's dialog puts before the provider's models, or the
+    name when there is none. pi merges an entry into its built-in provider of the
+    same id, so an unlabeled name must not be one of pi's.
+    """
+    return config["label"] or config["name"]
+
+
+def pi_models_json(config, models):
     """The "models" array body of a pi models.json provider block, indented to fit."""
     return ",\n".join(
         "        {\n"
         f'          "id": "{model["id"]}",\n'
+        f'          "api": "{PI_APIS[model["api"]][0]}",\n'
+        f'          "baseUrl": "{config["base_url"]}{PI_APIS[model["api"]][1]}",\n'
         f'          "reasoning": {"true" if model["reasoning"] else "false"},\n'
         f'          "input": {json.dumps(model["input"])},\n'
         f'          "contextWindow": {model["context_window"]},\n'
@@ -383,7 +400,8 @@ def shell(config, api=""):
         "M_SMALL_API": config["small_model"]["api"],
         "M_OPENCODE_LEAN": "true" if config["lean"] else "false",
         "M_OPENCODE_MODELS_JSON": opencode_models_json(config, models),
-        "M_PI_MODELS_JSON": pi_models_json(models),
+        "M_PI_ID": pi_id(config),
+        "M_PI_MODELS_JSON": pi_models_json(config, models),
         "M_MODEL_ROWS": model_rows(models),
     }
     return "\n".join(f"{key}={shlex.quote(value)}" for key, value in values.items())
@@ -444,8 +462,15 @@ def main(argv):
         elif action == "env-vars":
             print(env_vars())
         elif action == "check" and not argument:
+            pi_ids = {}
             for name in load_file():
-                load(name)
+                config = load(name)
+                taken = pi_ids.setdefault(pi_id(config), name)
+                if taken != name:
+                    raise ConfigError(
+                        f"{CONFIGS}: {taken!r} and {name!r} would both be {pi_id(config)!r} in pi"
+                        " — give one a label of its own"
+                    )
             primary_provider()
             agent_overrides("opencode")
             agent_overrides("pi")

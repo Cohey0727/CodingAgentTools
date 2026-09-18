@@ -137,7 +137,8 @@ mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/mig
 [2026-09-13 — Claude Code ランチャー廃止と見出し・API 別の configs.jsonc](docs/migrations/2026-09-13-drop-claude-launchers.md),
 [2026-09-18 — pi のダッシュボード拡張](docs/migrations/2026-09-18-pi-dashboard.md),
 [2026-09-18 — pi から OpenCode Zen / Go を使う](docs/migrations/2026-09-18-pi-opencode-auth.md),
-and [2026-09-18 — pi の MCP・サブエージェントと起動モデル](docs/migrations/2026-09-18-pi-mcp-subagents.md).
+[2026-09-18 — pi の MCP・サブエージェントと起動モデル](docs/migrations/2026-09-18-pi-mcp-subagents.md),
+and [2026-09-18 — pi の provider id を label に揃える](docs/migrations/2026-09-18-pi-provider-labels.md).
 
 ### Make targets
 
@@ -169,11 +170,12 @@ codewhale         # Codewhale — every configured provider is in its model pick
 dsh web           # DeepSeek Harness — every configured provider is in the Web UI's model picker
 ```
 
-`make setup` (and `make pi-global`) write every provider that has a token into `~/.pi/agent/models.json`, so a bare `pi` has all of them and `/model` switches mid-session. Each is filed once per API its models speak, as `<name>-<api>` — a *route*:
+`make setup` (and `make pi-global`) write every provider that has a token into `~/.pi/agent/models.json`, so a bare `pi` has all of them and `/model` switches mid-session. Each is filed under its `label` — the name OpenCode's model dialog puts before its models — or its name when it has none:
 
 ```bash
 pi                                         # starts on the default provider's model
-pi --model glm-anthropic/glm-5.3           # or pick at launch time
+pi --model Z.AI/glm-5.3                    # or pick at launch time
+pi --model commandcode/claude-opus-5
 ```
 
 pi also has OpenCode Zen and OpenCode Go built in, as `opencode` and `opencode-go`. They are not providers in `configs.jsonc`: you connect them once with `/connect` in OpenCode, and `make setup` (and `make pi-global`) gives pi an entry in `~/.pi/agent/auth.json` for every key OpenCode stored that pi has a provider for. The entry is a command reading the key back out of OpenCode's `~/.local/share/opencode/auth.json`, so no key is copied and one rotated in OpenCode needs no re-run. An entry you made yourself with pi's `/login` is left in place, and OAuth logins are not shared: pi refreshes those through its own `/login`. `make setup` also refreshes pi's model catalogs, so the Zen and Go lists include models those services added after the installed pi was released.
@@ -541,12 +543,12 @@ every model that does not set it itself.
 ### Provider fields
 
 A provider sits under its heading, and its key there is the provider's name —
-unique across headings. Each generated config files it once per API its models
-speak, as the route `<name>-<api>`; `make list` prints the name.
+unique across headings. Each generated config but pi's files it once per API its
+models speak, as the route `<name>-<api>`; `make list` prints the name.
 
 | Field | Meaning |
 |-------|---------|
-| `label` | Leads each model's name in OpenCode's model dialog (`Z.AI glm-5.3`), which tells providers sharing a heading apart, and names the route in DeepSeek Harness. Omit it where the heading already says whose models they are |
+| `label` | Leads each model's name in OpenCode's model dialog (`Z.AI glm-5.3`), which tells providers sharing a heading apart, names the route in DeepSeek Harness, and is the provider's id in pi. Omit it where the heading already says whose models they are |
 | `API_KEY` | **Required.** A `${VAR}` reference to the key |
 | `BASE_URL` | **Required.** The root both APIs hang off — `/v1/messages` or `/v1/chat/completions` is appended — as `${VAR:-default}` so `.env` can route it elsewhere |
 | `api` | **Required.** `"anthropic"` (Anthropic Messages) or `"openai"` (OpenAI Chat Completions): what every model speaks unless it sets its own |
@@ -765,12 +767,15 @@ OpenCode actually registers may be listed. Denying one it does not know takes
 and the AGENTS.md files still apply to both.
 
 **pi** — `make setup` (and `make pi-global`) write every provider that has a
-token into `~/.pi/agent/models.json`, one provider per route: `<name>-anthropic`
-with `api: "anthropic-messages"` and `baseUrl` set to `BASE_URL` as-is (pi hands
-it to the Anthropic SDK, which appends `/v1/messages`), `<name>-openai` with
-`api: "openai-completions"` and `baseUrl` set to `<BASE_URL>/v1`, plus every
-model of that route with its limits. The route id is what pi prints next to a
-model — `default [gtr-anthropic]`. No secret lands in the file:
+token into `~/.pi/agent/models.json` as one entry, under its `label` or, without
+one, its name — what pi prints next to a model, `default [GTR9]`. Two providers
+that would share an id fail `make check`, and a name without a label must not be
+one of pi's built-in provider ids, or pi merges the entry into that one. pi takes
+the API per model, so a provider whose models speak both stays one entry: every
+model carries its limits and either `api: "anthropic-messages"` with `baseUrl`
+set to `BASE_URL` as-is (pi hands it to the Anthropic SDK, which appends
+`/v1/messages`) or `api: "openai-completions"` with `baseUrl` set to
+`<BASE_URL>/v1`. No secret lands in the file:
 `apiKey` and each `REQUEST_HEADERS` value are `!`-prefixed shell commands pi runs
 at request time to read the variable back out of `.env`, so a rotated key or a
 `$(...)` computed header is picked up without a re-run. Re-run after changing a
