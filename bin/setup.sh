@@ -10,7 +10,8 @@
 # Keys still sitting in the old providers/<name>/.env files are carried over
 # first. Then the pi packages in $PI_PACKAGES are installed into pi's user
 # settings, DeepSeek Harness and Command Code are installed with npm unless
-# dsh / cmd is already on the PATH, and every provider whose key resolves is
+# dsh / cmd is already on the PATH, the OpenCode plugins in $OPENCODE_PLUGINS
+# are installed with `opencode plugin -g`, and every provider whose key resolves is
 # registered in the global config of every agent CLI — one generator each,
 # listed in $GLOBAL_GENERATORS.
 
@@ -350,6 +351,27 @@ install_npm_cli() { # <command> <package> <display name> <Node.js requirement>
   ok "$command $version installed"
 }
 
+# OpenCode TUI plugins are installed with `opencode plugin -g`, which records
+# them in ~/.config/opencode/tui.json and leaves the generated opencode.json
+# alone. A second run is a no-op.
+OPENCODE_PLUGINS='@jimicze-opencode/opencode-tps'
+
+install_opencode_plugins() {
+  local module
+  section 'installing OpenCode plugins'
+  if ! command -v opencode >/dev/null 2>&1; then
+    warn "skipped — 'opencode' is not on your PATH. Install it (https://opencode.ai), then re-run."
+    return 0
+  fi
+  for module in $OPENCODE_PLUGINS; do
+    if opencode plugin -g "$module" >/dev/null 2>&1; then
+      ok "$module"
+    else
+      warn "$module failed — run 'opencode plugin -g $module' by hand"
+    fi
+  done
+}
+
 check_environment() {
   local cmd where
   echo
@@ -425,6 +447,7 @@ main() {
   install_pi_packages
   install_npm_cli dsh "$DSH_PACKAGE" 'DeepSeek Harness' '^22.19.0 or >=24.0.0'
   install_npm_cli cmd "$COMMAND_CODE_PACKAGE" 'Command Code' '>=22'
+  install_opencode_plugins
 
   for generator in $GLOBAL_GENERATORS; do
     section "generating global ${generator%%-*} config"

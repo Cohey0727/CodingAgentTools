@@ -114,7 +114,7 @@ One interactive wizard does everything:
 1. Check the providers you want (arrows + Space, Enter to confirm — providers that already have a token are pre-checked)
 2. Paste each API token — an empty answer keeps the existing token
 3. `configs.jsonc` is validated before anything is written; `.env` is created from `.env.example` if missing (`chmod 600`), gets any variables added to `.env.example` since, and picks up keys still sitting in the old `providers/<name>/.env` files
-4. The pi packages that add [`/loop` and `/goal`](#loops-in-pi) are installed once into pi's user settings (`~/.pi/agent/settings.json`), and DeepSeek Harness and Command Code are installed with `npm install -g` unless `dsh` / `cmd` is already on your PATH
+4. The pi packages that add [`/loop` and `/goal`](#loops-in-pi) are installed once into pi's user settings (`~/.pi/agent/settings.json`), and DeepSeek Harness and Command Code are installed with `npm install -g` unless `dsh` / `cmd` is already on your PATH; the OpenCode TUI plugin [`@jimicze-opencode/opencode-tps`](https://www.npmjs.com/package/@jimicze-opencode/opencode-tps) is installed with `opencode plugin -g` when `opencode` is on your PATH (it lands in `~/.config/opencode/tui.json`, not in the generated `opencode.json`)
 5. Every provider whose key resolves is registered in the global config of every CLI — [one generator each](#generated-configs) — with every model in `configs.jsonc`, not just the tagged ones, and all of them starting on [the default provider](#default-provider)
 6. You get a warning if any of the CLIs those configs are for is missing from your PATH
 7. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/loop`](#loops-in-opencode) and [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode` ([details below](#skills-and-global-instructions))
@@ -139,7 +139,7 @@ and [2026-09-13 — Claude Code ランチャー廃止と見出し・API 別の c
 | Target | What it does |
 |--------|--------------|
 | `make setup` | Both halves: the provider wizard, then the skill, `AGENTS.md` and OpenCode extension install |
-| `make setup-providers` | The wizard above only: tokens, `.env` upkeep, pi packages, DeepSeek Harness, Command Code, and every global config |
+| `make setup-providers` | The wizard above only: tokens, `.env` upkeep, pi packages, DeepSeek Harness, Command Code, OpenCode plugins, and every global config |
 | `make setup-skills` | The shared assets only: `skills/`, `agents/`, `AGENTS.md` and `opencode/` into every agent CLI |
 | `make check` | Validate `configs.jsonc`, then refuse any concrete name outside it (see `CLAUDE.md`). What the pre-commit hook runs |
 | `make hooks` | Install the lefthook pre-commit hook that runs `make check` |
