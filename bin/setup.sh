@@ -9,9 +9,10 @@
 # At a prompt, pressing Enter with no input keeps whatever is already set.
 # Keys still sitting in the old providers/<name>/.env files are carried over
 # first. Then the pi packages in $PI_PACKAGES are installed into pi's user
-# settings, DeepSeek Harness and Command Code are installed with npm unless
-# dsh / cmd is already on the PATH, the OpenCode plugins in $OPENCODE_PLUGINS
-# are installed with `opencode plugin -g`, and every provider whose key resolves is
+# settings, DeepSeek Harness and Command Code are installed with npm, the
+# OpenCode plugins in $OPENCODE_PLUGINS are installed with `opencode plugin -g`
+# — each of those upgraded to its latest version when already there — and
+# every provider whose key resolves is
 # registered in the global config of every agent CLI — one generator each,
 # listed in $GLOBAL_GENERATORS.
 
@@ -290,9 +291,9 @@ prompt_token() { # <provider>
 # ------------------------------------------------------------- installation
 
 # pi resolves packages from its user settings, so one install covers every
-# provider.
+# provider. A package already there is brought to its latest version.
 install_pi_packages() {
-  local spec src cmd
+  local spec src cmd verb done
   section 'installing pi packages'
   if ! command -v pi >/dev/null 2>&1; then
     printf '  %s⚠%s %s\n' "$YLW" "$RST" \
@@ -303,35 +304,38 @@ install_pi_packages() {
   for spec in $PI_PACKAGES; do
     src=$(pi_package_source "$spec")
     cmd=$(pi_package_command "$spec")
-    if pi install "$src" >/dev/null 2>&1; then
-      printf '  %s✔%s %s%-26s%s %s%-6s%s\n' \
-        "$GRN" "$RST" "$B" "$src" "$RST" "$CYN" "$cmd" "$RST"
+    if pi_package_installed "$src"; then verb=update done=updated; else verb=install done=installed; fi
+    if pi "$verb" "$src" >/dev/null 2>&1; then
+      printf '  %s✔%s %s%-26s%s %s%-6s%s %s%s%s\n' \
+        "$GRN" "$RST" "$B" "$src" "$RST" "$CYN" "$cmd" "$RST" "$DIM" "$done" "$RST"
     else
-      printf '  %s⚠%s %s%-26s%s %sfailed — run '\''pi install %s'\'' by hand%s\n' \
-        "$YLW" "$RST" "$B" "$src" "$RST" "$YLW" "$src" "$RST"
+      printf '  %s⚠%s %s%-26s%s %sfailed — run '\''pi %s %s'\'' by hand%s\n' \
+        "$YLW" "$RST" "$B" "$src" "$RST" "$YLW" "$verb" "$src" "$RST"
     fi
   done
 }
 
-# DeepSeek Harness and Command Code ship as npm packages. A command already on
-# the PATH is left at the version it is; `npm install -g` again is how it is
-# upgraded.
+# DeepSeek Harness and Command Code ship as npm packages. Every run installs
+# the latest version, so a command already on the PATH is upgraded in place.
 DSH_PACKAGE='@deepseek-ai/dsh' # style-check: allow
 COMMAND_CODE_PACKAGE='command-code'
 
 install_npm_cli() { # <command> <package> <display name> <Node.js requirement>
-  local command=$1 package=$2 name=$3 node=$4 version
+  local command=$1 package=$2 name=$3 node=$4 version before=
   section "installing $name"
   if command -v "$command" >/dev/null 2>&1; then
-    ok "$command $("$command" --version 2>/dev/null) is already installed"
-    return 0
+    before=$("$command" --version 2>/dev/null || true)
   fi
   if ! command -v npm >/dev/null 2>&1; then
-    warn "skipped — 'npm' is not on your PATH. Install Node.js $node, then re-run."
+    if [ -n "$before" ]; then
+      warn "$command $before left as is — 'npm' is not on your PATH, so it cannot be upgraded"
+    else
+      warn "skipped — 'npm' is not on your PATH. Install Node.js $node, then re-run."
+    fi
     return 0
   fi
-  if ! npm install -g "$package" >/dev/null 2>&1; then
-    warn "failed — run 'npm install -g $package' by hand"
+  if ! npm install -g "$package@latest" >/dev/null 2>&1; then
+    warn "failed — run 'npm install -g $package@latest' by hand"
     return 0
   fi
   # asdf reaches a global npm binary only through a shim it has to regenerate.
@@ -348,12 +352,18 @@ install_npm_cli() { # <command> <package> <display name> <Node.js requirement>
     warn "installed, but '$command --version' failed — it needs Node.js $node"
     return 0
   fi
-  ok "$command $version installed"
+  if [ -z "$before" ]; then
+    ok "$command $version installed"
+  elif [ "$before" = "$version" ]; then
+    ok "$command $version is already the latest"
+  else
+    ok "$command $before → $version upgraded"
+  fi
 }
 
 # OpenCode TUI plugins are installed with `opencode plugin -g`, which records
 # them in ~/.config/opencode/tui.json and leaves the generated opencode.json
-# alone. A second run is a no-op.
+# alone. --force replaces an installed one with the latest version.
 OPENCODE_PLUGINS='@jimicze-opencode/opencode-tps'
 
 install_opencode_plugins() {
@@ -364,10 +374,10 @@ install_opencode_plugins() {
     return 0
   fi
   for module in $OPENCODE_PLUGINS; do
-    if opencode plugin -g "$module" >/dev/null 2>&1; then
+    if opencode plugin -g --force "$module" >/dev/null 2>&1; then
       ok "$module"
     else
-      warn "$module failed — run 'opencode plugin -g $module' by hand"
+      warn "$module failed — run 'opencode plugin -g --force $module' by hand"
     fi
   done
 }
