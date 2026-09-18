@@ -364,7 +364,7 @@ install_npm_cli() { # <command> <package> <display name> <Node.js requirement>
 # OpenCode TUI plugins are installed with `opencode plugin -g`, which records
 # them in ~/.config/opencode/tui.json and leaves the generated opencode.json
 # alone. --force replaces an installed one with the latest version.
-OPENCODE_PLUGINS='@jimicze-opencode/opencode-tps'
+OPENCODE_PLUGINS='oc-tps'
 
 install_opencode_plugins() {
   local module
