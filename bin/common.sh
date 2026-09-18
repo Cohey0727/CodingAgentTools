@@ -168,6 +168,87 @@ pi_global_models_path() { # -> the models.json `make pi-global` writes
   printf '%s/models.json' "$(pi_agent_dir)"
 }
 
+pi_auth_path() { # -> pi's credential store, shared with its /login
+  printf '%s/auth.json' "$(pi_agent_dir)"
+}
+
+opencode_auth_path() { # -> where OpenCode's /connect stores credentials
+  printf '%s/opencode/auth.json' "${XDG_DATA_HOME:-$HOME/.local/share}"
+}
+
+opencode_auth_ids() { # -> every id OpenCode's /connect holds an API key for,
+                      # one per line. OAuth logins are left out: pi refreshes
+                      # those itself, through its own /login.
+  "$PYTHON" - "$(opencode_auth_path)" <<'EOF'
+import json, re, sys
+try:
+    with open(sys.argv[1]) as f:
+        data = json.load(f)
+except (FileNotFoundError, ValueError):
+    sys.exit(0)
+for name, entry in data.items():
+    if isinstance(entry, dict) and entry.get("type") == "api" and entry.get("key") \
+            and re.fullmatch(r"[A-Za-z0-9._-]+", name):
+        print(name)
+EOF
+}
+
+opencode_auth_key() { # <id> -> the API key OpenCode's /connect stored for it
+  "$PYTHON" - "$(opencode_auth_path)" "$1" <<'EOF'
+import json, sys
+with open(sys.argv[1]) as f:
+    entry = json.load(f).get(sys.argv[2]) or {}
+sys.stdout.write(entry.get("key", ""))
+EOF
+}
+
+pi_knows_provider() { # <id> — built into pi, or registered in its models.json?
+  local out
+  out=$(pi auth check --provider "$1" --json --no-refresh 2>/dev/null) || true
+  [ -n "$out" ] && ! grep -q '"provider_not_found"' <<<"$out"
+}
+
+# pi's entry for a key OpenCode holds is a command reading it back out of
+# OpenCode's store, so no key is copied and one rotated there needs no re-run.
+# Entries are recognised as ours by that command; any other entry for the same
+# id, such as one made with pi's /login, is left in place.
+pi_link_opencode_auth() { # <id>... — make pi's store hold exactly these links;
+                          # none removes every link
+  "$PYTHON" - "$(pi_auth_path)" "$COMMON_DIR/common.sh" "$@" <<'EOF'
+import json, os, sys
+path, common, ids = sys.argv[1], sys.argv[2], sys.argv[3:]
+marker = f". {common}; opencode_auth_key "
+try:
+    with open(path) as f:
+        data = json.load(f)
+except FileNotFoundError:
+    data = {}
+ours = lambda e: isinstance(e, dict) and marker in str(e.get("key", ""))
+changed = False
+for name in [n for n, e in data.items() if ours(e) and n not in ids]:
+    del data[name]
+    print(f"removed {name}")
+    changed = True
+for name in ids:
+    if name in data and not ours(data[name]):
+        print(f"kept {name} (set up in pi itself)")
+        continue
+    entry = {"type": "api_key", "key": f"!bash -c '{marker}{name}'"}
+    if data.get(name) != entry:
+        data[name] = entry
+        changed = True
+    print(f"linked {name}")
+if changed:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    os.replace(tmp, path)
+EOF
+}
+
 pi_package_source() { # "npm:x=/cmd" -> "npm:x"
   printf '%s' "${1%%=*}"
 }

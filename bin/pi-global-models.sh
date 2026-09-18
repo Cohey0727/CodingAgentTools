@@ -10,6 +10,10 @@
 #
 # A provider is registered once per API its models speak, as "<name>-<api>":
 # pi takes one base URL and one API per provider entry.
+#
+# Providers connected with OpenCode's /connect stay OpenCode's and are not in
+# configs.jsonc. Every one pi also has built in gets an entry in pi's auth.json
+# that reads the key back out of OpenCode's store.
 
 set -euo pipefail
 
@@ -113,4 +117,18 @@ EOF
   echo "  Set pi's startup model to $start_route/$start_model"
 else
   echo "  pi's startup model needs python3 — pick it with /model then Ctrl+S" >&2
+fi
+
+# Keys held by OpenCode's /connect, for the providers pi has built in.
+if ! command -v pi >/dev/null 2>&1; then
+  echo "  pi is not on PATH — skipped linking OpenCode's /connect keys" >&2
+elif [ ! -f "$(opencode_auth_path)" ]; then
+  pi_link_opencode_auth | sed 's/^/  pi auth: /'
+else
+  linked=()
+  while IFS= read -r id; do
+    [ -n "$id" ] || continue
+    pi_knows_provider "$id" && linked+=("$id")
+  done < <(opencode_auth_ids)
+  pi_link_opencode_auth ${linked[@]+"${linked[@]}"} | sed 's/^/  pi auth: /'
 fi

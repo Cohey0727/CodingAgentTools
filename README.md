@@ -115,8 +115,8 @@ One interactive wizard does everything:
 1. Check the providers you want (arrows + Space, Enter to confirm — providers that already have a token are pre-checked)
 2. Paste each API token — an empty answer keeps the existing token
 3. `configs.jsonc` is validated before anything is written; `.env` is created from `.env.example` if missing (`chmod 600`), gets any variables added to `.env.example` since, and picks up keys still sitting in the old `providers/<name>/.env` files
-4. The pi packages that add [`/loop` and `/goal`](#loops-in-pi) are installed into pi's user settings (`~/.pi/agent/settings.json`), DeepSeek Harness and Command Code are installed with `npm install -g <package>@latest`, and the OpenCode TUI plugin [`oc-tps`](https://github.com/Tarquinen/oc-tps) is installed with `opencode plugin -g --force` when `opencode` is on your PATH (it lands in `~/.config/opencode/tui.json`, not in the generated `opencode.json`). Anything of these already installed is upgraded to its latest version, so re-running `make setup` is also how you update them
-5. Every provider whose key resolves is registered in the global config of every CLI — [one generator each](#generated-configs) — with every model in `configs.jsonc`, not just the tagged ones, and all of them starting on [the default provider](#default-provider)
+4. The pi packages that add [`/loop` and `/goal`](#loops-in-pi) are installed into pi's user settings (`~/.pi/agent/settings.json`) and pi's model catalogs are refreshed, DeepSeek Harness and Command Code are installed with `npm install -g <package>@latest`, and the OpenCode TUI plugin [`oc-tps`](https://github.com/Tarquinen/oc-tps) is installed with `opencode plugin -g --force` when `opencode` is on your PATH (it lands in `~/.config/opencode/tui.json`, not in the generated `opencode.json`). Anything of these already installed is upgraded to its latest version, so re-running `make setup` is also how you update them
+5. Every provider whose key resolves is registered in the global config of every CLI — [one generator each](#generated-configs) — with every model in `configs.jsonc`, not just the tagged ones, and all of them starting on [the default provider](#default-provider). pi also gets the keys OpenCode's `/connect` holds, for [Zen and Go](#usage)
 6. You get a warning if any of the CLIs those configs are for is missing from your PATH
 7. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/loop`](#loops-in-opencode) and [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode`, and pi gets its [dashboard](#pi-dashboard) in `~/.pi/agent/extensions` ([details below](#skills-and-global-instructions))
 
@@ -134,7 +134,8 @@ mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/mig
 [2026-09-11 — OpenCode の Subscriptions 見出し](docs/migrations/2026-09-11-opencode-subscriptions.md),
 [2026-09-13 — OpenCode の `/loop`](docs/migrations/2026-09-13-opencode-loop.md),
 [2026-09-13 — Claude Code ランチャー廃止と見出し・API 別の configs.jsonc](docs/migrations/2026-09-13-drop-claude-launchers.md),
-and [2026-09-18 — pi のダッシュボード拡張](docs/migrations/2026-09-18-pi-dashboard.md).
+[2026-09-18 — pi のダッシュボード拡張](docs/migrations/2026-09-18-pi-dashboard.md),
+and [2026-09-18 — pi から OpenCode Zen / Go を使う](docs/migrations/2026-09-18-pi-opencode-auth.md).
 
 ### Make targets
 
@@ -146,13 +147,13 @@ and [2026-09-18 — pi のダッシュボード拡張](docs/migrations/2026-09-1
 | `make check` | Validate `configs.jsonc`, then refuse any concrete name outside it (see `CLAUDE.md`). What the pre-commit hook runs |
 | `make hooks` | Install the lefthook pre-commit hook that runs `make check` |
 | `make list` | Every provider with its heading, endpoint and models with their tags, then every skill, subagent, OpenCode extension and pi extension with its install status |
-| `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from `configs.jsonc`, and set the startup model in `~/.pi/agent/settings.json` — run it after changing a model or endpoint |
+| `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from `configs.jsonc`, set the startup model in `~/.pi/agent/settings.json`, and link the keys OpenCode's `/connect` holds into `~/.pi/agent/auth.json` — run it after changing a model or endpoint, or connecting a provider in OpenCode |
 | `make opencode-global` | Re-generate OpenCode's global config from `configs.jsonc` — run it after editing it |
 | `make crush-global` | Re-generate Crush's global `~/.config/crush/crushrc` from `configs.jsonc` |
 | `make reasonix-global` | Re-generate Reasonix's global `~/.reasonix/config.toml`, and the keys it reads from `~/.reasonix/.env` |
 | `make codewhale-global` | Re-generate Codewhale's global `~/.codewhale/config.toml`, and the keys it reads from `~/.codewhale/.env` |
 | `make dsh-global` | Re-generate DeepSeek Harness's home patch `~/.dsh/cordis.patch.yml`, and the keys it reads from `~/.dsh/.env` |
-| `make uninstall` | Remove the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included) and the plugin shims generated from it. The `.env` is left alone |
+| `make uninstall` | Remove the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
 | `make help` | The target list above, on the terminal |
 
 ## Usage
@@ -171,6 +172,13 @@ dsh web           # DeepSeek Harness — every configured provider is in the Web
 ```bash
 pi                                         # starts on the default provider's model
 pi --model glm-anthropic/glm-5.3           # or pick at launch time
+```
+
+pi also has OpenCode Zen and OpenCode Go built in, as `opencode` and `opencode-go`. They are not providers in `configs.jsonc`: you connect them once with `/connect` in OpenCode, and `make setup` (and `make pi-global`) gives pi an entry in `~/.pi/agent/auth.json` for every key OpenCode stored that pi has a provider for. The entry is a command reading the key back out of OpenCode's `~/.local/share/opencode/auth.json`, so no key is copied and one rotated in OpenCode needs no re-run. An entry you made yourself with pi's `/login` is left in place, and OAuth logins are not shared: pi refreshes those through its own `/login`. `make setup` also refreshes pi's model catalogs, so the Zen and Go lists include models those services added after the installed pi was released.
+
+```bash
+pi --model opencode-go/deepseek-v4.1-flash     # OpenCode Go, on the key OpenCode's /connect stored
+pi --list-models opencode                      # what Zen and Go serve
 ```
 
 Both generators start you on the same provider; see [Default provider](#default-provider). For pi that means `defaultProvider` / `defaultModel` in `~/.pi/agent/settings.json`, the two keys Ctrl+S in `/model` writes — so a re-run replaces a pick you saved there. The rest of that file is left as it is. Writing them needs `python3`; without it the two keys are skipped and pi starts wherever it was.

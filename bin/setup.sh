@@ -9,7 +9,7 @@
 # At a prompt, pressing Enter with no input keeps whatever is already set.
 # Keys still sitting in the old providers/<name>/.env files are carried over
 # first. Then the pi packages in $PI_PACKAGES are installed into pi's user
-# settings, DeepSeek Harness and Command Code are installed with npm, the
+# settings and pi's model catalogs are refreshed, DeepSeek Harness and Command Code are installed with npm, the
 # OpenCode plugins in $OPENCODE_PLUGINS are installed with `opencode plugin -g`
 # — each of those upgraded to its latest version when already there — and
 # every provider whose key resolves is
@@ -313,6 +313,14 @@ install_pi_packages() {
         "$YLW" "$RST" "$B" "$src" "$RST" "$YLW" "$verb" "$src" "$RST"
     fi
   done
+  # pi's built-in providers list the models its catalog had when it was
+  # released; a refresh picks up the ones those services added since.
+  if pi update --models >/dev/null 2>&1; then
+    printf '  %s✔%s %s%-26s%s %s%s%s\n' "$GRN" "$RST" "$B" 'model catalogs' "$RST" "$DIM" 'refreshed' "$RST"
+  else
+    printf '  %s⚠%s %s%-26s%s %sfailed — run '\''pi update --models'\'' by hand%s\n' \
+      "$YLW" "$RST" "$B" 'model catalogs' "$RST" "$YLW" "$RST"
+  fi
 }
 
 # DeepSeek Harness and Command Code ship as npm packages. Every run installs

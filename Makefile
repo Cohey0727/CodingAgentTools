@@ -49,6 +49,7 @@ uninstall:
 	done
 	@. "$(COMMON)"; rm -rf "$$(opencode_tokens_dir)" \
 		&& echo "  Removed $$(opencode_tokens_dir)"
+	@. "$(COMMON)"; pi_link_opencode_auth | sed 's/^/  pi auth: /'
 	@if command -v pi >/dev/null 2>&1; then \
 		. "$(COMMON)"; \
 		for spec in $$PI_PACKAGES; do \
