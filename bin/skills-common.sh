@@ -18,10 +18,12 @@ AGENTS_SRC="$ROOT/agents"
 OPENCODE_SRC="$ROOT/opencode"
 OPENCODE_PLUGIN_TEMPLATE="$ROOT/bin/opencode-plugin.template"
 
-# pi's own extension point: one extension per pi/extensions/*.ts, symlinked
-# into pi's auto-discovered extensions directory. pi resolves its own imports
-# for an extension wherever the file really lives, so a symlink is enough.
-PI_EXT_SRC="$ROOT/pi/extensions"
+# pi's own extension points, each symlinked into pi's agent directory: an
+# extension per pi/extensions/*.ts, and a subagent definition per
+# pi/agents/*.md for the subagents package. pi resolves an extension's imports
+# wherever the file really lives, so a symlink is enough.
+PI_SRC="$ROOT/pi"
+PI_KINDS="extensions agents"
 
 # ~/.claude is Claude Code's own config dir. ~/.agents is the vendor-neutral
 # location the other agent CLIs read skills from.
@@ -95,13 +97,13 @@ opencode_plugin_names() { # every opencode/plugin/*.js file in the repo
   return 0
 }
 
-pi_extension_dir() { # -> the directory pi loads global extensions from
-  printf '%s/extensions' "$(pi_agent_dir)"
+pi_kind_dir() { # <kind> -> where pi reads that kind from
+  printf '%s/%s' "$(pi_agent_dir)" "$1"
 }
 
-pi_extension_names() { # every pi/extensions/*.ts file in the repo
+pi_names() { # <kind> -> every pi/<kind>/ file in the repo
   local f
-  for f in "$PI_EXT_SRC"/*.ts; do
+  for f in "$PI_SRC/$1"/*.ts "$PI_SRC/$1"/*.md; do
     [ -e "$f" ] && basename "$f"
   done
   return 0

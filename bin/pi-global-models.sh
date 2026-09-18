@@ -95,7 +95,8 @@ echo "  Wrote $OUT (${#entries[@]} routes)"
 
 # pi starts on defaultProvider / defaultModel from its own user settings, which
 # also hold the theme and the installed packages — so the file is merged, never
-# rewritten. Ctrl+S in /model writes the same two keys.
+# rewritten. Ctrl+S in /model writes the same two keys. configs.jsonc's
+# top-level pi.overrides is merged in after them, so its keys win.
 settings="$AGENT_DIR/settings.json"
 if command -v python3 >/dev/null 2>&1; then
   python3 - "$settings" "$start_route" "$start_model" <<'EOF'
@@ -114,7 +115,10 @@ with open(tmp, "w") as f:
     f.write("\n")
 os.replace(tmp, path)
 EOF
-  echo "  Set pi's startup model to $start_route/$start_model"
+  merged=$("$PYTHON" "$ROOT/bin/models.py" pi-merge <"$settings")
+  printf '%s\n' "$merged" >"$settings.tmp" && mv "$settings.tmp" "$settings"
+  startup=$("$PYTHON" -c 'import json, sys; d = json.load(open(sys.argv[1])); print(d.get("defaultProvider"), d.get("defaultModel"), sep="/")' "$settings")
+  echo "  Set pi's startup model to $startup"
 else
   echo "  pi's startup model needs python3 — pick it with /model then Ctrl+S" >&2
 fi
@@ -132,3 +136,25 @@ else
   done < <(opencode_auth_ids)
   pi_link_opencode_auth ${linked[@]+"${linked[@]}"} | sed 's/^/  pi auth: /'
 fi
+
+# pi-mcp-adapter reads OpenCode's MCP servers from its generated opencode.json,
+# so configs.jsonc's opencode.overrides.mcp is the one list both CLIs run.
+# Anything else in pi's mcp.json is kept.
+"$PYTHON" - "$AGENT_DIR/mcp.json" <<'EOF'
+import json, os, sys
+path = sys.argv[1]
+try:
+    with open(path) as f:
+        data = json.load(f)
+except FileNotFoundError:
+    data = {}
+imports = data.setdefault("imports", [])
+if "opencode" not in imports:
+    imports.append("opencode")
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    os.replace(tmp, path)
+EOF
+echo "  Pointed pi's MCP servers at OpenCode's config in $AGENT_DIR/mcp.json"

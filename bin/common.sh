@@ -155,10 +155,11 @@ default_provider() { # <configured provider>... -> the one to start on. The name
 }
 
 # pi packages `make setup` installs, as "<source>=<slash command>" pairs. pi
-# keeps its core small and ships no loop of its own: /loop repeats a prompt
-# until a stop condition, /goal drives an objective across turns. Override to
-# install a different set: PI_PACKAGES="npm:pi-reactor=/reactor" make setup
-PI_PACKAGES="${PI_PACKAGES:-npm:@realvendex/pi-loop=/loop npm:pi-goal=/goal}"
+# keeps its core small: /loop repeats a prompt until a stop condition, /goal
+# drives an objective across turns, /mcp bridges MCP servers, and /agents runs
+# subagents the way Claude Code's Agent tool does. Override to install a
+# different set: PI_PACKAGES="npm:pi-reactor=/reactor" make setup
+PI_PACKAGES="${PI_PACKAGES:-npm:@realvendex/pi-loop=/loop npm:pi-goal=/goal npm:pi-mcp-adapter=/mcp npm:@tintinweb/pi-subagents=/agents}"
 
 pi_agent_dir() { # -> pi's agent directory: settings, auth, models, packages
   printf '%s' "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"

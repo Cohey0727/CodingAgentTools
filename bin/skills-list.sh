@@ -56,14 +56,19 @@ list_opencode() {
 }
 
 list_pi() {
-  local name mark
+  local kind name mark desc
 
-  section "pi ($(pi_extension_names | wc -l | tr -d ' '))"
-  while IFS= read -r name; do
-    if linked_to_repo "$(pi_extension_dir)/$name"; then mark="${GRN}✔${RST}"; else mark="${YLW}⚠${RST}"; fi
-    printf '  %s %-26s %s%s%s\n' "$mark" "extensions/$name" "$DIM" \
-      "$(trunc "$(opencode_summary "$PI_EXT_SRC/$name")" "$DESC_COLS")" "$RST"
-  done < <(pi_extension_names)
+  section "pi ($(( $(pi_names extensions | wc -l) + $(pi_names agents | wc -l) )))"
+  for kind in $PI_KINDS; do
+    while IFS= read -r name; do
+      if linked_to_repo "$(pi_kind_dir "$kind")/$name"; then mark="${GRN}✔${RST}"; else mark="${YLW}⚠${RST}"; fi
+      case $name in
+        *.md) desc=$(frontmatter_field "$PI_SRC/$kind/$name" description); desc=${desc#\'}; desc=${desc%\'} ;;
+        *) desc=$(opencode_summary "$PI_SRC/$kind/$name") ;;
+      esac
+      printf '  %s %-26s %s%s%s\n' "$mark" "$kind/$name" "$DIM" "$(trunc "$desc" "$DESC_COLS")" "$RST"
+    done < <(pi_names "$kind")
+  done
 }
 
 list_context() {

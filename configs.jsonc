@@ -31,6 +31,15 @@
     }
   },
 
+  // Deep-merged, key by key, into pi's ~/.pi/agent/settings.json last, so a key
+  // here wins over the startup model the primary provider would give.
+  "pi": {
+    "overrides": {
+      "defaultProvider": "opencode-go",
+      "defaultModel": "deepseek-v4.1-flash"
+    }
+  },
+
   // Keyed by the heading each group of providers sits under in OpenCode's model
   // dialog, beside OpenCode's own Zen and Go. A provider name is unique across
   // headings.

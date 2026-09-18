@@ -36,6 +36,7 @@ agents/<name>.md                 # a subagent, linked into ~/.claude/agents and 
 opencode/command/<name>.md       # an OpenCode slash command, linked into ~/.config/opencode/command
 opencode/plugin/<name>.js        # an OpenCode plugin, reached from a shim in ~/.config/opencode/plugin
 pi/extensions/<name>.ts          # a pi extension, linked into ~/.pi/agent/extensions
+pi/agents/<name>.md              # a pi subagent definition, linked into ~/.pi/agent/agents
 configs.jsonc                    # every provider by heading: endpoint, API, models, tags, ${VAR} references (in git)
 .env                             # the values those references point at (gitignored, chmod 600)
 .env.example                     # the same variables, empty (in git)
@@ -62,7 +63,7 @@ docs/migrations/                 # upgrade notes for existing checkouts
 Makefile                         # setup / setup-providers / setup-skills / list / uninstall / <agent>-global / help
 ```
 
-Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; adding a skill is a new `skills/<name>/SKILL.md` and a `make setup-skills`. An OpenCode slash command is a new `opencode/command/<name>.md`, and a plugin a new `opencode/plugin/<name>.js` exporting `plugin({ tool })` — same `make setup-skills`. So is a pi extension: a new `pi/extensions/<name>.ts`.
+Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; adding a skill is a new `skills/<name>/SKILL.md` and a `make setup-skills`. An OpenCode slash command is a new `opencode/command/<name>.md`, and a plugin a new `opencode/plugin/<name>.js` exporting `plugin({ tool })` — same `make setup-skills`. So is a pi extension, a new `pi/extensions/<name>.ts`, and a pi subagent, a new `pi/agents/<name>.md`.
 
 ## Requirements
 
@@ -115,7 +116,7 @@ One interactive wizard does everything:
 1. Check the providers you want (arrows + Space, Enter to confirm — providers that already have a token are pre-checked)
 2. Paste each API token — an empty answer keeps the existing token
 3. `configs.jsonc` is validated before anything is written; `.env` is created from `.env.example` if missing (`chmod 600`), gets any variables added to `.env.example` since, and picks up keys still sitting in the old `providers/<name>/.env` files
-4. The pi packages that add [`/loop` and `/goal`](#loops-in-pi) are installed into pi's user settings (`~/.pi/agent/settings.json`) and pi's model catalogs are refreshed, DeepSeek Harness and Command Code are installed with `npm install -g <package>@latest`, and the OpenCode TUI plugin [`oc-tps`](https://github.com/Tarquinen/oc-tps) is installed with `opencode plugin -g --force` when `opencode` is on your PATH (it lands in `~/.config/opencode/tui.json`, not in the generated `opencode.json`). Anything of these already installed is upgraded to its latest version, so re-running `make setup` is also how you update them
+4. pi itself is updated, the [pi packages](#pi-packages) that add `/loop`, `/goal`, MCP and subagents are installed into pi's user settings (`~/.pi/agent/settings.json`), and pi's model catalogs are refreshed, DeepSeek Harness and Command Code are installed with `npm install -g <package>@latest`, and the OpenCode TUI plugin [`oc-tps`](https://github.com/Tarquinen/oc-tps) is installed with `opencode plugin -g --force` when `opencode` is on your PATH (it lands in `~/.config/opencode/tui.json`, not in the generated `opencode.json`). Anything of these already installed is upgraded to its latest version, so re-running `make setup` is also how you update them
 5. Every provider whose key resolves is registered in the global config of every CLI — [one generator each](#generated-configs) — with every model in `configs.jsonc`, not just the tagged ones, and all of them starting on [the default provider](#default-provider). pi also gets the keys OpenCode's `/connect` holds, for [Zen and Go](#usage)
 6. You get a warning if any of the CLIs those configs are for is missing from your PATH
 7. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/loop`](#loops-in-opencode) and [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode`, and pi gets its [dashboard](#pi-dashboard) in `~/.pi/agent/extensions` ([details below](#skills-and-global-instructions))
@@ -135,7 +136,8 @@ mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/mig
 [2026-09-13 — OpenCode の `/loop`](docs/migrations/2026-09-13-opencode-loop.md),
 [2026-09-13 — Claude Code ランチャー廃止と見出し・API 別の configs.jsonc](docs/migrations/2026-09-13-drop-claude-launchers.md),
 [2026-09-18 — pi のダッシュボード拡張](docs/migrations/2026-09-18-pi-dashboard.md),
-and [2026-09-18 — pi から OpenCode Zen / Go を使う](docs/migrations/2026-09-18-pi-opencode-auth.md).
+[2026-09-18 — pi から OpenCode Zen / Go を使う](docs/migrations/2026-09-18-pi-opencode-auth.md),
+and [2026-09-18 — pi の MCP・サブエージェントと起動モデル](docs/migrations/2026-09-18-pi-mcp-subagents.md).
 
 ### Make targets
 
@@ -242,39 +244,65 @@ OpenCode can start somewhere else. `make opencode-global` deep-merges the top-le
 }
 ```
 
+pi works the same way. `make pi-global` deep-merges the top-level `pi.overrides` into `~/.pi/agent/settings.json` after writing the default provider's model there, so pi starts on OpenCode Go's DeepSeek too. Any other key of pi's [settings](https://pi.dev/docs/settings) can go there, written in pi's own form:
+
+```jsonc
+"pi": {
+  "overrides": {
+    "defaultProvider": "opencode-go",
+    "defaultModel": "deepseek-v4.1-flash"
+  }
+}
+```
+
 Anything else OpenCode's config takes goes there too, written in OpenCode's own form. The permission policy does: `"permission": "allow"` runs every tool without an approval prompt, so a session never stops to ask. Its MCP servers do — today the [Playwright MCP](https://github.com/microsoft/playwright-mcp), started on the persistent profile `~/playwright/profiles/default` so a login survives restarts. OpenCode expands `{env:HOME}` in the command itself, so the same entry works on every machine. Chrome locks a profile to one browser, so while another agent drives that profile, OpenCode's Playwright cannot start one. `opencode mcp list` shows whether it connected.
 
-### Loops in pi
+### pi packages
 
-pi keeps its core small and ships no loop of its own — nor sub-agents, MCP,
-plan mode or to-dos. Everything of that kind lives in
-[pi packages](https://pi.dev/packages), so `make setup` installs two of them
-and pi can iterate unattended the way Claude Code's
-`/loop` and `/goal` do:
+pi keeps its core small and ships no loop of its own, nor subagents or MCP.
+Everything of that kind lives in [pi packages](https://pi.dev/packages), so
+`make setup` installs four of them:
 
 | Package | Adds | What it does |
 |---------|------|--------------|
 | [`npm:@realvendex/pi-loop`](https://github.com/ZachDreamZ/pi-loop) | `/loop` | Repeat a prompt until a stop condition: `--max N`, `--until "TEXT"`, `--until-stable N` (convergence), `--timeout 5m`, `--yes` for autopilot |
 | `npm:pi-goal` | `/goal` | A persistent objective the agent keeps working on across turns until it is complete, paused, or out of budget |
+| [`npm:pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter) | `/mcp` | MCP servers behind one `mcp` tool, started when first used |
+| [`npm:@tintinweb/pi-subagents`](https://github.com/tintinweb/pi-subagents) | `/agents` | Claude Code's `Agent` tool with `general-purpose`, `Explore` and `Plan`, run in the foreground or background, plus Claude Code's `Workflow` scripts as `SubagentWorkflow` |
 
 ```
 /loop "make the tests pass" --until-stable 2 --max 20
 /goal "port the CLI flags to the new parser"
 ```
 
-They go into pi's user settings (`~/.pi/agent/settings.json`). Install a
-different set by editing `agents.pi.packages` in `configs.jsonc`, as
-`"<source>": "<slash command>"`
-pairs — an empty command just leaves the label off:
+They go into pi's user settings (`~/.pi/agent/settings.json`). The list is
+`PI_PACKAGES` in `bin/common.sh`, as `<source>=<slash command>` pairs. Install
+a different set for one run by setting it:
 
-```jsonc
-"packages": { "npm:pi-reactor": "/reactor" }
+```bash
+PI_PACKAGES="npm:pi-reactor=/reactor" make setup
 ```
 
+**MCP.** pi runs the same MCP servers as OpenCode. `make pi-global` adds an
+`opencode` import to `~/.pi/agent/mcp.json`, and the adapter reads the `mcp`
+entries of the generated `~/.config/opencode/opencode.json`, which come from
+`opencode.overrides.mcp` in `configs.jsonc`. Parallel Search gives pi web
+search and fetch with no key, and Playwright drives the same persistent
+browser profile. Only one agent at a time can drive that profile. `/mcp` shows
+each server and its tools. Other keys in `mcp.json` are kept.
+
+**Subagents.** The skills written for Claude Code's `Agent` tool, such as
+`deep-review`, `fanout` and `evidence-redteam`, run in pi unchanged. The
+package's built-in `Explore` runs on Claude Haiku, which this setup reaches only
+through paid providers, so `pi/agents/Explore.md` replaces it with the same
+prompt and no `model:`. It then runs on the parent session's model.
+`general-purpose` and `Plan` inherit it already. Each subagent is a full model
+session, so running several in parallel multiplies the cost.
+
 > **Note:** pi packages run with full system access and the registry is not
-> curated. Both packages above are third-party npm packages — read the source
-> before trusting them with an unattended loop, and prefer a container or a
-> throwaway checkout for autopilot runs.
+> curated. All four packages above are third-party npm packages — read the
+> source before trusting them with an unattended loop, and prefer a container
+> or a throwaway checkout for autopilot runs.
 
 ### pi dashboard
 
@@ -827,14 +855,16 @@ export const plugin = ({ tool }) => async ({ client }) => ({ /* hooks */ })
 A file in either directory that this repo did not put there is left alone —
 shims are recognised by their first line, commands by pointing back here.
 
-### pi extensions
+### pi extensions and subagents
 
-pi's own extension points live in `pi/extensions/` and are symlinked into
-`~/.pi/agent/extensions/`, where pi loads every `*.ts` at startup. pi resolves
+pi's own extension points live in `pi/` and are symlinked into pi's agent
+directory: `pi/extensions/*.ts` into `~/.pi/agent/extensions/`, where pi loads
+every `*.ts` at startup, and `pi/agents/*.md` into `~/.pi/agent/agents/`, where
+the subagents package finds agent definitions. pi resolves
 an extension's imports of its own packages (`@earendil-works/pi-coding-agent`,
 `@earendil-works/pi-tui`, `@earendil-works/pi-ai`, `typebox`) wherever the file
 really lives, so unlike an OpenCode plugin no shim is needed. Edit the file here
-and run `/reload` in pi to pick it up. An extension you put in that directory
+and run `/reload` in pi to pick it up. A file you put in either directory
 yourself is left alone by `make uninstall`.
 
 The two `freelance-*` skills read a `personal-config.json` next to their

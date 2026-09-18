@@ -8,8 +8,8 @@
 # the .env beside it holds those values and is the only file with a key in it.
 # At a prompt, pressing Enter with no input keeps whatever is already set.
 # Keys still sitting in the old providers/<name>/.env files are carried over
-# first. Then the pi packages in $PI_PACKAGES are installed into pi's user
-# settings and pi's model catalogs are refreshed, DeepSeek Harness and Command Code are installed with npm, the
+# first. Then pi is updated, the pi packages in $PI_PACKAGES are installed into
+# pi's user settings and pi's model catalogs are refreshed, DeepSeek Harness and Command Code are installed with npm, the
 # OpenCode plugins in $OPENCODE_PLUGINS are installed with `opencode plugin -g`
 # — each of those upgraded to its latest version when already there — and
 # every provider whose key resolves is
@@ -291,14 +291,27 @@ prompt_token() { # <provider>
 # ------------------------------------------------------------- installation
 
 # pi resolves packages from its user settings, so one install covers every
-# provider. A package already there is brought to its latest version.
+# provider. pi itself and every package already there are brought to their
+# latest version.
 install_pi_packages() {
-  local spec src cmd verb done
+  local spec src cmd verb done before after
   section 'installing pi packages'
   if ! command -v pi >/dev/null 2>&1; then
     printf '  %s⚠%s %s\n' "$YLW" "$RST" \
       "skipped — 'pi' is not on your PATH. Install it (https://pi.dev), then re-run."
     return 0
+  fi
+  before=$(pi --version 2>/dev/null || true)
+  if pi update --self >/dev/null 2>&1; then
+    after=$(pi --version 2>/dev/null || true)
+    if [ "$before" = "$after" ]; then
+      printf '  %s✔%s %s%-26s%s %s%s, already the latest%s\n' "$GRN" "$RST" "$B" 'pi' "$RST" "$DIM" "$after" "$RST"
+    else
+      printf '  %s✔%s %s%-26s%s %s%s -> %s%s\n' "$GRN" "$RST" "$B" 'pi' "$RST" "$DIM" "$before" "$after" "$RST"
+    fi
+  else
+    printf '  %s⚠%s %s%-26s%s %sfailed — run '\''pi update --self'\'' by hand%s\n' \
+      "$YLW" "$RST" "$B" 'pi' "$RST" "$YLW" "$RST"
   fi
   # shellcheck disable=SC2086  # word-splitting PI_PACKAGES is intended
   for spec in $PI_PACKAGES; do

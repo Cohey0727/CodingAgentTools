@@ -22,6 +22,7 @@ The file is JSON with // line comments allowed.
   models.py providers           one provider name per line
   models.py primary             the provider marked "primary", if any
   models.py opencode-merge      the OpenCode config on stdin, opencode.overrides merged in
+  models.py pi-merge            pi's settings.json on stdin, pi.overrides merged in
   models.py vocabulary          every concrete name no file but configs.jsonc may hold
   models.py env-vars            every "${NAME}" the file references, with its provider
 """
@@ -43,7 +44,7 @@ APIS = ("anthropic", "openai")
 MODEL_KEYS = {"id", "api", "tags", "context_window", "max_tokens", "reasoning", "input"}
 PROVIDER_KEYS = {"label", "API_KEY", "BASE_URL", "REQUEST_HEADERS", "api", "primary", "defaults", "opencode", "models"}
 OPENCODE_KEYS = {"lean", "context_window", "max_tokens"}
-OPENCODE_ROOT_KEYS = {"overrides"}
+AGENT_ROOT_KEYS = {"overrides"}
 
 REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
 
@@ -158,13 +159,13 @@ def load_file():
     return {name: raw for name, (_, raw) in sections().items()}
 
 
-def opencode_overrides():
-    """The top-level opencode.overrides, laid over the generated OpenCode config last."""
-    where = f"{CONFIGS}: opencode"
-    raw = load_root().get("opencode") or {}
+def agent_overrides(agent):
+    """The top-level <agent>.overrides, laid over that agent's generated config last."""
+    where = f"{CONFIGS}: {agent}"
+    raw = load_root().get(agent) or {}
     if not isinstance(raw, dict):
         raise ConfigError(f"{where}: must be an object")
-    _check_keys(where, raw, OPENCODE_ROOT_KEYS)
+    _check_keys(where, raw, AGENT_ROOT_KEYS)
     overrides = raw.get("overrides") or {}
     if not isinstance(overrides, dict):
         raise ConfigError(f"{where}: overrides must be an object")
@@ -426,7 +427,7 @@ def main(argv):
     action = argv[1] if len(argv) > 1 else ""
     argument = argv[2] if len(argv) > 2 else ""
     api = argv[3] if len(argv) > 3 else ""
-    if action not in ("sh", "check", "tags", "providers", "env-vars", "primary", "opencode-merge", "vocabulary"):
+    if action not in ("sh", "check", "tags", "providers", "env-vars", "primary", "opencode-merge", "pi-merge", "vocabulary"):
         print(__doc__.strip(), file=sys.stderr)
         return 2
     try:
@@ -434,9 +435,10 @@ def main(argv):
             print("\n".join(load_file()))
         elif action == "primary":
             print(primary_provider())
-        elif action == "opencode-merge":
-            config = json.loads(strip_comments(sys.stdin.read()))
-            print(json.dumps(deep_merge(config, opencode_overrides()), indent=2, ensure_ascii=False))
+        elif action in ("opencode-merge", "pi-merge"):
+            config = json.loads(strip_comments(sys.stdin.read()) or "{}")
+            merged = deep_merge(config, agent_overrides(action.removesuffix("-merge")))
+            print(json.dumps(merged, indent=2, ensure_ascii=False))
         elif action == "vocabulary":
             print(vocabulary())
         elif action == "env-vars":
@@ -445,7 +447,8 @@ def main(argv):
             for name in load_file():
                 load(name)
             primary_provider()
-            opencode_overrides()
+            agent_overrides("opencode")
+            agent_overrides("pi")
         elif not argument:
             print(f"models.py {action}: a provider name is required", file=sys.stderr)
             return 2

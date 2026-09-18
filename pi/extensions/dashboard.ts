@@ -488,8 +488,11 @@ export default function dashboard(pi: ExtensionAPI) {
 		refresh();
 	});
 
+	// Only where someone watches the list: subagents and print mode run
+	// without a UI, and a plan nobody sees is wasted tokens.
 	pi.on("before_agent_start", async (event, ctx) => {
 		lastCtx = ctx;
+		if (!ctx.hasUI) return;
 		return { systemPrompt: `${event.systemPrompt}\n${TODO_GUIDANCE}` };
 	});
 

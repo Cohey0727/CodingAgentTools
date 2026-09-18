@@ -3,7 +3,8 @@
 #
 # Only symlinks pointing back into this repo, and plugin shims generated from
 # it, are removed — anything installed from elsewhere is left untouched. That
-# includes pi's extensions directory: extensions you put there yourself stay.
+# includes pi's extensions and agents directories: files you put there
+# yourself stay.
 
 set -euo pipefail
 
@@ -50,9 +51,11 @@ for target in "$(opencode_plugin_dir)"/*; do
 done
 [ "$N_REMOVED" -gt "$before" ] || note 'nothing installed from this repo'
 
-section "$(tilde "$(pi_extension_dir)")"
+section "$(tilde "$(pi_agent_dir)")"
 before=$N_REMOVED
-clean_dir "$(pi_agent_dir)" extensions
+for kind in $PI_KINDS; do
+  clean_dir "$(pi_agent_dir)" "$kind"
+done
 [ "$N_REMOVED" -gt "$before" ] || note 'nothing linked from this repo'
 
 section 'AGENTS.md'
