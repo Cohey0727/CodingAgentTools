@@ -15,3 +15,7 @@ bin/__pycache__/
 # Claude Code local state (per-developer, not shared)
 .claude/settings.local.json
 .claude/.credentials.json
+
+# opencode / commandcode をリポジトリ内で実行したときのローカル状態
+/.opencode/
+/.commandcode/
