@@ -23,7 +23,7 @@
     {
       "name": "muse-spark",
       "label": "Meta Muse Spark 1.3 Contributor (Command Code)",
-      "enabled": true,
+      "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model commandcode-openai/meta/muse-spark-1.3-contributor --agent plan",
       "timeout_ms": 1200000,
