@@ -14,7 +14,7 @@ banner
 section 'targets'
 target 'make setup' 'both halves: the provider wizard, then the skill symlinks'
 target 'make setup-providers' 'pick providers, paste tokens, install dsh, Command Code and every global config'
-target 'make setup-skills' 'link skills/, agents/, AGENTS.md and opencode/ into every agent CLI'
+target 'make setup-skills' 'link skills/, agents/, AGENTS.md, opencode/ and pi/ into every agent CLI'
 target 'make list' 'every provider, skill, subagent and OpenCode extension, with its install status'
 target 'make pi-global' "re-generate pi's global models.json from configs.jsonc"
 target 'make opencode-global' "re-generate OpenCode's global config from configs.jsonc"
@@ -32,6 +32,7 @@ note 'skills and AGENTS.md are installed as symlinks — edits here take effect 
 note '~/.claude/skills is read by Claude Code and opencode'
 note '~/.agents/skills is read by Codex, opencode and pi'
 note 'opencode/ adds OpenCode-only extensions: /loop repeats one prompt until done, /goal keeps one objective going'
+note 'pi/ adds pi-only extensions: a dashboard footer (tok/s, context, topic, todo) and /panel'
 note 'AGENTS.md is the single global instruction file — Claude Code reads it as ~/.claude/CLAUDE.md'
 note 'real files and directories at a target path are never overwritten'
 note '.env is never touched by uninstall'

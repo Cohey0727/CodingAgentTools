@@ -55,6 +55,17 @@ list_opencode() {
   done < <(opencode_plugin_names)
 }
 
+list_pi() {
+  local name mark
+
+  section "pi ($(pi_extension_names | wc -l | tr -d ' '))"
+  while IFS= read -r name; do
+    if linked_to_repo "$(pi_extension_dir)/$name"; then mark="${GRN}✔${RST}"; else mark="${YLW}⚠${RST}"; fi
+    printf '  %s %-26s %s%s%s\n' "$mark" "extensions/$name" "$DIM" \
+      "$(trunc "$(opencode_summary "$PI_EXT_SRC/$name")" "$DESC_COLS")" "$RST"
+  done < <(pi_extension_names)
+}
+
 list_context() {
   local target mark
 
@@ -88,6 +99,7 @@ banner
 list_skills
 list_agents
 list_opencode
+list_pi
 list_context
 list_targets
 echo

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install this repo's skills, subagents and OpenCode extensions
+# Install this repo's skills, subagents, and OpenCode and pi extensions
 # (`make setup-skills`).
 #
 # Every skill under skills/ and every subagent under agents/ is symlinked into
@@ -7,7 +7,8 @@
 # editing a file in this repo takes effect immediately without reinstalling.
 # The same goes for OpenCode's slash commands under opencode/command/; its
 # plugins get a generated shim pointing back here instead, for the reason in
-# bin/opencode-plugin.template.
+# bin/opencode-plugin.template. pi's extensions under pi/extensions/ are
+# symlinked like the commands.
 #
 #   existing symlink or own shim  -> replaced
 #   existing real file/directory  -> skipped, never overwritten
@@ -99,6 +100,18 @@ install_opencode() { # OpenCode's global slash commands and plugins
   done < <(opencode_plugin_names)
 }
 
+install_pi() { # pi's global extensions
+  local dir name
+  [ -d "$PI_EXT_SRC" ] || return 0
+
+  dir=$(pi_extension_dir)
+  section "$(tilde "$dir")"
+  mkdir -p "$dir"
+  while IFS= read -r name; do
+    link_item "$PI_EXT_SRC/$name" "$dir/$name" "extensions/$name"
+  done < <(pi_extension_names)
+}
+
 install_context() { # the shared AGENTS.md, under whatever name each CLI expects
   local target
   [ -f "$CONTEXT_SRC" ] || return 0
@@ -121,7 +134,7 @@ warnings() { # every problem worth surfacing, one per line
   while IFS= read -r link; do
     [ -n "$link" ] || continue
     echo "dangling symlink: $(tilde "$link") -> $(readlink "$link")"
-  done < <(dangling_links "$(opencode_command_dir)")
+  done < <(dangling_links "$(opencode_command_dir)" "$(pi_extension_dir)")
   return 0
 }
 
@@ -156,10 +169,16 @@ report_readers() { # which installed CLIs actually pick up what we linked
   else
     warn "$(tilde "$(opencode_config_dir)") -> opencode is not on PATH"
   fi
+
+  if command -v pi >/dev/null 2>&1; then
+    ok "$(tilde "$(pi_extension_dir)") $DIM->$RST pi"
+  else
+    warn "$(tilde "$(pi_extension_dir)") -> pi is not on PATH"
+  fi
 }
 
 main() {
-  local root n_skills n_agents n_commands n_plugins roots='' line
+  local root n_skills n_agents n_commands n_plugins n_pi roots='' line
 
   banner
 
@@ -167,6 +186,7 @@ main() {
   n_agents=$(agent_names | wc -l | tr -d ' ')
   n_commands=$(opencode_command_names | wc -l | tr -d ' ')
   n_plugins=$(opencode_plugin_names | wc -l | tr -d ' ')
+  n_pi=$(pi_extension_names | wc -l | tr -d ' ')
 
   for root in "${TARGET_ROOTS[@]}"; do
     install_root "$root"
@@ -175,6 +195,7 @@ main() {
   done
 
   install_opencode
+  install_pi
   install_context
 
   section 'summary'
@@ -183,6 +204,8 @@ main() {
   printf '  %s%s commands%s · %s%s plugins%s %s->%s %s\n' \
     "$B" "$n_commands" "$RST" "$B" "$n_plugins" "$RST" "$DIM" "$RST" \
     "$(tilde "$(opencode_config_dir)")"
+  printf '  %s%s pi extensions%s %s->%s %s\n' \
+    "$B" "$n_pi" "$RST" "$DIM" "$RST" "$(tilde "$(pi_extension_dir)")"
   printf '  %sAGENTS.md%s %s->%s %s targets\n' \
     "$B" "$RST" "$DIM" "$RST" "${#CONTEXT_TARGETS[@]}"
   printf '  %slinked %s · updated %s · skipped %s%s\n' \

@@ -2,7 +2,8 @@
 # Remove what `make setup-skills` installed (`make uninstall`).
 #
 # Only symlinks pointing back into this repo, and plugin shims generated from
-# it, are removed — anything installed from elsewhere is left untouched.
+# it, are removed — anything installed from elsewhere is left untouched. That
+# includes pi's extensions directory: extensions you put there yourself stay.
 
 set -euo pipefail
 
@@ -48,6 +49,11 @@ for target in "$(opencode_plugin_dir)"/*; do
   ok "removed plugin/$(basename "$target")"
 done
 [ "$N_REMOVED" -gt "$before" ] || note 'nothing installed from this repo'
+
+section "$(tilde "$(pi_extension_dir)")"
+before=$N_REMOVED
+clean_dir "$(pi_agent_dir)" extensions
+[ "$N_REMOVED" -gt "$before" ] || note 'nothing linked from this repo'
 
 section 'AGENTS.md'
 before=$N_REMOVED

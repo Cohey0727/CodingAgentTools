@@ -53,7 +53,7 @@ provider に新しい属性が要るなら、順序は必ずこう:
 その名前が自動的に禁止語になる。3 文字以下の provider 名は、値として使われた
 形（引用符や `=` の右）でのみ検出する。
 
-走査対象はこのレポの機構 — `bin/` `Makefile` `lefthook.yml` `opencode/`
+走査対象はこのレポの機構 — `bin/` `Makefile` `lefthook.yml` `opencode/` `pi/`
 `.claude/*.json` — と staged の新規ファイル。`README.md` / `docs/` /
 `AGENTS.md` は provider を説明するのが役割、`skills/` は使いたい provider を
 名指しするのが役割なので、どちらも対象外。

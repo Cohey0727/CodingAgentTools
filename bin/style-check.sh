@@ -25,7 +25,7 @@ source "$ROOT/bin/common.sh"
 # commit has to be refused too. Documentation describes providers, and a skill
 # names the one it wants to run; neither is scanned.
 scanned() {
-  tracked_and_staged 'bin/*' 'Makefile' 'lefthook.yml' 'opencode/*' '.claude/*.json'
+  tracked_and_staged 'bin/*' 'Makefile' 'lefthook.yml' 'opencode/*' 'pi/*' '.claude/*.json'
 }
 
 machinery() { scanned; }

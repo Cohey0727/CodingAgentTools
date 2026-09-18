@@ -35,6 +35,7 @@ skills/<name>/SKILL.md           # a skill, linked into ~/.claude/skills and ~/.
 agents/<name>.md                 # a subagent, linked into ~/.claude/agents and ~/.agents/agents
 opencode/command/<name>.md       # an OpenCode slash command, linked into ~/.config/opencode/command
 opencode/plugin/<name>.js        # an OpenCode plugin, reached from a shim in ~/.config/opencode/plugin
+pi/extensions/<name>.ts          # a pi extension, linked into ~/.pi/agent/extensions
 configs.jsonc                    # every provider by heading: endpoint, API, models, tags, ${VAR} references (in git)
 .env                             # the values those references point at (gitignored, chmod 600)
 .env.example                     # the same variables, empty (in git)
@@ -51,7 +52,7 @@ bin/crush-global-config.sh       # registers every provider in Crush's global cr
 bin/reasonix-global-config.sh    # registers every provider in Reasonix's global config.toml (`make reasonix-global`)
 bin/codewhale-global-config.sh   # registers every provider in Codewhale's global config.toml (`make codewhale-global`)
 bin/dsh-global-config.sh         # registers every provider in DeepSeek Harness's home patch (`make dsh-global`)
-bin/skills-common.sh             # where skills, subagents, AGENTS.md and the OpenCode extensions are installed
+bin/skills-common.sh             # where skills, subagents, AGENTS.md and the OpenCode and pi extensions are installed
 bin/skills-setup.sh              # links them there (`make setup-skills`)
 bin/skills-list.sh               # their install status (part of `make list`)
 bin/skills-uninstall.sh          # removes only the symlinks pointing back here (part of `make uninstall`)
@@ -61,7 +62,7 @@ docs/migrations/                 # upgrade notes for existing checkouts
 Makefile                         # setup / setup-providers / setup-skills / list / uninstall / <agent>-global / help
 ```
 
-Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; adding a skill is a new `skills/<name>/SKILL.md` and a `make setup-skills`. An OpenCode slash command is a new `opencode/command/<name>.md`, and a plugin a new `opencode/plugin/<name>.js` exporting `plugin({ tool })` — same `make setup-skills`.
+Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; adding a skill is a new `skills/<name>/SKILL.md` and a `make setup-skills`. An OpenCode slash command is a new `opencode/command/<name>.md`, and a plugin a new `opencode/plugin/<name>.js` exporting `plugin({ tool })` — same `make setup-skills`. So is a pi extension: a new `pi/extensions/<name>.ts`.
 
 ## Requirements
 
@@ -117,7 +118,7 @@ One interactive wizard does everything:
 4. The pi packages that add [`/loop` and `/goal`](#loops-in-pi) are installed into pi's user settings (`~/.pi/agent/settings.json`), DeepSeek Harness and Command Code are installed with `npm install -g <package>@latest`, and the OpenCode TUI plugin [`oc-tps`](https://github.com/Tarquinen/oc-tps) is installed with `opencode plugin -g --force` when `opencode` is on your PATH (it lands in `~/.config/opencode/tui.json`, not in the generated `opencode.json`). Anything of these already installed is upgraded to its latest version, so re-running `make setup` is also how you update them
 5. Every provider whose key resolves is registered in the global config of every CLI — [one generator each](#generated-configs) — with every model in `configs.jsonc`, not just the tagged ones, and all of them starting on [the default provider](#default-provider)
 6. You get a warning if any of the CLIs those configs are for is missing from your PATH
-7. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/loop`](#loops-in-opencode) and [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode` ([details below](#skills-and-global-instructions))
+7. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/loop`](#loops-in-opencode) and [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode`, and pi gets its [dashboard](#pi-dashboard) in `~/.pi/agent/extensions` ([details below](#skills-and-global-instructions))
 
 To rotate a token, pick up new settings or add a provider later, just re-run `make setup`. `make setup-providers` and `make setup-skills` each run one half on its own; only the provider half prompts.
 
@@ -132,25 +133,26 @@ mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/mig
 [2026-09-09 — providers/ 廃止と configs.jsonc への集約](docs/migrations/2026-09-09-configs-jsonc.md),
 [2026-09-11 — OpenCode の Subscriptions 見出し](docs/migrations/2026-09-11-opencode-subscriptions.md),
 [2026-09-13 — OpenCode の `/loop`](docs/migrations/2026-09-13-opencode-loop.md),
-and [2026-09-13 — Claude Code ランチャー廃止と見出し・API 別の configs.jsonc](docs/migrations/2026-09-13-drop-claude-launchers.md).
+[2026-09-13 — Claude Code ランチャー廃止と見出し・API 別の configs.jsonc](docs/migrations/2026-09-13-drop-claude-launchers.md),
+and [2026-09-18 — pi のダッシュボード拡張](docs/migrations/2026-09-18-pi-dashboard.md).
 
 ### Make targets
 
 | Target | What it does |
 |--------|--------------|
-| `make setup` | Both halves: the provider wizard, then the skill, `AGENTS.md` and OpenCode extension install |
+| `make setup` | Both halves: the provider wizard, then the skill, `AGENTS.md`, OpenCode extension and pi extension install |
 | `make setup-providers` | The wizard above only: tokens, `.env` upkeep, pi packages, DeepSeek Harness, Command Code, OpenCode plugins, and every global config |
-| `make setup-skills` | The shared assets only: `skills/`, `agents/`, `AGENTS.md` and `opencode/` into every agent CLI |
+| `make setup-skills` | The shared assets only: `skills/`, `agents/`, `AGENTS.md`, `opencode/` and `pi/` into every agent CLI |
 | `make check` | Validate `configs.jsonc`, then refuse any concrete name outside it (see `CLAUDE.md`). What the pre-commit hook runs |
 | `make hooks` | Install the lefthook pre-commit hook that runs `make check` |
-| `make list` | Every provider with its heading, endpoint and models with their tags, then every skill, subagent and OpenCode extension with its install status |
+| `make list` | Every provider with its heading, endpoint and models with their tags, then every skill, subagent, OpenCode extension and pi extension with its install status |
 | `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from `configs.jsonc`, and set the startup model in `~/.pi/agent/settings.json` — run it after changing a model or endpoint |
 | `make opencode-global` | Re-generate OpenCode's global config from `configs.jsonc` — run it after editing it |
 | `make crush-global` | Re-generate Crush's global `~/.config/crush/crushrc` from `configs.jsonc` |
 | `make reasonix-global` | Re-generate Reasonix's global `~/.reasonix/config.toml`, and the keys it reads from `~/.reasonix/.env` |
 | `make codewhale-global` | Re-generate Codewhale's global `~/.codewhale/config.toml`, and the keys it reads from `~/.codewhale/.env` |
 | `make dsh-global` | Re-generate DeepSeek Harness's home patch `~/.dsh/cordis.patch.yml`, and the keys it reads from `~/.dsh/.env` |
-| `make uninstall` | Remove the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo and the plugin shims generated from it. The `.env` is left alone |
+| `make uninstall` | Remove the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included) and the plugin shims generated from it. The `.env` is left alone |
 | `make help` | The target list above, on the terminal |
 
 ## Usage
@@ -265,6 +267,41 @@ pairs — an empty command just leaves the label off:
 > curated. Both packages above are third-party npm packages — read the source
 > before trusting them with an unattended loop, and prefer a container or a
 > throwaway checkout for autopilot runs.
+
+### pi dashboard
+
+`make setup` links `pi/extensions/dashboard.ts` into `~/.pi/agent/extensions`,
+so every `pi` starts with a two-line footer in place of the built-in one, a
+to-do list the model keeps while it works, and a side panel:
+
+```
+─ todo 1/3 ─────────────────────────────────────────────────────────────
+  ▶ Run hello.py with python3
+  ○ Confirm the output
+── ⠏ Working ────────────────────────────────────────────────────────────
+◆ deepseek-v4-pro medium · ctx ▰▱▱▱▱▱▱▱ 12% 121k/1.00M · ↑51.5k ↓688 · ⚡ 60.8 tok/s · ⏱ 14s ⚙ 1 ·  main
+▶ Port the CLI flags to the new parser · todo 1/3 · ▶ Run hello.py with python3 · loop: 2/10
+```
+
+| Part | What it shows |
+|------|---------------|
+| Footer, first line | Model and thinking level, context window use as a bar that turns yellow at 65% and red at 85%, tokens sent and received this session (cached input included), tokens per second, time since the prompt and tools running, git branch |
+| Footer, second line | The topic, to-do progress and the item in progress, then whatever other extensions report there, such as `/loop` and `/goal` |
+| To-do widget | The open items above the editor, while there are any |
+| `/panel` or ctrl+alt+p | A side panel at the top right with the full to-do list and the session figures, including cost when the provider reports one. It does not take the keyboard, so you keep typing while it is open. Hidden below 100 columns |
+| `/todos` | Hide or show the to-do widget |
+| `/topic TEXT` | Name the session. The topic is an active `/goal` objective first, then this name, then the first prompt |
+
+The to-do list comes from a `todo` tool the extension gives the model, together
+with one paragraph of system prompt asking it to plan any task of more than a
+few steps with that tool and to tick items off as it verifies them. The list is
+stored in the tool results, so `/tree` and forks restore the list that belonged
+to that point in the session.
+
+Tokens per second is measured from the first streamed token, so waiting for the
+provider does not count. A live estimate shows while a reply streams and the
+provider's own output count replaces it when the reply ends. Replies shorter
+than a couple of dozen tokens leave the last figure in place.
 
 ### Loops in OpenCode
 
@@ -781,6 +818,16 @@ export const plugin = ({ tool }) => async ({ client }) => ({ /* hooks */ })
 
 A file in either directory that this repo did not put there is left alone —
 shims are recognised by their first line, commands by pointing back here.
+
+### pi extensions
+
+pi's own extension points live in `pi/extensions/` and are symlinked into
+`~/.pi/agent/extensions/`, where pi loads every `*.ts` at startup. pi resolves
+an extension's imports of its own packages (`@earendil-works/pi-coding-agent`,
+`@earendil-works/pi-tui`, `@earendil-works/pi-ai`, `typebox`) wherever the file
+really lives, so unlike an OpenCode plugin no shim is needed. Edit the file here
+and run `/reload` in pi to pick it up. An extension you put in that directory
+yourself is left alone by `make uninstall`.
 
 The two `freelance-*` skills read a `personal-config.json` next to their
 `SKILL.md` — issuer name, address, registration number, output directory. Those

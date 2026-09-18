@@ -18,6 +18,11 @@ AGENTS_SRC="$ROOT/agents"
 OPENCODE_SRC="$ROOT/opencode"
 OPENCODE_PLUGIN_TEMPLATE="$ROOT/bin/opencode-plugin.template"
 
+# pi's own extension point: one extension per pi/extensions/*.ts, symlinked
+# into pi's auto-discovered extensions directory. pi resolves its own imports
+# for an extension wherever the file really lives, so a symlink is enough.
+PI_EXT_SRC="$ROOT/pi/extensions"
+
 # ~/.claude is Claude Code's own config dir. ~/.agents is the vendor-neutral
 # location the other agent CLIs read skills from.
 TARGET_ROOTS=("$HOME/.claude" "$HOME/.agents")
@@ -90,6 +95,18 @@ opencode_plugin_names() { # every opencode/plugin/*.js file in the repo
   return 0
 }
 
+pi_extension_dir() { # -> the directory pi loads global extensions from
+  printf '%s/extensions' "$(pi_agent_dir)"
+}
+
+pi_extension_names() { # every pi/extensions/*.ts file in the repo
+  local f
+  for f in "$PI_EXT_SRC"/*.ts; do
+    [ -e "$f" ] && basename "$f"
+  done
+  return 0
+}
+
 shim_from_repo() { # <path> -> 0 when it is a plugin shim generated from this repo
   [ -f "$1" ] || return 1
   generated_here "$1" || return 1
@@ -102,7 +119,8 @@ frontmatter_field() { # <file> <field> -> first value, empty when absent
 }
 
 opencode_summary() { # <file> -> what it does: frontmatter for a command,
-                     # the first line of the header comment for a plugin
+                     # the first line of the header comment for a plugin or
+                     # a pi extension
   case $1 in
     *.md) frontmatter_field "$1" description ;;
     *) sed -n 's|^ \* \(..*\)|\1|p' "$1" | head -1 ;;
