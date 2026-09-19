@@ -13,6 +13,9 @@
 #   existing symlink or own shim  -> replaced
 #   existing real file/directory  -> skipped, never overwritten
 #   nothing there                 -> created
+#
+# A skill named in bin/removed-skills.txt gets its symlink deleted instead, so
+# a rename or removal there does not leave a dangling link behind.
 
 set -euo pipefail
 
@@ -21,6 +24,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/skills-common.sh"
 
 N_LINKED=0
 N_UPDATED=0
+N_REMOVED=0
 N_SKIPPED=0
 
 link_item() { # <src> <target> <label>
@@ -42,10 +46,26 @@ link_item() { # <src> <target> <label>
   fi
 }
 
+remove_stale_skills() { # <root> — drop links for skills no longer in the repo
+  local root=$1 name target
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    target="$root/skills/$name"
+    [ ! -e "$SKILLS_SRC/$name" ] || continue
+    linked_to_repo "$target" || continue
+    rm "$target"
+    N_REMOVED=$((N_REMOVED + 1))
+    printf '  %s✔%s %-30s %sremoved — no longer in the repo%s\n' \
+      "$GRN" "$RST" "skills/$name" "$DIM" "$RST"
+  done < <(removed_skill_names)
+}
+
 install_root() { # <root>
   local root=$1 name
   section "$(tilde "$root")"
   mkdir -p "$root/skills" "$root/agents"
+
+  remove_stale_skills "$root"
 
   while IFS= read -r name; do
     link_item "$SKILLS_SRC/$name" "$root/skills/$name" "skills/$name"
@@ -210,8 +230,8 @@ main() {
     "$B" "$n_pi" "$RST" "$B" "$n_pi_agents" "$RST" "$DIM" "$RST" "$(tilde "$(pi_agent_dir)")"
   printf '  %sAGENTS.md%s %s->%s %s targets\n' \
     "$B" "$RST" "$DIM" "$RST" "${#CONTEXT_TARGETS[@]}"
-  printf '  %slinked %s · updated %s · skipped %s%s\n' \
-    "$DIM" "$N_LINKED" "$N_UPDATED" "$N_SKIPPED" "$RST"
+  printf '  %slinked %s · updated %s · removed %s · skipped %s%s\n' \
+    "$DIM" "$N_LINKED" "$N_UPDATED" "$N_REMOVED" "$N_SKIPPED" "$RST"
 
   section 'checks'
   report_readers

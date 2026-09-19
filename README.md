@@ -55,6 +55,7 @@ bin/codewhale-global-config.sh   # registers every provider in Codewhale's globa
 bin/dsh-global-config.sh         # registers every provider in DeepSeek Harness's home patch (`make dsh-global`)
 bin/skills-common.sh             # where skills, subagents, AGENTS.md and the OpenCode and pi extensions are installed
 bin/skills-setup.sh              # links them there (`make setup-skills`)
+bin/removed-skills.txt           # skills no longer shipped; setup deletes their old links
 bin/skills-list.sh               # their install status (part of `make list`)
 bin/skills-uninstall.sh          # removes only the symlinks pointing back here (part of `make uninstall`)
 bin/list.sh                      # everything this repo manages (`make list`)
@@ -307,7 +308,7 @@ browser profile. Only one agent at a time can drive that profile. `/mcp` shows
 each server and its tools. Other keys in `mcp.json` are kept.
 
 **Subagents.** The skills written for Claude Code's `Agent` tool, such as
-`deep-review`, `fanout` and `evidence-redteam`, run in pi unchanged. The
+`deep-review` and `fanout`, run in pi unchanged. The
 package's built-in `Explore` runs on Claude Haiku, which this setup reaches only
 through paid providers, so `pi/agents/Explore.md` replaces it with the same
 prompt and no `model:`. It then runs on the parent session's model.
@@ -843,10 +844,11 @@ What linking does:
 - an existing real file or directory → skipped, never overwritten
 - nothing there → created
 
-The `checks` section of `make setup-skills` names the readers actually on your
-PATH and reports symlinks left dangling by a skill that was renamed or removed
-upstream. Re-run it after adding, renaming or deleting one; `make list` shows
-what is linked where.
+A skill renamed or removed leaves its symlink behind, so write the old name
+into `bin/removed-skills.txt`: the next `make setup-skills` deletes the link
+from both roots. Anything else left dangling is named in the `checks` section,
+which also reports the readers actually on your PATH. Re-run it after adding,
+renaming or deleting one; `make list` shows what is linked where.
 
 ### OpenCode commands and plugins
 

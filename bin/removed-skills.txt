@@ -1,0 +1,14 @@
+# Skills this repo used to ship, one name per line; `#` starts a comment.
+# `make setup-skills` deletes the symlink each name left behind in
+# <root>/skills/ (~/.claude and ~/.agents) when the link points back here.
+# Add the old name whenever a skill is removed or renamed.
+dev-hotl
+dev-issue-create
+dev-issue-implement
+dev-issue-review
+dev-pr-review
+dev-pr-review-resolve
+evidence-redteam
+git-workflow
+google-calendar
+semantic-stacked-pr

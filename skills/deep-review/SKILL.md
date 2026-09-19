@@ -283,6 +283,5 @@ git worktree remove --force <tmp>/deep-review-wt
 |---|---|
 | 単一モデル × 5観点で深く見る | **/deep-review** (これ) |
 | 複数モデルの意見を突き合わせる | `/fusion-review` |
-| レビュー待ちPRを見つけて捌く (merge/close まで) | `/dev-pr-review` |
 | 未コミット変更をサッと見る | `local-reviewer` エージェント |
 | 同じ作業を多数ファイルに横展開する | `/fanout` |

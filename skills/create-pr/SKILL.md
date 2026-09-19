@@ -1,9 +1,9 @@
 ---
-name: git-workflow
+name: create-pr
 description: 変更のコミットから PR 作成まで一括実行する。「PR作成」「プルリク」と言われたときに使用。
 ---
 
-# Git Workflow: Branch → Commit → Push → PR
+# Create PR: Branch → Commit → Push → PR
 
 Run the full workflow from commit to PR creation in one shot.
 
@@ -161,7 +161,7 @@ git diff origin/${BASE_BRANCH}...HEAD --stat
 
 - デフォルトは通常PR（ドラフトではない）
 - ユーザーがコマンド引数や会話の中で明示的にドラフトPRを指定した場合のみドラフトにする
-  - 例: `/git-workflow --draft`, 「ドラフトで」「WIPで出して」等
+  - 例: `/create-pr --draft`, 「ドラフトで」「WIPで出して」等
 
 ```bash
 gh pr create \
@@ -239,7 +239,7 @@ PRタイトル・本文・コミットメッセージの記述言語は、明示
 ### Explicit non-draft PR
 
 ```
-User: /git-workflow --no-draft
+User: /create-pr --no-draft
 1. ... (same workflow)
 8. gh pr create --title "feat: ..." ...  (no --draft flag)
 ```

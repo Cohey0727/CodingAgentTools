@@ -12,6 +12,10 @@ source "$ROOT/bin/common.sh"
 SKILLS_SRC="$ROOT/skills"
 AGENTS_SRC="$ROOT/agents"
 
+# Skill names this repo used to ship. `make setup-skills` deletes the symlink
+# each one left in <root>/skills/; see bin/removed-skills.txt.
+REMOVED_SKILLS_FILE="$ROOT/bin/removed-skills.txt"
+
 # OpenCode's own extension points: a slash command per opencode/command/*.md,
 # a plugin per opencode/plugin/*.js. Both are global, so they apply whichever
 # provider the session runs on.
@@ -70,6 +74,13 @@ skill_names() { # every skills/<name>/ directory in the repo
   for d in "$SKILLS_SRC"/*/; do
     [ -d "$d" ] && basename "$d"
   done
+  return 0
+}
+
+removed_skill_names() { # every name registered as no longer shipped
+  [ -f "$REMOVED_SKILLS_FILE" ] || return 0
+  sed -e 's/#.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+    "$REMOVED_SKILLS_FILE" | grep -v '^$'
   return 0
 }
 
