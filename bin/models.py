@@ -218,7 +218,7 @@ def load(name):
     if not base_url:
         raise ConfigError(f"{where}: BASE_URL is required")
 
-    api = _api(where, raw.get("api"))
+    api = _api(where, expand(raw.get("api") or ""))
 
     headers_raw = raw.get("REQUEST_HEADERS") or {}
     if not isinstance(headers_raw, dict):
@@ -430,7 +430,11 @@ def env_vars():
     """
     lines = []
     for name, raw in load_file().items():
-        fields = [("API_KEY", raw.get("API_KEY") or ""), ("BASE_URL", raw.get("BASE_URL") or "")]
+        fields = [
+            ("API_KEY", raw.get("API_KEY") or ""),
+            ("BASE_URL", raw.get("BASE_URL") or ""),
+            ("api", raw.get("api") or ""),
+        ]
         fields += [
             (f"REQUEST_HEADERS {header}", value or "")
             for header, value in (raw.get("REQUEST_HEADERS") or {}).items()

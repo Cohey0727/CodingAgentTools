@@ -10,7 +10,7 @@ One repo that generates the global config of six CLIs covering every provider �
 | Subscriptions | GLM (Z.ai) | `https://api.z.ai/api/anthropic` | anthropic | `glm-5.3` |
 | Subscriptions | Kimi (Moonshot) | `https://api.kimi.com/coding` | anthropic | `kimi-k3` |
 | Subscriptions | Local (llama.cpp) | `http://127.0.0.1:11301` | anthropic | `default` |
-| Subscriptions | gtr (llama.cpp behind Cloudflare) | `https://gtr-llama.spaghetti-monster.com` | anthropic | `default` |
+| Subscriptions | gtr (llama.cpp behind Cloudflare) | `https://gtr-halogen.spaghetti-monster.com` | openai | `default` |
 | Command Code | Command Code | `https://api.commandcode.ai/provider` | openai, and anthropic for Claude | `deepseek/deepseek-v4.1-flash` |
 
 `make setup` writes every provider into each CLI's global config, so a bare `opencode` gets them all under `/models`, a bare `pi` under `/model`, `crush`, `reasonix` and `codewhale` each start with the whole set, and so does `dsh web` — `dsh` has no default profile, so a bare `dsh` only answers `--profile <name> is required`.
@@ -21,7 +21,7 @@ There is no proxy or translation layer: each CLI talks to each endpoint in the A
 
 > **Note:** Local is not a hosted service — it points at a `llama-server` on your own machine, which serves the Anthropic shape on `/v1/messages`. Here that server is LlamaGate (`~/Workspace/LlamaGate`): `just start` brings it up on `127.0.0.1:11301`, `just profiles` lists the models it can load and `just start <profile>` swaps to one. There is no account and no key, so its `API_KEY` is a placeholder the CLIs merely require to be non-empty. Both llama.cpp providers use the fixed model id `default`: llama-server answers with whatever it has loaded and ignores the requested name, so swapping the model on the server needs no edit here. Keep `context_window` at or below the server's `--ctx-size`.
 
-> **Note:** gtr is a `llama-server` on another machine, published through a Cloudflare tunnel and gated by Cloudflare Access. Requests without Access credentials get a 302 to the login page, so its `REQUEST_HEADERS` carry an Access service token (`CF-Access-Client-Id` / `CF-Access-Client-Secret`), whose values come from `.env` — where a short-lived `cloudflared access token` can stand in for a stored one. Like Local, its `API_KEY` is only a placeholder unless `llama-server` runs with `--api-key`.
+> **Note:** gtr is a `llama-server` on another machine, published through a Cloudflare tunnel and gated by Cloudflare Access. Requests without Access credentials get a 302 to the login page, so its `REQUEST_HEADERS` carry an Access service token (`CF-Access-Client-Id` / `CF-Access-Client-Secret`), whose values come from `.env` — where a short-lived `cloudflared access token` can stand in for a stored one. Like Local, its `API_KEY` is only a placeholder unless `llama-server` runs with `--api-key`. It answers the OpenAI shape; `GTR9_API` in `.env` switches the CLIs to the Anthropic one if it is ever put behind such a route.
 
 > **Note:** Command Code's [Provider API](https://commandcode.ai/docs/provider) serves Claude only on `/v1/messages` and every other model only on `/v1/chat/completions`, answering 400 on the wrong one — so its Claude models carry `"api": "anthropic"` and the rest follow the provider's `"api": "openai"`. It needs a paid plan: the Go plan has no API access.
 
@@ -486,9 +486,9 @@ and the `.env` beside it is one line per key:
 DEEPSEEK_API_KEY=sk-...
 ```
 
-Two reference forms work in any string — `API_KEY`, `BASE_URL`, and each value
-under `REQUEST_HEADERS` — and both resolve against the environment when the value
-is needed, so nothing from `.env` is ever copied into the file:
+Two reference forms work in any string — `API_KEY`, `BASE_URL`, `api`, and each
+value under `REQUEST_HEADERS` — and both resolve against the environment when the
+value is needed, so nothing from `.env` is ever copied into the file:
 
 | Written | Resolves to |
 |---------|-------------|
@@ -552,7 +552,7 @@ models speak, as the route `<name>-<api>`; `make list` prints the name.
 | `label` | Leads each model's name in OpenCode's model dialog (`Z.AI glm-5.3`), which tells providers sharing a heading apart, names the route in DeepSeek Harness, and is the provider's id in pi. Omit it where the heading already says whose models they are |
 | `API_KEY` | **Required.** A `${VAR}` reference to the key |
 | `BASE_URL` | **Required.** The root both APIs hang off — `/v1/messages` or `/v1/chat/completions` is appended — as `${VAR:-default}` so `.env` can route it elsewhere |
-| `api` | **Required.** `"anthropic"` (Anthropic Messages) or `"openai"` (OpenAI Chat Completions): what every model speaks unless it sets its own |
+| `api` | **Required.** `"anthropic"` (Anthropic Messages) or `"openai"` (OpenAI Chat Completions): what every model speaks unless it sets its own. May be a `${VAR:-default}` reference where the shape depends on the route, as `gtr`'s does |
 | `REQUEST_HEADERS` | Extra request headers as a `{ "Name": "value" }` object, sent by every CLI — e.g. a Cloudflare Access service token in front of a self-hosted server. A value written as `${VAR}` is referenced wherever the CLI's format can express a reference |
 | `primary` | `true` on at most one provider — the one every generated config starts on |
 | `opencode.lean` | `true` gives the provider [a lean agent of its own](#lean-agents) |

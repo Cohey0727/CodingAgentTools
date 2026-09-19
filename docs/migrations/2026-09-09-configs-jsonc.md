@@ -54,7 +54,7 @@ rm -rf providers/
     },
     "gtr": {
       "API_KEY": "${GTR_API_KEY:-gtr}",
-      "BASE_URL": "${GTR_BASE_URL:-https://gtr-llama.spaghetti-monster.com}",
+      "BASE_URL": "${GTR_BASE_URL:-https://gtr-halogen.spaghetti-monster.com}",
       "REQUEST_HEADERS": {
         "CF-Access-Client-Id": "${GTR_CF_ACCESS_CLIENT_ID}",
         "CF-Access-Client-Secret": "${GTR_CF_ACCESS_CLIENT_SECRET}"

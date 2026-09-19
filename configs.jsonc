@@ -140,8 +140,11 @@
         // llama-server takes no auth unless started with --api-key, but the CLIs
         // require a non-empty value.
         "API_KEY": "${GTR_API_KEY:-gtr}",
-        "BASE_URL": "${GTR_BASE_URL:-https://gtr-llama.spaghetti-monster.com}",
-        "api": "anthropic",
+        "BASE_URL": "${GTR9_BASE_URL:-https://gtr-halogen.spaghetti-monster.com}",
+        // The shape the server answers: "openai" for /v1/chat/completions,
+        // "anthropic" for /v1/messages. Overridable because the route it sits
+        // behind may change.
+        "api": "${GTR9_API:-openai}",
 
         // Cloudflare Access answers a request without these with a 302 to its
         // login page.
