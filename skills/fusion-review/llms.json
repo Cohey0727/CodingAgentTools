@@ -1,12 +1,12 @@
 {
   "schemas": {
-    "self": "このセッションの Claude 自身がレビュアーの1人として直接レビューを書く。外部プロセスは起動しない",
+    "self": "このセッションのホストLLM自身がレビュアーの1人として直接レビューを書く。外部プロセスは起動しない",
     "stdin": "任意コマンド。`command` をそのまま実行し、stdin にプロンプト・stdout に回答"
   },
   "llms": [
     {
-      "name": "claude",
-      "label": "Anthropic Claude (このセッション自身)",
+      "name": "self",
+      "label": "このセッション自身 (ホストLLM)",
       "enabled": true,
       "schema": "self",
       "notes": "外部LLMの回答を読む前に、独立したレビューを自分で書き切ること (回答を見た後だと引きずられる)"
