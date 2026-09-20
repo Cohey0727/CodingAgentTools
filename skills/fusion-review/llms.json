@@ -39,6 +39,15 @@
       "notes": "--agent plan で read-only"
     },
     {
+      "name": "gtr",
+      "label": "GTR9 (llama.cpp behind Cloudflare)",
+      "enabled": true,
+      "schema": "stdin",
+      "command": "opencode run --model gtr-openai/default --agent plan",
+      "timeout_ms": 1200000,
+      "notes": "--agent plan で read-only。OpenCode 側の上限が context 16384 / output 4096 と小さく prefill も遅いため、大きな diff ではプロンプトが圧縮されうる"
+    },
+    {
       "name": "deepseek",
       "label": "DeepSeek (直接契約)",
       "enabled": false,
