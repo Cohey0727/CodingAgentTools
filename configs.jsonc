@@ -39,8 +39,8 @@
   // here wins over the startup model the primary provider would give.
   "pi": {
     "overrides": {
-      "defaultProvider": "opencode-go",
-      "defaultModel": "deepseek-v4.1-flash"
+      "defaultProvider": "Z.AI",
+      "defaultModel": "glm-5.3-flash"
     }
   },
 

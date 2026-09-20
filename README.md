@@ -186,7 +186,7 @@ pi --model opencode-go/deepseek-v4.1-flash     # OpenCode Go, on the key OpenCod
 pi --list-models opencode                      # what Zen and Go serve
 ```
 
-Both generators start you on the same provider; see [Default provider](#default-provider). For pi that means `defaultProvider` / `defaultModel` in `~/.pi/agent/settings.json`, the two keys Ctrl+S in `/model` writes — so a re-run replaces a pick you saved there. The rest of that file is left as it is. Writing them needs `python3`; without it the two keys are skipped and pi starts wherever it was.
+The two generators otherwise start you on the same provider; `pi.overrides` points pi at Z.AI's GLM-5.3 Flash instead. See [Default provider](#default-provider). For pi that means `defaultProvider` / `defaultModel` in `~/.pi/agent/settings.json`, the two keys Ctrl+S in `/model` writes — so a re-run replaces a pick you saved there. The rest of that file is left as it is. Writing them needs `python3`; without it the two keys are skipped and pi starts wherever it was.
 
 `make setup` (and `make opencode-global`) write every provider that has a token into the global `~/.config/opencode/opencode.json`, so a bare `opencode` starts with all of them and `/models` switches mid-session — each under the heading `configs.jsonc` files it under, beside OpenCode's own Zen and Go (see [OpenCode's model dialog](#opencodes-model-dialog)):
 
@@ -247,13 +247,13 @@ OpenCode can start somewhere else. `make opencode-global` deep-merges the top-le
 }
 ```
 
-pi works the same way. `make pi-global` deep-merges the top-level `pi.overrides` into `~/.pi/agent/settings.json` after writing the default provider's model there, so pi starts on OpenCode Go's DeepSeek too. Any other key of pi's [settings](https://pi.dev/docs/settings) can go there, written in pi's own form:
+pi works the same way. `make pi-global` deep-merges the top-level `pi.overrides` into `~/.pi/agent/settings.json` after writing the default provider's model there, so pi starts on Z.AI's GLM-5.3 Flash instead. Any other key of pi's [settings](https://pi.dev/docs/settings) can go there, written in pi's own form:
 
 ```jsonc
 "pi": {
   "overrides": {
-    "defaultProvider": "opencode-go",
-    "defaultModel": "deepseek-v4.1-flash"
+    "defaultProvider": "Z.AI",
+    "defaultModel": "glm-5.3-flash"
   }
 }
 ```
