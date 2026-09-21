@@ -128,6 +128,7 @@ cd <tmp>/fusion-wt && cat <tmp>/prompt.md | timeout <timeout_ms/1000>s <command>
 
 - タイムアウトは llms.json の `timeout_ms` を shell の `timeout` コマンド (秒に換算) で強制する。Bash ツールの `timeout` パラメータは上限 10 分で `timeout_ms` がそれを超えうるため、ツール側ではなく shell 側で制御する
 - 全LLMの起動を済ませてから完了を待つ (逐次実行しない)
+- 起動直後に落ちたら `err-<name>.log` を確認してから扱いを決める。インフラ起因の衝突 (例: opencode が共有するローカル DB の `database is locked` — 並列起動同士のロック競合) はモデルの失敗ではないため、他の起動の完了後に**直列で 1 回だけ**再起動してよい。モデル応答の失敗・タイムアウト・空出力は §7 のとおりリトライせずスキップする
 - cwd を worktree にするのは、レビュアーにコード全体を探索させるためと、万一書き込まれても使い捨ての worktree で済ませるため
 
 **`schema: self` (このセッション自身)** は、外部LLMを起動した直後・回答を読む**前**に、同じ prompt.md に対する自分のレビューを `<tmp>/review-self.md` に書き切る。自分も worktree 内の類似コードとの比較・既存ユーティリティの検索まで行うこと。先に他モデルの回答を読むと引きずられて独立性が失われるため、順序を守ること。
@@ -172,26 +173,31 @@ tmp の中間成果物 `review-<name>.md` 一式を入力として、**ホスト
 
 中間成果物 `review-<name>.md` は消さずに tmp に残す (後から個別レビューを読み返せるように)。ただし**ファイル名にモデル名が含まれるため、パスを報告文に列挙しない**。「個別の中間結果は同じディレクトリに残してある」程度に留め、ユーザーから明示的に求められたときだけ具体名を出す。
 
-**PRモード**: 統合結果を PR に**1つのレビュー**として投稿する。行を特定できる指摘は該当行へのインラインコメント、行を特定できない指摘と全体サマリーはレビュー本文に入れる:
+**PRモード**: PR への投稿は**実行全体でレビュー 1 件だけ**。部分投稿・切り分けのための投稿は絶対にしない。行を特定できる指摘はすべて該当行へのインラインコメントにし、**本文にインラインと重複する内容は書かない**。本文には短い Summary (merge 判断と残る指摘の要約) と、インラインにできない指摘だけを置く — 指摘がすべてインラインに載るなら本文は Summary のみでよい (行番号に直接書いた指摘を本文で繰り返すのは読み手の二度手間)。
+
+**投稿は GraphQL の pending レビューで組み立てる。** REST の一括 POST (`POST /pulls/{n}/reviews` に `comments` 配列) は、1 行でも差分に存在しない行が混ざると全体が 422 で落ちる。その原因特定のためにコメントを 1 件ずつ投稿すると、成功したものがそのまま PR に残り重複レビューが量産される (投稿済みレビューは API から削除できない)。pending レビューなら、行解決に失敗したコメントだけが単独でエラーになり、確定するまで PR には何も現れない:
 
 ```bash
-gh api repos/{owner}/{repo}/pulls/{number}/reviews --input review.json
+# pending レビューを作成 (確定まで PR には非表示)
+PR_ID=$(gh pr view <N> --json id --jq .id)
+SHA=$(gh pr view <N> --json headRefOid --jq .headRefOid)
+RID=$(gh api graphql -f query='mutation($pr:ID!,$sha:GitObjectID!){ addPullRequestReview(input:{pullRequestId:$pr, commitOID:$sha}){ pullRequestReview{ id } } }' -f pr=$PR_ID -F sha=$SHA --jq '.data.addPullRequestReview.pullRequestReview.id')
+
+# インラインコメントを 1 件ずつ追加。失敗しても pending のままなので、
+# その指摘だけ本文へ移すか棄却する (PR には何も出ない)
+gh api graphql -f query='mutation($r:ID!,$path:String!,$line:Int!,$body:String!){ addPullRequestReviewThread(input:{pullRequestReviewId:$r, path:$path, line:$line, side:RIGHT, body:$body}){ thread{ id } } }' \
+  -f r=$RID -f path=src/foo.ts -F line=42 -f body="[HIGH] 内容"
+
+# 全件載せたら本文を付けて確定
+gh api graphql -f query='mutation($r:ID!,$body:String!){ submitPullRequestReview(input:{pullRequestReviewId:$r, event:COMMENT, body:$body}){ pullRequestReview{ url } } }' \
+  -f r=$RID -f body="<Summary + インラインにできない指摘>"
 ```
 
-```json
-{
-  "commit_id": "<PRのheadのSHA>",
-  "event": "COMMENT",
-  "body": "<ホストLLMの総括 + 行を特定できない指摘>",
-  "comments": [
-    { "path": "src/foo.ts", "line": 42, "side": "RIGHT", "body": "[HIGH] 内容" }
-  ]
-}
-```
-
+- インラインにできるのは **GitHub の PR 差分に現れる行**だけ。ローカルで計算した merge-base はずれることがある (ブランチの一部コミットが既に develop に入っている等)。行アンカーとファイル数・増減行数の統計は `gh pr view --json changedFiles,additions,deletions` と `gh api repos/.../pulls/<N>/files` の patch を正とする。差分ハンク内の無変更行 (コンテキスト行) にもインラインは付けられない
 - `event` は `COMMENT` 固定 (approve / request changes の判断は人間に残す)
 - 対応不要と裁定した指摘は PR には書かず、チャットでの報告にのみ含める
-- 投稿前に指摘件数と内容の要約をユーザーに見せる必要はない (このスキルは自律実行前提)。ただし投稿後にレビューURLを報告する
+- 中断・作り直す場合は `deletePullRequestReview` で pending レビューを削除できる (確定後は削除できない)
+- 投稿後にレビューURLを報告する
 
 最後に worktree を片付ける:
 
