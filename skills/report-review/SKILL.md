@@ -1,11 +1,11 @@
 ---
 name: report-review
-description: Spec-driven review that reports in three fixed sections (仕様チェック / docsチェック / コード品質) to a temp file, a specified folder, or inline PR comments at the exact lines. Use when asked with 「report-review」「レビューレポート」「レビューしてレポートにまとめて」.
+description: Spec-driven review that reports in six fixed sections (仕様チェック / docsチェック / コード品質 / パフォーマンス / セキュリティ / 技術選定) to a temp file, a specified folder, or inline PR comments at the exact lines. Use when asked with 「report-review」「レビューレポート」「レビューしてレポートにまとめて」.
 ---
 
-# report-review — spec-driven 3-section review
+# report-review — spec-driven multi-section review
 
-Spec-driven code review that always reports in **three fixed sections** — 仕様チェック (spec compliance), docsチェック (docs & conventions), コード品質 (code quality) — and delivers the result as a temp file, a file in a user-specified folder, or inline comments posted directly on the PR lines.
+Spec-driven code review that always reports in **six fixed sections** — 仕様チェック (spec compliance), docsチェック (docs & conventions), コード品質 (code quality), パフォーマンス (performance), セキュリティ (security), 技術選定 (selection of newly adopted libraries / technologies) — and delivers the result as a temp file, a file in a user-specified folder, or inline comments posted directly on the PR lines.
 
 Unlike `/deep-review` (5 parallel subagents for adversarial depth), this runs a single review context focused on judging the diff **against the spec**. Lighter and faster; use it when you have a spec and want a structured verdict, not an exhaustive sweep.
 
@@ -54,7 +54,7 @@ git worktree add --detach <tmp>/report-review-wt FETCH_HEAD
 
 Then collect the review baseline from the repository: `CLAUDE.md`, `CONTRIBUTING.md`, `docs/` style guides and ADRs, lint/formatter configs. If none exist, judge conventions against the existing code itself and say so in the report.
 
-### Step 3: Review the three sections
+### Step 3: Review the six sections
 
 Fixed sections, fixed sub-checks. Every sub-check ends with either findings or an explicit "no issues" plus **what was checked** — a silent section is indistinguishable from a skipped one. Every finding carries `file:line` and verifiable evidence; drop anything you cannot back with code.
 
@@ -112,6 +112,28 @@ Diff-added tests are checked against `/test-generation`'s prohibited patterns:
 2. **Tests against mocks**: asserting what the mock returns when the SUT just passes it through — that tests the mock, not the SUT.
 3. **Combinatorial explosion**: mechanically generated cartesian products; case counts disproportionate to the aspect being tested.
 
+#### パフォーマンス
+
+- Hot paths: N+1 queries, I/O inside loops, unnecessary recomputation, accidental O(n²).
+- Behavior when data volume grows 10x / 100x: unbounded lists, missing pagination / limits.
+- Frontend: unnecessary re-renders, missing memoization, synchronous heavy work, bundle size.
+- Backend resources: connection / cache behavior, missing DB indexes, full scans.
+
+#### セキュリティ
+
+- Authentication / authorization: IDOR, tenant / user boundary crossings, missing checks.
+- Input validation, injection (SQL / command / path / template), XSS / CSRF.
+- Hardcoded secrets and tokens; PII or credentials leaking into logs / error messages.
+- Known CVEs in dependencies touched by the diff.
+
+#### 技術選定
+
+Applies when the diff adopts a new library or technology (new packages, frameworks, infra components). If nothing new is adopted, write "No new libraries or technologies introduced — not applicable" — the section is never dropped silently.
+
+- Is the adopted version the current stable / LTS? Pinning an EOL or non-LTS major is a finding.
+- Are the alternatives workable? Compare 2–3 realistic candidates — including what the repository already depends on — on fit, maintenance, and cost. The first search hit is not a justification.
+- Maintenance status: last release, release cadence, open CVEs, license. Overlap with a dependency already in the tree is a finding.
+
 ### Step 4: Assemble the report
 
 Fixed structure. Section headers stay in Japanese as designated:
@@ -142,6 +164,15 @@ Fixed structure. Section headers stay in Japanese as designated:
 ### 修正量の乖離
 ### テスト品質
 
+## パフォーマンス
+<findings, or "No issues — <what was checked>">
+
+## セキュリティ
+<same format>
+
+## 技術選定
+<findings, or "No new libraries or technologies introduced — not applicable">
+
 ## Summary
 <merge-ready or fix-first, and which findings block — about the code only>
 ```
@@ -170,7 +201,7 @@ Write to `<folder>/report-review-<slug>.md` (create the directory if needed). Do
 
 #### PR inline
 
-Findings whose line is inside the PR diff become inline comments at that exact line. Everything else (cross-cutting findings such as 修正量の乖離 and docs updates, plus the summary) goes into the review body:
+Findings whose line is inside the PR diff become inline comments at that exact line. Everything else (cross-cutting findings such as 修正量の乖離, docs updates, and 技術選定 verdicts, plus the summary) goes into the review body:
 
 ```bash
 gh api repos/{owner}/{repo}/pulls/{number}/reviews --input review.json
@@ -199,7 +230,7 @@ gh api repos/{owner}/{repo}/pulls/{number}/reviews --input review.json
 
 ## Rules
 
-- **Three sections, fixed sub-checks.** Never drop a section because the diff is small — write "no issues" with what was checked instead.
+- **Six sections, fixed.** Never drop a section because the diff is small or "not relevant" — write "no issues" (or "not applicable" for 技術選定) with what was checked instead.
 - **No spec, no review.** Ask instead of inferring the spec.
 - **Every finding has `file:line` + evidence.** Unverifiable findings are dropped, not softened.
 - **Section headers stay in Japanese** (仕様チェック / docsチェック / コード品質 and their sub-checks). The rest of the report follows the repository's documentation language.
