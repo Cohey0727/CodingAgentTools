@@ -39,15 +39,6 @@
       "notes": "--agent plan で read-only"
     },
     {
-      "name": "gtr",
-      "label": "GTR9 (llama.cpp behind Cloudflare)",
-      "enabled": true,
-      "schema": "stdin",
-      "command": "opencode run --model gtr-openai/default --agent plan",
-      "timeout_ms": 1200000,
-      "notes": "--agent plan で read-only"
-    },
-    {
       "name": "deepseek",
       "label": "DeepSeek (直接契約)",
       "enabled": false,
