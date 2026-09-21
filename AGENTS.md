@@ -24,6 +24,7 @@ Claude Code は `~/.claude/CLAUDE.md`、pi は `~/.pi/agent/AGENTS.md`、Codex �
 - **勝手にブランチを切るな・切り替えるな。** 作業開始前にメインチェックアウトのブランチを `git -C <メインチェックアウト> branch --show-current` で確認し、そのブランチで作業する。`git checkout -b` / `git switch -c` / `git branch <new>` はユーザーの明示指示があるときだけ。worktree も今いるブランチから作る（worktree 内の `branch --show-current` は自分が作ったブランチが出るだけで確認にならない）。
   - **指示されたドキュメント・ファイルが今のブランチに無い、または内容が古い → 作業対象ブランチを間違えているサイン。** 別ブランチから見つけてコピーして済ませず、手を止めてユーザーに確認する。
   - 大規模な変更に入る前に `git log --oneline HEAD..<他のアクティブブランチ>` で未マージのコミット数を見る。多ければベースが間違っている。
+- **`git pull origin <branch>` は完全禁止。** pull は対象ブランチに `git checkout` してから、引数なしの `git pull` だけを使う。他ブランチを取り込むなら `git merge <branch>`。ブランチ確認と pull を `&&` で 1 コマンドに繋げない（確認結果を見る前に実行される）。
 - **commit と push は 1 つの操作で、許可を聞かない。** 作業が一区切りついたら指示を待たず commit して push する。「コミットしますか」の類を一切書かない。push できない場合は黙って local に残さず、理由を即報告して指示を仰ぐ。
 - コミットメッセージは conventional commits 形式。
 - PR は最新コミットだけでなくブランチ全体の差分を見てから書く。
