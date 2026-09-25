@@ -13,17 +13,17 @@
     },
     {
       "name": "deepseek-go",
-      "label": "DeepSeek V4.1 Flash (OpenCode Go)",
+      "label": "DeepSeek V4.1 Flash (Command Code)",
       "enabled": true,
       "schema": "stdin",
-      "command": "opencode run --model opencode-go/deepseek-v4.1-flash --agent plan",
+      "command": "opencode run --model commandcode-openai/deepseek/deepseek-v4.1-flash --agent plan",
       "timeout_ms": 1200000,
       "notes": "--agent plan で read-only"
     },
     {
       "name": "muse-spark",
       "label": "Meta Muse Spark 1.3 Contributor (Command Code)",
-      "enabled": false,
+      "enabled": true,
       "schema": "stdin",
       "command": "opencode run --model commandcode-openai/meta/muse-spark-1.3-contributor --agent plan",
       "timeout_ms": 1200000,
@@ -31,10 +31,10 @@
     },
     {
       "name": "glm-flash-go",
-      "label": "Zhipu AI GLM-5.3 Flash (OpenCode Go)",
+      "label": "Zhipu AI GLM-5.3 Flash (Command Code)",
       "enabled": true,
       "schema": "stdin",
-      "command": "opencode run --model opencode-go/glm-5.3-flash --agent plan",
+      "command": "opencode run --model commandcode-openai/z-ai/glm-5.3-flash --agent plan",
       "timeout_ms": 1200000,
       "notes": "--agent plan で read-only"
     },
