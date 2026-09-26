@@ -23,7 +23,7 @@ There is no proxy or translation layer: each CLI talks to each endpoint in the A
 
 > **Note:** gtr is a `llama-server` on another machine, published through a Cloudflare tunnel and gated by Cloudflare Access. Requests without Access credentials get a 302 to the login page, so its `REQUEST_HEADERS` carry an Access service token (`CF-Access-Client-Id` / `CF-Access-Client-Secret`), whose values come from `.env` — where a short-lived `cloudflared access token` can stand in for a stored one. Like Local, its `API_KEY` is only a placeholder unless `llama-server` runs with `--api-key`. It answers the OpenAI shape; `GTR9_API` in `.env` switches the CLIs to the Anthropic one if it is ever put behind such a route.
 
-> **Note:** Command Code's [Provider API](https://commandcode.ai/docs/provider) serves Claude only on `/v1/messages` and every other model only on `/v1/chat/completions`, answering 400 on the wrong one — so its Claude models carry `"api": "anthropic"` and the rest follow the provider's `"api": "openai"`. It needs a paid plan: the Go plan has no API access.
+> **Note:** Command Code's [Provider API](https://commandcode.ai/docs/provider) serves Claude only on `/v1/messages` and every other model only on `/v1/chat/completions`, answering 400 on the wrong one — so its Claude models carry `"api": "anthropic"` and the rest follow the provider's `"api": "openai"`. It needs a paid plan: the Go plan has no API access. Its model list is not maintained by hand: the provider declares `catalog` and `make update` rewrites it from the Provider API's own list.
 
 The other half of the repo is what those CLIs run *with*: the skills under `skills/` and the single global instruction file `AGENTS.md`, symlinked into every CLI's config directory by the same `make setup` — see [Skills and global instructions](#skills-and-global-instructions). The [Command Code](https://commandcode.ai) CLI (`cmd`) takes only this half: `make setup` installs it and links it the skills and `AGENTS.md`, but writes it no provider.
 
@@ -45,6 +45,8 @@ bin/models.py                    # the only reader of configs.jsonc: validates i
 bin/common.sh                    # shared resolution: configs.jsonc through models.py, values from .env
 bin/style-check.sh               # refuse any name configs.jsonc owns from appearing anywhere else
 bin/model-ref.sh                 # "<route id>/<model>" for one provider, so nothing else spells a model id
+bin/models-update.sh             # fetches the live catalog of every provider that names one (`make update`)
+bin/models-update.py             # rewrites that provider's models in configs.jsonc from it
 bin/opencode-plugin.template     # OpenCode plugin shim; @@IMPL@@ baked in at setup time
 bin/setup.sh                     # provider wizard: pick providers, paste tokens, install (`make setup-providers`)
 bin/pi-global-models.sh          # registers every provider in pi's global models.json (`make pi-global`)
@@ -151,6 +153,7 @@ and [2026-09-18 — pi の provider id を label に揃える](docs/migrations/2
 | `make check` | Validate `configs.jsonc`, then refuse any concrete name outside it (see `CLAUDE.md`). What the pre-commit hook runs |
 | `make hooks` | Install the lefthook pre-commit hook that runs `make check` |
 | `make list` | Every provider with its heading, endpoint and models with their tags, then every skill, subagent, OpenCode extension and pi extension with its install status |
+| `make update` | Fetch the live model catalog (`catalog`) of every provider that names one and rewrite its models in `configs.jsonc` — ids, context windows and per-model API follow the catalog, tags stay hand-written. Re-run the config generators afterwards |
 | `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from `configs.jsonc`, set the startup model in `~/.pi/agent/settings.json`, and link the keys OpenCode's `/connect` holds into `~/.pi/agent/auth.json` — run it after changing a model or endpoint, or connecting a provider in OpenCode |
 | `make opencode-global` | Re-generate OpenCode's global config from `configs.jsonc` — run it after editing it |
 | `make crush-global` | Re-generate Crush's global `~/.config/crush/crushrc` from `configs.jsonc` |
@@ -553,6 +556,7 @@ models speak, as the route `<name>-<api>`; `make list` prints the name.
 | `API_KEY` | **Required.** A `${VAR}` reference to the key |
 | `BASE_URL` | **Required.** The root both APIs hang off — `/v1/messages` or `/v1/chat/completions` is appended — as `${VAR:-default}` so `.env` can route it elsewhere |
 | `api` | **Required.** `"anthropic"` (Anthropic Messages) or `"openai"` (OpenAI Chat Completions): what every model speaks unless it sets its own. May be a `${VAR:-default}` reference where the shape depends on the route, as `gtr`'s does |
+| `catalog` | Path GET with `BASE_URL` listing the provider's models, in OpenAI's `/v1/models` shape. `make update` rewrites the provider's `models` from it, so a provider with one is not maintained by hand |
 | `REQUEST_HEADERS` | Extra request headers as a `{ "Name": "value" }` object, sent by every CLI — e.g. a Cloudflare Access service token in front of a self-hosted server. A value written as `${VAR}` is referenced wherever the CLI's format can express a reference |
 | `primary` | `true` on at most one provider — the one every generated config starts on |
 | `opencode.lean` | `true` gives the provider [a lean agent of its own](#lean-agents) |

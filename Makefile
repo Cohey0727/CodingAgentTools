@@ -3,7 +3,7 @@ SHELL   := /bin/bash
 ROOT          := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 COMMON        := $(ROOT)/bin/common.sh
 
-.PHONY: setup setup-providers setup-skills list uninstall help pi-global opencode-global \
+.PHONY: setup setup-providers setup-skills list uninstall help update pi-global opencode-global \
 	crush-global reasonix-global codewhale-global dsh-global check hooks
 
 # Both halves of the repo: the provider wizard first (it prompts), then the
@@ -36,6 +36,11 @@ hooks:
 		exit 1; \
 	}
 	@lefthook install
+
+# Fetch the live model catalog of every provider that names one ("catalog")
+# and rewrite that provider's models in configs.jsonc from the answer.
+update:
+	@"$(ROOT)/bin/models-update.sh"
 
 # Show what this repo manages, with install status.
 list:

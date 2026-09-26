@@ -47,7 +47,7 @@ APIS = ("anthropic", "openai")
 PI_APIS = {"anthropic": ("anthropic-messages", ""), "openai": ("openai-completions", "/v1")}
 
 MODEL_KEYS = {"id", "api", "tags", "context_window", "max_tokens", "reasoning", "input"}
-PROVIDER_KEYS = {"label", "API_KEY", "BASE_URL", "REQUEST_HEADERS", "api", "primary", "defaults", "opencode", "models"}
+PROVIDER_KEYS = {"label", "API_KEY", "BASE_URL", "REQUEST_HEADERS", "api", "catalog", "primary", "defaults", "opencode", "models"}
 OPENCODE_KEYS = {"lean", "context_window", "max_tokens"}
 AGENT_ROOT_KEYS = {"overrides"}
 
@@ -220,6 +220,10 @@ def load(name):
 
     api = _api(where, expand(raw.get("api") or ""))
 
+    catalog = expand(raw.get("catalog") or "")
+    if catalog and not catalog.startswith("/"):
+        raise ConfigError(f'{where}: catalog must be a path beginning with "/"')
+
     headers_raw = raw.get("REQUEST_HEADERS") or {}
     if not isinstance(headers_raw, dict):
         raise ConfigError(f"{where}: REQUEST_HEADERS must be an object")
@@ -284,6 +288,7 @@ def load(name):
         "api_key_var": api_key_var,
         "api_key_fallback": api_key_fallback,
         "base_url": base_url,
+        "catalog": catalog,
         "headers": headers,
         "lean": bool(opencode.get("lean", False)),
         "opencode_context_window": opencode.get("context_window"),
@@ -384,6 +389,7 @@ def shell(config, api=""):
         "M_API_KEY_VAR": config["api_key_var"],
         "M_API_KEY_FALLBACK": config["api_key_fallback"],
         "M_BASE_URL": config["base_url"],
+        "M_CATALOG": config["catalog"],
         # One header per line: name, the variable it came from (empty when the
         # value is a literal), that variable's fallback, then the value. The
         # fields are separated by US (\x1f), not a tab: bash collapses runs of
