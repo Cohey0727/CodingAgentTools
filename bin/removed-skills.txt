@@ -11,4 +11,5 @@ dev-pr-review-resolve
 evidence-redteam
 git-workflow
 google-calendar
+resolve-conflict
 semantic-stacked-pr
