@@ -97,6 +97,7 @@
 
       "kimi": {
         "label": "Moonshot",
+        "picker": false,
         "API_KEY": "${KIMI_API_KEY}",
         "BASE_URL": "${KIMI_BASE_URL:-https://api.kimi.com/coding}",
         "api": "anthropic",
@@ -115,6 +116,7 @@
 
       "local": {
         "label": "Local",
+        "picker": false,
         // llama-server takes no auth, but the CLIs require a non-empty value.
         "API_KEY": "${LOCAL_API_KEY:-local}",
         "BASE_URL": "${LOCAL_BASE_URL:-http://127.0.0.1:11301}",

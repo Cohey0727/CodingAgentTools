@@ -559,6 +559,7 @@ models speak, as the route `<name>-<api>`; `make list` prints the name.
 | `catalog` | Path GET with `BASE_URL` listing the provider's models, in OpenAI's `/v1/models` shape. `make update` rewrites the provider's `models` from it, so a provider with one is not maintained by hand |
 | `REQUEST_HEADERS` | Extra request headers as a `{ "Name": "value" }` object, sent by every CLI — e.g. a Cloudflare Access service token in front of a self-hosted server. A value written as `${VAR}` is referenced wherever the CLI's format can express a reference |
 | `primary` | `true` on at most one provider — the one every generated config starts on |
+| `picker` | `false` keeps the provider out of the checkbox list `make setup` starts from — configure it by naming it directly (`bin/setup.sh <name>`). A key that resolves still registers it like any other provider |
 | `opencode.lean` | `true` gives the provider [a lean agent of its own](#lean-agents) |
 | `opencode.context_window`, `opencode.max_tokens` | Cap every model's limits for OpenCode. These are the window a session may grow into before it is compacted, so a backend too slow to prefill its full context sets them lower — `gtr` does |
 

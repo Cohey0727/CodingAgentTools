@@ -28,7 +28,13 @@ source "$ROOT/bin/ui.sh"
 
 # ------------------------------------------------------------------ helpers
 
-discover_providers() { provider_names; }
+discover_providers() { # -> the providers the checkbox picker offers
+  local p
+  while IFS= read -r p; do
+    ( models_resolve "$p" && [ "$M_PICKER" = true ] ) || continue
+    printf '%s\n' "$p"
+  done < <(provider_names)
+}
 
 provider_section() { # <provider> -> the heading configs.jsonc files it under
   ( models_resolve "$1" && printf '%s' "$M_SECTION" )
