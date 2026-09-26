@@ -16,7 +16,7 @@ target 'make setup' 'both halves: the provider wizard, then the skill symlinks'
 target 'make setup-providers' 'pick providers, paste tokens, install dsh, Command Code and every global config'
 target 'make setup-skills' 'link skills/, agents/, AGENTS.md, opencode/ and pi/ into every agent CLI'
 target 'make list' 'every provider, skill, subagent and OpenCode extension, with its install status'
-target 'make update' "refresh every provider whose models come from a live catalog: configs.jsonc is rewritten from the provider's own list"
+target 'make update' 'fetch every live model catalog, rewrite configs.jsonc from it, and regenerate every global config'
 target 'make pi-global' "re-generate pi's global models.json from configs.jsonc"
 target 'make opencode-global' "re-generate OpenCode's global config from configs.jsonc"
 target 'make crush-global' "re-generate Crush's global config from configs.jsonc"

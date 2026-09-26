@@ -38,9 +38,15 @@ hooks:
 	@lefthook install
 
 # Fetch the live model catalog of every provider that names one ("catalog")
-# and rewrite that provider's models in configs.jsonc from the answer.
+# and rewrite that provider's models in configs.jsonc from the answer, then
+# regenerate every global config from configs.jsonc — one command brings
+# everything up to date. A generator failing stops the run: half-refreshed
+# configs would not say so themselves.
 update:
 	@"$(ROOT)/bin/models-update.sh"
+	@. "$(COMMON)"; for generator in $$GLOBAL_GENERATORS; do \
+		"$(ROOT)/bin/$$generator.sh" || exit 1; \
+	done
 
 # Show what this repo manages, with install status.
 list:

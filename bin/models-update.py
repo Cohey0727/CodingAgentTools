@@ -252,8 +252,6 @@ def main(argv):
             print(f"  - {model_id}")
         for line in updated:
             print(f"  ~ {line}")
-        print("  now re-run the config generators: make pi-global opencode-global"
-              " crush-global reasonix-global codewhale-global dsh-global")
         return 0
     except (UpdateError, ConfigError) as exc:
         print(f"update: {exc}", file=sys.stderr)

@@ -153,7 +153,7 @@ and [2026-09-18 — pi の provider id を label に揃える](docs/migrations/2
 | `make check` | Validate `configs.jsonc`, then refuse any concrete name outside it (see `CLAUDE.md`). What the pre-commit hook runs |
 | `make hooks` | Install the lefthook pre-commit hook that runs `make check` |
 | `make list` | Every provider with its heading, endpoint and models with their tags, then every skill, subagent, OpenCode extension and pi extension with its install status |
-| `make update` | Fetch the live model catalog (`catalog`) of every provider that names one and rewrite its models in `configs.jsonc` — ids, context windows and per-model API follow the catalog, tags stay hand-written. Re-run the config generators afterwards |
+| `make update` | Fetch the live model catalog (`catalog`) of every provider that names one and rewrite its models in `configs.jsonc` — ids, context windows and per-model API follow the catalog, tags stay hand-written — then regenerate every global config. One command brings everything up to date |
 | `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from `configs.jsonc`, set the startup model in `~/.pi/agent/settings.json`, and link the keys OpenCode's `/connect` holds into `~/.pi/agent/auth.json` — run it after changing a model or endpoint, or connecting a provider in OpenCode |
 | `make opencode-global` | Re-generate OpenCode's global config from `configs.jsonc` — run it after editing it |
 | `make crush-global` | Re-generate Crush's global `~/.config/crush/crushrc` from `configs.jsonc` |
