@@ -116,8 +116,8 @@ make setup
 
 One interactive wizard does everything:
 
-1. Check the providers you want (arrows + Space, Enter to confirm — providers that already have a token are pre-checked)
-2. Paste each API token — an empty answer keeps the existing token
+1. Check the providers whose token you want to set or change (arrows + Space, Enter to confirm). Providers that already have a token show ✅ and start unchecked, so Enter alone leaves every token as it is
+2. Paste the API token of each checked provider — an empty answer keeps the existing token
 3. `configs.jsonc` is validated before anything is written; `.env` is created from `.env.example` if missing (`chmod 600`), gets any variables added to `.env.example` since, and picks up keys still sitting in the old `providers/<name>/.env` files
 4. pi itself is updated, the [pi packages](#pi-packages) that add `/loop`, `/goal`, MCP and subagents are installed into pi's user settings (`~/.pi/agent/settings.json`), and pi's model catalogs are refreshed, and DeepSeek Harness and Command Code are installed with `npm install -g <package>@latest`. Anything of these already installed is upgraded to its latest version, so re-running `make setup` is also how you update them
 5. Every provider whose key resolves is registered in the global config of every CLI — [one generator each](#generated-configs) — with every model in `configs.jsonc`, not just the tagged ones, and all of them starting on [the default provider](#default-provider). pi also gets the keys OpenCode's `/connect` holds, for [Zen and Go](#usage). Then the [OpenCode plugins](#opencode-plugins-from-npm) are installed or upgraded with `opencode plugin -g --force` when `opencode` is on your PATH

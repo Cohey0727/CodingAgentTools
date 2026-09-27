@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Interactive setup (`make setup`).
 #
-#   bin/setup.sh                  checkbox multi-select, then key prompts
+#   bin/setup.sh                  check the providers to change, then key prompts
 #   bin/setup.sh <provider>...    skip the checkbox, still prompt for keys
 #
 # configs.jsonc lists every provider and refers to its secrets as "${NAME}";
@@ -183,9 +183,9 @@ draw_item() { # <index>
     printf '  [%s] %s%-12s%s' "$mark" "$B" "${ITEMS[$i]}" "$RST"
   fi
   if [ -n "$tok" ]; then
-    printf '  %s%-16s%s %skey: set%s\n' "$DIM" "$section" "$RST" "$GRN" "$RST"
+    printf '  %s%-16s%s ✅\n' "$DIM" "$section" "$RST"
   else
-    printf '  %s%-16s%s %skey: not set%s\n' "$DIM" "$section" "$RST" "$DIM" "$RST"
+    printf '  %s%-16s%s\n' "$DIM" "$section" "$RST"
   fi
 }
 
@@ -195,7 +195,7 @@ redraw() {
   for i in "${!ITEMS[@]}"; do draw_item "$i"; done
 }
 
-pick_providers() { # <provider>... -> SELECTED; returns 1 if nothing chosen
+pick_providers() { # <provider>... -> SELECTED, the ones checked to change
   ITEMS=("$@")
   CURSOR=0
   SELECTED=()
@@ -207,6 +207,7 @@ pick_providers() { # <provider>... -> SELECTED; returns 1 if nothing chosen
   stty -icanon -echo
   tput civis 2>/dev/null || true
 
+  printf '%s✅ key set · [x] change now%s\n' "$DIM" "$RST"
   printf '%sSpace: toggle · a: all · Enter: confirm · Ctrl-C: abort%s\n' "$DIM" "$RST"
   for i in "${!ITEMS[@]}"; do draw_item "$i"; done
 
@@ -244,7 +245,6 @@ pick_providers() { # <provider>... -> SELECTED; returns 1 if nothing chosen
   for i in "${!ITEMS[@]}"; do
     if [ "${CHECKED[$i]}" = 1 ]; then SELECTED+=("${ITEMS[$i]}"); fi
   done
-  [ "${#SELECTED[@]}" -gt 0 ]
 }
 
 # ------------------------------------------------------------ token prompt
@@ -439,7 +439,7 @@ AGENTS
 # -------------------------------------------------------------------- main
 
 main() {
-  local providers=() all=() p i tok generator
+  local providers=() all=() p i generator
 
   banner
 
@@ -469,23 +469,16 @@ main() {
     fi
     ensure_env
     sync_env_keys
-    # Pre-check providers whose key already resolves.
     CHECKED=()
-    for i in "${!all[@]}"; do
-      tok=$(current_token "${all[$i]}")
-      if [ -n "$tok" ]; then CHECKED[$i]=1; else CHECKED[$i]=0; fi
-    done
-    if ! pick_providers "${all[@]}"; then
-      printf '%s⚠ no providers selected — nothing to do%s\n' "$YLW" "$RST"
-      exit 0
-    fi
-    providers=("${SELECTED[@]}")
+    for i in "${!all[@]}"; do CHECKED[$i]=0; done
+    pick_providers "${all[@]}"
+    providers=(${SELECTED[@]+"${SELECTED[@]}"})
   fi
 
   ensure_env
   sync_env_keys
 
-  for p in "${providers[@]}"; do
+  for p in ${providers[@]+"${providers[@]}"}; do
     prompt_token "$p"
   done
 
