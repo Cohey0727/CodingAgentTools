@@ -7,7 +7,8 @@
 # configs.jsonc lists every provider and refers to its secrets as "${NAME}";
 # the .env beside it holds those values and is the only file with a key in it.
 # At a prompt, pressing Enter with no input keeps whatever is already set.
-# The checkbox also has a "dsh web" row, which sets SERVE_HOST for `make serve`.
+# The checkbox also has a "dsh web" row, which sets SERVE_HOST for `make serve`;
+# once it is set, the nginx `make serve` runs is installed with Homebrew too.
 # Keys still sitting in the old providers/<name>/.env files are carried over
 # first. Then pi is updated, the pi packages in $PI_PACKAGES are installed into
 # pi's user settings and pi's model catalogs are refreshed, DeepSeek Harness and
@@ -475,6 +476,38 @@ install_npm_cli() { # <command> <package> <display name> <Node.js requirement>
   fi
 }
 
+# `make serve` puts nginx in front of dsh web, so it is installed once
+# SERVE_HOST says that is in use. `brew install` also upgrades an outdated one.
+install_serve_nginx() {
+  local before= version
+  [ -n "$(env_value SERVE_HOST)" ] || return 0
+  section 'installing nginx for make serve'
+  if command -v nginx >/dev/null 2>&1; then
+    before=$(nginx -v 2>&1 | sed 's|.*/||')
+  fi
+  if ! command -v brew >/dev/null 2>&1; then
+    if [ -n "$before" ]; then
+      warn "nginx $before left as is — 'brew' is not on your PATH, so it cannot be upgraded"
+    else
+      warn "skipped — 'brew' is not on your PATH. Install nginx with your package manager."
+    fi
+    return 0
+  fi
+  if ! brew install nginx >/dev/null 2>&1; then
+    warn "failed — run 'brew install nginx' by hand"
+    return 0
+  fi
+  hash -r
+  version=$(nginx -v 2>&1 | sed 's|.*/||')
+  if [ -z "$before" ]; then
+    ok "nginx $version installed"
+  elif [ "$before" = "$version" ]; then
+    ok "nginx $version is already the latest"
+  else
+    ok "nginx $before → $version upgraded"
+  fi
+}
+
 # OpenCode plugins are installed with `opencode plugin add`, which records a
 # TUI plugin in ~/.config/opencode/cli.json and a server plugin in opencode.json
 # under its `plugins` key. The server ones are listed in
@@ -582,6 +615,7 @@ main() {
   install_opencode_cli
   install_npm_cli dsh "$DSH_PACKAGE" 'DeepSeek Harness' '^22.19.0 or >=24.0.0'
   install_npm_cli cmd "$COMMAND_CODE_PACKAGE" 'Command Code' '>=22'
+  install_serve_nginx
 
   for generator in $GLOBAL_GENERATORS; do
     section "generating global ${generator%%-*} config"

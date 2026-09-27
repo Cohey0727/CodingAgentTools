@@ -96,9 +96,9 @@ codewhale-global:
 dsh-global:
 	@"$(ROOT)/bin/dsh-global-config.sh"
 
-# Serve DeepSeek Harness's Web UI on 127.0.0.1 for the hostname SERVE_HOST names
-# (`make setup` sets it), printing the URL that opens it there. Does nothing
-# while SERVE_HOST is empty.
+# Serve DeepSeek Harness's Web UI on 127.0.0.1 behind nginx for the hostname
+# SERVE_HOST names (`make setup` sets it), where it opens without a token. Does
+# nothing while SERVE_HOST is empty.
 serve:
 	@"$(ROOT)/bin/serve.sh"
 

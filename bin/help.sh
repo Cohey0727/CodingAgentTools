@@ -23,7 +23,7 @@ target 'make crush-global' "re-generate Crush's global config from configs.jsonc
 target 'make reasonix-global' "re-generate Reasonix's global config from configs.jsonc"
 target 'make codewhale-global' "re-generate Codewhale's global config from configs.jsonc"
 target 'make dsh-global' "re-generate DeepSeek Harness's home patch from configs.jsonc"
-target 'make serve' "run dsh web for the hostname SERVE_HOST names, printing its public URL"
+target 'make serve' "run dsh web behind nginx for the hostname SERVE_HOST names, no token needed there"
 target 'make uninstall' 'remove the generated configs and symlinks this repo installed'
 target 'make help' 'this screen'
 
