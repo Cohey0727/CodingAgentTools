@@ -7,6 +7,7 @@
 # configs.jsonc lists every provider and refers to its secrets as "${NAME}";
 # the .env beside it holds those values and is the only file with a key in it.
 # At a prompt, pressing Enter with no input keeps whatever is already set.
+# The checkbox also has a "dsh web" row, which sets SERVE_HOST for `make serve`.
 # Keys still sitting in the old providers/<name>/.env files are carried over
 # first. Then pi is updated, the pi packages in $PI_PACKAGES are installed into
 # pi's user settings and pi's model catalogs are refreshed, DeepSeek Harness and
@@ -46,6 +47,16 @@ api_key_var() { # <provider> -> the .env variable its API_KEY points at
 
 current_token() { # <provider> -> its resolved key, maybe ""
   ( models_resolve "$1" 2>/dev/null && printf '%s' "$M_API_KEY" )
+}
+
+DSH_ITEM='dsh web' # the checkbox row after the providers that sets SERVE_HOST
+
+item_section() { # <checkbox row> -> the heading shown beside it
+  if [ "$1" = "$DSH_ITEM" ]; then printf 'DeepSeek Harness'; else provider_section "$1"; fi
+}
+
+item_value() { # <checkbox row> -> the value that earns it a ✅, maybe ""
+  if [ "$1" = "$DSH_ITEM" ]; then env_value SERVE_HOST; else current_token "$1"; fi
 }
 
 api_key_url() { # <provider> -> the signup URL commented above its variable in
@@ -174,8 +185,8 @@ cleanup_tty() {
 draw_item() { # <index>
   local i=$1 mark section tok
   if [ "${CHECKED[$i]}" = 1 ]; then mark="${GRN}x${RST}"; else mark=' '; fi
-  section=$(provider_section "${ITEMS[$i]}")
-  tok=$(current_token "${ITEMS[$i]}")
+  section=$(item_section "${ITEMS[$i]}")
+  tok=$(item_value "${ITEMS[$i]}")
   printf '\033[2K\r'
   if [ "$i" = "$CURSOR" ]; then
     printf '\033[7m> [%s] %-12s\033[0m' "$mark" "${ITEMS[$i]}"
@@ -195,7 +206,7 @@ redraw() {
   for i in "${!ITEMS[@]}"; do draw_item "$i"; done
 }
 
-pick_providers() { # <provider>... -> SELECTED, the ones checked to change
+pick_providers() { # <checkbox row>... -> SELECTED, the ones checked to change
   ITEMS=("$@")
   CURSOR=0
   SELECTED=()
@@ -207,7 +218,7 @@ pick_providers() { # <provider>... -> SELECTED, the ones checked to change
   stty -icanon -echo
   tput civis 2>/dev/null || true
 
-  printf '%s✅ key set · [x] change now%s\n' "$DIM" "$RST"
+  printf '%s✅ set · [x] change now%s\n' "$DIM" "$RST"
   printf '%sSpace: toggle · a: all · Enter: confirm · Ctrl-C: abort%s\n' "$DIM" "$RST"
   for i in "${!ITEMS[@]}"; do draw_item "$i"; done
 
@@ -292,6 +303,33 @@ prompt_token() { # <provider>
       [ -n "$v" ] && [ -z "$(env_value "$v")" ] && printf '%s\t%s\n' "$v" "$name"
     done < <(header_names)
   )
+}
+
+prompt_dsh_host() { # -> SERVE_HOST in .env: the hostname `make serve` trusts
+  local host new
+  host=$(env_value SERVE_HOST)
+  section "$DSH_ITEM"
+  note 'SERVE_HOST in .env — the hostname a Cloudflare Tunnel publishes `make serve` under'
+  if [ -n "$host" ]; then
+    printf '  %shost%s [%s — Enter to keep]: ' "$B" "$RST" "$host"
+  else
+    printf '  %shost%s: ' "$B" "$RST"
+  fi
+  IFS= read -r new || new=''
+  new=$(printf '%s' "$new" | tr -d '[:space:]')
+  # --trusted-host takes an authority, so a pasted URL is cut down to one.
+  new=${new#*://}
+  new=${new%%/*}
+  if [ -z "$new" ]; then
+    if [ -n "$host" ]; then
+      ok 'kept existing host'
+    else
+      warn "left empty — 'make serve' starts nothing until SERVE_HOST is set"
+    fi
+  else
+    set_env_var SERVE_HOST "$new"
+    ok "host updated — 'make serve' serves dsh web at https://$new"
+  fi
 }
 
 # ------------------------------------------------------------- installation
@@ -439,7 +477,7 @@ AGENTS
 # -------------------------------------------------------------------- main
 
 main() {
-  local providers=() all=() p i generator
+  local providers=() all=() p i generator dsh=
 
   banner
 
@@ -467,12 +505,15 @@ main() {
       echo "setup: configs.jsonc lists no providers" >&2
       exit 1
     fi
+    all+=("$DSH_ITEM")
     ensure_env
     sync_env_keys
     CHECKED=()
     for i in "${!all[@]}"; do CHECKED[$i]=0; done
     pick_providers "${all[@]}"
-    providers=(${SELECTED[@]+"${SELECTED[@]}"})
+    for p in ${SELECTED[@]+"${SELECTED[@]}"}; do
+      if [ "$p" = "$DSH_ITEM" ]; then dsh=1; else providers+=("$p"); fi
+    done
   fi
 
   ensure_env
@@ -481,6 +522,7 @@ main() {
   for p in ${providers[@]+"${providers[@]}"}; do
     prompt_token "$p"
   done
+  if [ -n "$dsh" ]; then prompt_dsh_host; fi
 
   install_pi_packages
   install_npm_cli dsh "$DSH_PACKAGE" 'DeepSeek Harness' '^22.19.0 or >=24.0.0'

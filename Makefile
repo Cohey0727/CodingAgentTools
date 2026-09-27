@@ -4,7 +4,7 @@ ROOT          := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 COMMON        := $(ROOT)/bin/common.sh
 
 .PHONY: setup setup-providers setup-skills list uninstall help update pi-global opencode-global \
-	crush-global reasonix-global codewhale-global dsh-global check hooks
+	crush-global reasonix-global codewhale-global dsh-global serve check hooks
 
 # Both halves of the repo: the provider wizard first (it prompts), then the
 # skill symlinks. SKIP_BANNER keeps it to a single banner.
@@ -95,6 +95,12 @@ codewhale-global:
 
 dsh-global:
 	@"$(ROOT)/bin/dsh-global-config.sh"
+
+# Serve DeepSeek Harness's Web UI on 127.0.0.1 for the hostname SERVE_HOST names
+# (`make setup` sets it), printing the URL that opens it there. Does nothing
+# while SERVE_HOST is empty.
+serve:
+	@"$(ROOT)/bin/serve.sh"
 
 help:
 	@"$(ROOT)/bin/help.sh"

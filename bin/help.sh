@@ -23,12 +23,13 @@ target 'make crush-global' "re-generate Crush's global config from configs.jsonc
 target 'make reasonix-global' "re-generate Reasonix's global config from configs.jsonc"
 target 'make codewhale-global' "re-generate Codewhale's global config from configs.jsonc"
 target 'make dsh-global' "re-generate DeepSeek Harness's home patch from configs.jsonc"
+target 'make serve' "run dsh web for the hostname SERVE_HOST names, printing its public URL"
 target 'make uninstall' 'remove the generated configs and symlinks this repo installed'
 target 'make help' 'this screen'
 
 section 'notes'
 note 'configs.jsonc holds every provider: endpoint, models and the tags naming each slot'
-note '.env holds the values configs.jsonc refers to as ${NAME} — nothing else'
+note '.env holds the values configs.jsonc refers to as ${NAME}, and SERVE_HOST for make serve'
 note 'skills and AGENTS.md are installed as symlinks — edits here take effect immediately'
 note '~/.claude/skills is read by Claude Code and opencode'
 note '~/.agents/skills is read by Codex, opencode and pi'

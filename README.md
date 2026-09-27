@@ -55,6 +55,7 @@ bin/crush-global-config.sh       # registers every provider in Crush's global cr
 bin/reasonix-global-config.sh    # registers every provider in Reasonix's global config.toml (`make reasonix-global`)
 bin/codewhale-global-config.sh   # registers every provider in Codewhale's global config.toml (`make codewhale-global`)
 bin/dsh-global-config.sh         # registers every provider in DeepSeek Harness's home patch (`make dsh-global`)
+bin/serve.sh                     # runs dsh web for the hostname SERVE_HOST names (`make serve`)
 bin/skills-common.sh             # where skills, subagents, AGENTS.md and the OpenCode and pi extensions are installed
 bin/skills-setup.sh              # links them there (`make setup-skills`)
 bin/removed-skills.txt           # skills no longer shipped; setup deletes their old links
@@ -63,7 +64,7 @@ bin/skills-uninstall.sh          # removes only the symlinks pointing back here 
 bin/list.sh                      # everything this repo manages (`make list`)
 bin/help.sh                      # target overview (`make help`)
 docs/migrations/                 # upgrade notes for existing checkouts
-Makefile                         # setup / setup-providers / setup-skills / list / uninstall / <agent>-global / help
+Makefile                         # setup / setup-providers / setup-skills / list / uninstall / <agent>-global / serve / help
 ```
 
 Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; adding a skill is a new `skills/<name>/SKILL.md` and a `make setup-skills`. An OpenCode slash command is a new `opencode/command/<name>.md`, and a plugin a new `opencode/plugin/<name>.js` exporting `plugin({ tool })` — same `make setup-skills`. So is a pi extension, a new `pi/extensions/<name>.ts`, and a pi subagent, a new `pi/agents/<name>.md`.
@@ -116,7 +117,7 @@ make setup
 
 One interactive wizard does everything:
 
-1. Check the providers whose token you want to set or change (arrows + Space, Enter to confirm). Providers that already have a token show ✅ and start unchecked, so Enter alone leaves every token as it is
+1. Check the providers whose token you want to set or change (arrows + Space, Enter to confirm). Providers that already have a token show ✅ and start unchecked, so Enter alone leaves every token as it is. The last row, `dsh web`, is not a provider: checking it asks for the hostname [`make serve`](#dsh-web-through-a-cloudflare-tunnel) serves DeepSeek Harness under
 2. Paste the API token of each checked provider — an empty answer keeps the existing token
 3. `configs.jsonc` is validated before anything is written; `.env` is created from `.env.example` if missing (`chmod 600`), gets any variables added to `.env.example` since, and picks up keys still sitting in the old `providers/<name>/.env` files
 4. pi itself is updated, the [pi packages](#pi-packages) that add `/loop`, `/goal`, MCP and subagents are installed into pi's user settings (`~/.pi/agent/settings.json`), and pi's model catalogs are refreshed, and DeepSeek Harness and Command Code are installed with `npm install -g <package>@latest`. Anything of these already installed is upgraded to its latest version, so re-running `make setup` is also how you update them
@@ -160,6 +161,7 @@ and [2026-09-18 — pi の provider id を label に揃える](docs/migrations/2
 | `make reasonix-global` | Re-generate Reasonix's global `~/.reasonix/config.toml`, and the keys it reads from `~/.reasonix/.env` |
 | `make codewhale-global` | Re-generate Codewhale's global `~/.codewhale/config.toml`, and the keys it reads from `~/.codewhale/.env` |
 | `make dsh-global` | Re-generate DeepSeek Harness's home patch `~/.dsh/cordis.patch.yml`, and the keys it reads from `~/.dsh/.env` |
+| `make serve` | Run `dsh web` for the hostname `SERVE_HOST` names and print the URL that opens it there — see [dsh web through a Cloudflare Tunnel](#dsh-web-through-a-cloudflare-tunnel). Does nothing while `SERVE_HOST` is empty |
 | `make uninstall` | Remove the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
 | `make help` | The target list above, on the terminal |
 
@@ -225,6 +227,29 @@ and the generated `crushrc` points them at the default provider's `default` and
 `small` models. Naming a model it does not know is not an error there: Crush
 silently falls back to a model of its own choosing and writes that correction
 back to disk, so a hand-edit that misspells one is easy to miss.
+
+### dsh web through a Cloudflare Tunnel
+
+`make serve` runs `dsh web` for a browser elsewhere, reached through a
+Cloudflare Tunnel. `SERVE_HOST` names the tunnel's public hostname — set it by
+checking `dsh web` in `make setup`, in `.env`, or in the environment
+(`SERVE_HOST=dsh.example.com make serve`); while it is empty, nothing starts.
+
+```bash
+make serve
+# dsh web: http://127.0.0.1:3080/?token=…
+# dsh web: https://dsh.example.com/?token=…    ← open this one remotely
+```
+
+dsh still listens on `127.0.0.1:3080` only; `SERVE_HOST` goes to
+`--trusted-host`, the one hostname besides loopback whose Host and Origin
+headers dsh accepts. So the tunnel's route must point at
+`http://127.0.0.1:3080` and must not override the HTTP Host header. The token
+in the URL is new each time dsh starts and trades itself for a cookie.
+
+That token is dsh's only lock, and whoever holds it can run any command and read
+any file on this machine. Put a Cloudflare Access application in front of the
+hostname that admits only you.
 
 ### Default provider
 
@@ -657,7 +682,9 @@ heading — `Z.AI glm-5.3 Subscriptions` against `GLM-5.3 OpenCode Go`.
 One variable per line, named by whatever `configs.jsonc` references.
 `.env.example` lists them all with the URL to get each key from, and
 `make setup` prompts for the keys. The variables that already have a default in
-`configs.jsonc` ship commented out there — uncomment one to override it. The file
+`configs.jsonc` ship commented out there — uncomment one to override it. One
+variable is not a provider's: `SERVE_HOST`, the hostname
+[`make serve`](#dsh-web-through-a-cloudflare-tunnel) serves under. The file
 is sourced by bash, so a value can be computed at use time:
 
 ```bash
