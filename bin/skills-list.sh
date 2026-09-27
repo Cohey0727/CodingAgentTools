@@ -49,7 +49,7 @@ list_opencode() {
 
   while IFS= read -r name; do
     target="$(opencode_plugin_dir)/$name"
-    if shim_from_repo "$target"; then mark="${GRN}✔${RST}"; else mark="${YLW}⚠${RST}"; fi
+    if linked_to_repo "$target" || shim_from_repo "$target"; then mark="${GRN}✔${RST}"; else mark="${YLW}⚠${RST}"; fi
     printf '  %s %-26s %s%s%s\n' "$mark" "plugin/$name" "$DIM" \
       "$(trunc "$(opencode_summary "$OPENCODE_SRC/plugin/$name")" "$DESC_COLS")" "$RST"
   done < <(opencode_plugin_names)

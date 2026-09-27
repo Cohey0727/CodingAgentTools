@@ -44,7 +44,11 @@ section "$(tilde "$(opencode_config_dir)")"
 before=$N_REMOVED
 clean_dir "$(opencode_config_dir)" command
 for target in "$(opencode_plugin_dir)"/*; do
-  shim_from_repo "$target" || continue
+  [ -e "$target" ] || [ -L "$target" ] || continue
+  case $(readlink "$target" 2>/dev/null || true) in
+    "$ROOT"/*) ;;
+    *) shim_from_repo "$target" || continue ;;
+  esac
   rm "$target"
   N_REMOVED=$((N_REMOVED + 1))
   ok "removed plugin/$(basename "$target")"

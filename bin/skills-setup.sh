@@ -5,10 +5,10 @@
 # Every skill under skills/ and every subagent under agents/ is symlinked into
 # both ~/.claude (Claude Code) and ~/.agents (Codex and other agent CLIs), so
 # editing a file in this repo takes effect immediately without reinstalling.
-# The same goes for OpenCode's slash commands under opencode/command/; its
-# plugins get a generated shim pointing back here instead, for the reason in
-# bin/opencode-plugin.template. pi's extensions and subagent definitions
-# under pi/ are symlinked like the commands.
+# The same goes for OpenCode's slash commands under opencode/command/ and its
+# plugins under opencode/plugin/ — the v2 plugin API needs no npm imports, so
+# the plugins are symlinked like the commands. pi's extensions and subagent
+# definitions under pi/ are symlinked the same way.
 #
 #   existing symlink or own shim  -> replaced
 #   existing real file/directory  -> skipped, never overwritten
@@ -76,31 +76,6 @@ install_root() { # <root>
   done < <(agent_names)
 }
 
-write_shim() { # <impl> <target> <label> — the generated stand-in for a plugin
-  local impl=$1 target=$2 label=$3 verb='generated'
-
-  if [ -e "$target" ] || [ -L "$target" ]; then
-    if ! shim_from_repo "$target"; then
-      N_SKIPPED=$((N_SKIPPED + 1))
-      printf '  %s⚠%s %-30s %sskipped — not generated here%s\n' \
-        "$YLW" "$RST" "$label" "$YLW" "$RST"
-      return 0
-    fi
-    verb='updated'
-  fi
-
-  sed -e "s|@@MARKER@@|$OPENCODE_PLUGIN_MARKER|" -e "s|@@IMPL@@|$impl|" \
-    "$OPENCODE_PLUGIN_TEMPLATE" > "$target"
-
-  if [ "$verb" = updated ]; then
-    N_UPDATED=$((N_UPDATED + 1))
-    printf '  %s✔%s %-30s %supdated%s\n' "$GRN" "$RST" "$label" "$DIM" "$RST"
-  else
-    N_LINKED=$((N_LINKED + 1))
-    printf '  %s✔%s %-30s %s%sgenerated%s\n' "$GRN" "$RST" "$label" "$B" "$GRN" "$RST"
-  fi
-}
-
 install_opencode() { # OpenCode's global slash commands and plugins
   local dir name
   [ -d "$OPENCODE_SRC" ] || return 0
@@ -116,7 +91,12 @@ install_opencode() { # OpenCode's global slash commands and plugins
   dir=$(opencode_plugin_dir)
   mkdir -p "$dir"
   while IFS= read -r name; do
-    write_shim "$OPENCODE_SRC/plugin/$name" "$dir/$name" "plugin/$name"
+    # v2 plugins need no npm imports, so they are linked like the commands; a
+    # v1-era shim this repo generated is replaced by the link.
+    if [ -f "$dir/$name" ] && [ ! -L "$dir/$name" ] && shim_from_repo "$dir/$name"; then
+      rm "$dir/$name"
+    fi
+    link_item "$OPENCODE_SRC/plugin/$name" "$dir/$name" "plugin/$name"
   done < <(opencode_plugin_names)
 }
 

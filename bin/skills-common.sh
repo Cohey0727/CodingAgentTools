@@ -20,7 +20,6 @@ REMOVED_SKILLS_FILE="$ROOT/bin/removed-skills.txt"
 # a plugin per opencode/plugin/*.js. Both are global, so they apply whichever
 # provider the session runs on.
 OPENCODE_SRC="$ROOT/opencode"
-OPENCODE_PLUGIN_TEMPLATE="$ROOT/bin/opencode-plugin.template"
 
 # pi's own extension points, each symlinked into pi's agent directory: an
 # extension per pi/extensions/*.ts, and a subagent definition per

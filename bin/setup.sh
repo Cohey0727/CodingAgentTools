@@ -12,10 +12,11 @@
 # first. Then pi is updated, the pi packages in $PI_PACKAGES are installed into
 # pi's user settings and pi's model catalogs are refreshed, DeepSeek Harness and
 # Command Code are installed with npm — each of those upgraded to its latest
-# version when already there — and every provider whose key resolves is
-# registered in the global config of every agent CLI — one generator each,
-# listed in $GLOBAL_GENERATORS. Last, the OpenCode plugins in $OPENCODE_PLUGINS
-# are installed or upgraded with `opencode plugin -g`.
+# version when already there — OpenCode likewise with its v2 installer script,
+# and every provider whose key resolves is registered in the global config of
+# every agent CLI — one generator each, listed in $GLOBAL_GENERATORS. Last, the
+# OpenCode plugins in $OPENCODE_PLUGINS are installed or upgraded with
+# `opencode plugin add`.
 
 set -euo pipefail
 
@@ -385,6 +386,54 @@ install_pi_packages() {
 DSH_PACKAGE='@deepseek-ai/dsh' # style-check: allow
 COMMAND_CODE_PACKAGE='command-code'
 
+# OpenCode ships as a single binary. Its installer script drops the latest one
+# into ~/.opencode/bin and appends that directory to the shell's rc on the
+# first install only, so every run of this reinstalls — upgrading an opencode
+# already there — without touching the rc again.
+OPENCODE_INSTALL_URL='https://opencode.ai/v2/install'
+
+install_opencode_cli() {
+  local before= version
+  section 'installing OpenCode'
+  if command -v opencode >/dev/null 2>&1; then
+    before=$(opencode --version 2>/dev/null || true)
+  fi
+  if ! command -v curl >/dev/null 2>&1; then
+    if [ -n "$before" ]; then
+      warn "opencode $before left as is — 'curl' is not on your PATH, so it cannot be upgraded"
+    else
+      warn "skipped — 'curl' is not on your PATH. Install it, then re-run."
+    fi
+    return 0
+  fi
+  if ! curl -fsSL "$OPENCODE_INSTALL_URL" | bash >/dev/null 2>&1; then
+    warn "failed — run 'curl -fsSL $OPENCODE_INSTALL_URL | bash' by hand"
+    return 0
+  fi
+  hash -r
+  # A fresh install reaches the PATH only in new shells; this run needs the
+  # binary right away, for the plugin installs below.
+  if ! command -v opencode >/dev/null 2>&1 && [ -x "$HOME/.opencode/bin/opencode" ]; then
+    export PATH="$HOME/.opencode/bin:$PATH"
+    hash -r
+    warn "$(tilde "$HOME/.opencode/bin") added to this run's PATH — new shells get it from your rc"
+  fi
+  if ! command -v opencode >/dev/null 2>&1; then
+    warn "installed into ~/.opencode/bin, which is not on your PATH"
+    return 0
+  fi
+  version=$(opencode --version 2>/dev/null || true)
+  if [ -z "$version" ]; then
+    warn "installed, but 'opencode --version' failed"
+  elif [ -z "$before" ]; then
+    ok "opencode $version installed"
+  elif [ "$before" = "$version" ]; then
+    ok "opencode $version is already the latest"
+  else
+    ok "opencode $before → $version upgraded"
+  fi
+}
+
 install_npm_cli() { # <command> <package> <display name> <Node.js requirement>
   local command=$1 package=$2 name=$3 node=$4 version before=
   section "installing $name"
@@ -426,14 +475,14 @@ install_npm_cli() { # <command> <package> <display name> <Node.js requirement>
   fi
 }
 
-# OpenCode plugins are installed with `opencode plugin -g`, which records a TUI
-# plugin in ~/.config/opencode/tui.json and a server plugin in opencode.json.
-# The server ones are listed in opencode.overrides.plugin in configs.jsonc too,
-# so the generated opencode.json keeps them and this only finds them there.
-# Without that file, `opencode plugin` would write an opencode.jsonc beside it,
-# so this runs after the generators. --force replaces an installed one with the
-# latest version.
-OPENCODE_PLUGINS='oc-tps @slkiser/opencode-quota @tarquinen/opencode-dcp opencode-handoff'
+# OpenCode plugins are installed with `opencode plugin add`, which records a
+# TUI plugin in ~/.config/opencode/cli.json and a server plugin in opencode.json
+# under its `plugins` key. The server ones are listed in
+# opencode.overrides.plugins in configs.jsonc too, so the generated opencode.json
+# keeps them and this only finds them there. Without that file the add would
+# create an opencode.json the generator here does not own, so this runs after
+# the generators. quota and handoff stay out until they ship v2-format plugins.
+OPENCODE_PLUGINS='oc-tps @tarquinen/opencode-dcp'
 
 install_opencode_plugins() {
   local module
@@ -447,12 +496,17 @@ install_opencode_plugins() {
     return 0
   fi
   for module in $OPENCODE_PLUGINS; do
-    if opencode plugin -g --force "$module" >/dev/null 2>&1; then
+    if opencode plugin add "$module" >/dev/null 2>&1; then
       ok "$module"
     else
-      warn "$module failed — run 'opencode plugin -g --force $module' by hand"
+      warn "$module failed — run 'opencode plugin add $module' by hand"
     fi
   done
+  if opencode plugin update >/dev/null 2>&1; then
+    ok 'plugins updated to their latest'
+  else
+    warn "update failed — run 'opencode plugin update' by hand"
+  fi
 }
 
 check_environment() {
@@ -525,6 +579,7 @@ main() {
   if [ -n "$dsh" ]; then prompt_dsh_host; fi
 
   install_pi_packages
+  install_opencode_cli
   install_npm_cli dsh "$DSH_PACKAGE" 'DeepSeek Harness' '^22.19.0 or >=24.0.0'
   install_npm_cli cmd "$COMMAND_CODE_PACKAGE" 'Command Code' '>=22'
 

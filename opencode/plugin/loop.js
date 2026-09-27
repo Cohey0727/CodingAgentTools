@@ -4,11 +4,12 @@
  *
  * OpenCode runs one turn per user message. This plugin adds the repetition:
  *
- *   command.execute.before  intercepts /loop, stores the task, and replaces
- *                           the message the model receives
- *   session.idle            the turn ended — check the stop conditions, then
- *                           send the next iteration while the loop is active
- *   loop_finish             the only way the model can end the loop itself
+ *   ctx.command.transform   owns /loop: stores the task and submits the
+ *                           message the model receives
+ *   ctx.event.subscribe     session.idle — the turn ended, check the stop
+ *                           conditions, then send the next iteration while
+ *                           the loop is active
+ *   loop_finish tool        the only way the model can end the loop itself
  *
  * State lives in one JSON file per session under $XDG_DATA_HOME/opencode-loop,
  * so it survives compaction; it does not survive a restart on purpose (see
@@ -264,268 +265,297 @@ Report that back to the user in a line or two and do nothing else this turn.`
 
 // -------------------------------------------------------------------- plugin
 
-/**
- * `tool` arrives from the generated shim in OpenCode's plugin directory rather
- * than from an import here: OpenCode resolves a plugin's npm imports from where
- * the file really lives, and this file lives in the repo, outside the config
- * dir where OpenCode installs @opencode-ai/plugin.
- */
-export const plugin = ({ tool }) => async ({ client }) => {
-  pruneState()
+// The default export is a plain object on purpose: importing @opencode/plugin
+// would make OpenCode resolve an npm package from where this file really lives,
+// and as a symlink it lives in the repo, outside the config dir. Everything the
+// plugin needs — client, command, tool and event registration — is on ctx.
+export default {
+  id: "loop",
 
-  // The assistant message each session finished last, kept so `session.idle`
-  // can tell a completed turn from an aborted or failed one without another
-  // round trip to the server.
-  const lastAssistant = new Map()
+  async setup(ctx) {
+    pruneState()
 
-  const toast = async (message, variant = "info") => {
-    try {
-      await client.tui.showToast({ body: { title: "loop", message, variant } })
-    } catch {}
-  }
+    // The last finished step of each session: v2 reports the assistant message
+    // per step, so the turn-end handler can tell turns apart and dedupe its own
+    // continuation without a round trip to the server.
+    const lastStep = new Map()
 
-  // --every waits out the interval with one timer per session. Timers live in
-  // the opencode process, and `busy` keeps a due timer from cutting into a turn
-  // that is already running — the next idle picks the loop back up instead.
-  const timers = new Map()
-  const busy = new Set()
-
-  const clearTimer = (sessionID) => {
-    const timer = timers.get(sessionID)
-    if (timer) clearTimeout(timer)
-    timers.delete(sessionID)
-  }
-
-  const stop = async (sessionID, state, status, reason) => {
-    clearTimer(sessionID)
-    writeState(sessionID, { ...state, status, reason, updatedAt: Date.now() })
-    await toast(`${status}${reason ? ` — ${reason}` : ""}`, status === "complete" ? "success" : "warning")
-  }
-
-  const dispatch = async (sessionID, state) => {
-    const next = {
-      ...state,
-      iteration: state.iteration + 1,
-      nextAt: state.everyMs ? Date.now() + state.everyMs : null,
-      updatedAt: Date.now(),
+    const toast = async (message, variant = "info") => {
+      try {
+        await ctx.client.tui.showToast({ body: { title: COMMAND, message, variant } })
+      } catch {}
     }
-    writeState(sessionID, next)
-    busy.add(sessionID)
-    try {
-      await client.session.promptAsync({
-        path: { id: sessionID },
-        body: { parts: [{ type: "text", text: continuePrompt(next) }] },
-      })
-    } catch (error) {
-      await stop(sessionID, next, "paused", `could not continue: ${error?.message ?? error}`)
-    }
-  }
 
-  const fire = async (sessionID) => {
-    const state = readState(sessionID)
-    if (!state || state.status !== "active" || state.runtime !== RUNTIME) return
-    if (busy.has(sessionID)) return
-    if (state.deadline && Date.now() >= state.deadline) {
-      await stop(sessionID, state, "timeout", `time budget reached (${formatDuration(state.timeoutMs)})`)
-      return
-    }
-    if (state.iteration >= state.max) {
-      await stop(sessionID, state, "budget", `turn limit reached (${state.max})`)
-      return
-    }
-    await dispatch(sessionID, state)
-  }
+    // --every waits out the interval with one timer per session. Timers live in
+    // the opencode process, and `busy` keeps a due timer from cutting into a turn
+    // that is already running — the next idle picks the loop back up instead.
+    const timers = new Map()
+    const busy = new Set()
 
-  const armTimer = (sessionID, delayMs) => {
-    clearTimer(sessionID)
-    const timer = setTimeout(() => {
+    const clearTimer = (sessionID) => {
+      const timer = timers.get(sessionID)
+      if (timer) clearTimeout(timer)
       timers.delete(sessionID)
-      void fire(sessionID)
-    }, Math.max(0, delayMs))
-    timer.unref?.()
-    timers.set(sessionID, timer)
-  }
-
-  // A control subcommand still costs a turn, and that turn ends in an idle
-  // event. Answering "what is my loop" must not count as an iteration, nor
-  // start the next one: the loop waits for the user instead.
-  const holdNextIdle = (sessionID, state) => {
-    if (state?.status === "active") writeState(sessionID, { ...state, skipNextIdle: true })
-  }
-
-  const refuse = (sessionID, state, headline) => {
-    holdNextIdle(sessionID, state)
-    return ackPrompt(headline, state)
-  }
-
-  // Final text of the last assistant turn, for --until and --until-stable.
-  // Null when it cannot be read, so a failed fetch is never mistaken for an
-  // empty reply that repeats.
-  const lastReply = async (sessionID) => {
-    try {
-      const result = await client.session.messages({ path: { id: sessionID } })
-      const messages = result?.data ?? []
-      for (let i = messages.length - 1; i >= 0; i--) {
-        const { info, parts } = messages[i]
-        if (info?.role !== "assistant") continue
-        return (parts ?? [])
-          .filter((part) => part.type === "text")
-          .map((part) => part.text)
-          .join("\n")
-          .trim()
-      }
-      return ""
-    } catch {
-      return null
     }
-  }
 
-  return {
-    tool: {
-      loop_finish: tool({
+    const stop = async (sessionID, state, status, reason) => {
+      clearTimer(sessionID)
+      writeState(sessionID, { ...state, status, reason, updatedAt: Date.now() })
+      await toast(`${status}${reason ? ` — ${reason}` : ""}`, status === "complete" ? "success" : "warning")
+    }
+
+    // dispatch claims a pending continuation in the same write that counts the
+    // iteration, so only the first of the plugin's instances to reach it runs.
+    const dispatch = async (sessionID, state) => {
+      const next = {
+        ...state,
+        pending: false,
+        iteration: state.iteration + 1,
+        nextAt: state.everyMs ? Date.now() + state.everyMs : null,
+        updatedAt: Date.now(),
+      }
+      writeState(sessionID, next)
+      busy.add(sessionID)
+      // Not awaited: the iteration is queued and the idle handler keeps
+      // consuming events while the turn runs.
+      void ctx.session
+        .prompt({ sessionID, text: continuePrompt(next), delivery: "queue" })
+        .catch((error) => stop(sessionID, next, "paused", `could not continue: ${error?.message ?? error}`))
+        .catch(() => {})
+    }
+
+    const fire = async (sessionID) => {
+      const state = readState(sessionID)
+      if (!state || state.status !== "active" || state.runtime !== RUNTIME) return
+      if (!state.pending) return
+      if (busy.has(sessionID)) return
+      if (state.deadline && Date.now() >= state.deadline) {
+        await stop(sessionID, state, "timeout", `time budget reached (${formatDuration(state.timeoutMs)})`)
+        return
+      }
+      if (state.iteration >= state.max) {
+        await stop(sessionID, state, "budget", `turn limit reached (${state.max})`)
+        return
+      }
+      await dispatch(sessionID, state)
+    }
+
+    const armTimer = (sessionID, delayMs) => {
+      clearTimer(sessionID)
+      const timer = setTimeout(() => {
+        timers.delete(sessionID)
+        void fire(sessionID)
+      }, Math.max(0, delayMs))
+      timer.unref?.()
+      timers.set(sessionID, timer)
+    }
+
+    // A control subcommand still costs a turn, and that turn ends in an idle
+    // event. Answering "what is my loop" must not count as an iteration, nor
+    // start the next one: the loop waits for the user instead.
+    const holdNextIdle = (sessionID, state) => {
+      if (state?.status === "active") writeState(sessionID, { ...state, skipNextIdle: true })
+    }
+
+    const refuse = (sessionID, state, headline) => {
+      holdNextIdle(sessionID, state)
+      return ackPrompt(headline, state)
+    }
+
+    // Final text of the last assistant turn, for --until and --until-stable.
+    // Null when it cannot be read, so a failed fetch is never mistaken for an
+    // empty reply that repeats.
+    const lastReply = async (sessionID) => {
+      try {
+        const entries = await ctx.session.context({ sessionID })
+        for (let i = entries.length - 1; i >= 0; i--) {
+          const entry = entries[i]
+          if (entry?.type !== "assistant") continue
+          return (entry.content ?? [])
+            .filter((part) => part.type === "text")
+            .map((part) => part.text)
+            .join("\n")
+            .trim()
+        }
+        return ""
+      } catch {
+        return null
+      }
+    }
+
+    await ctx.tool.transform((editor) => {
+      editor.add({
+        name: "loop_finish",
         description:
           "End the active /loop. Use status 'complete' when the task is done and you can name the evidence, or 'blocked' when no defensible path remains. Has no effect when no loop is active.",
-        args: {
-          status: tool.schema.enum(["complete", "blocked"]).describe("complete when the task is done, blocked when it cannot be"),
-          summary: tool.schema.string().describe("what was achieved and what proves it, or what is blocking and what would unblock it"),
+        input: {
+          type: "object",
+          properties: {
+            status: {
+              type: "string",
+              enum: ["complete", "blocked"],
+              description: "complete when the task is done, blocked when it cannot be",
+            },
+            summary: {
+              type: "string",
+              description: "what was achieved and what proves it, or what is blocking and what would unblock it",
+            },
+          },
+          required: ["status", "summary"],
+          additionalProperties: false,
         },
-        async execute(args, ctx) {
-          const state = readState(ctx.sessionID)
-          if (!state || state.status !== "active") return "No loop is active in this session; nothing to finish."
-          clearTimer(ctx.sessionID)
-          writeState(ctx.sessionID, { ...state, status: args.status, summary: args.summary, updatedAt: Date.now() })
+        async execute(args, context) {
+          const sessionID = context?.sessionID
+          const state = readState(sessionID)
+          if (!state || state.status !== "active") return { content: "No loop is active in this session; nothing to finish." }
+          clearTimer(sessionID)
+          writeState(sessionID, { ...state, status: args.status, summary: args.summary, updatedAt: Date.now() })
           await toast(`${args.status}: ${args.summary}`, args.status === "complete" ? "success" : "warning")
-          return `Loop marked ${args.status}. The session will stop repeating the task on its own.`
+          return { content: `Loop marked ${args.status}. The session will stop repeating the task on its own.` }
         },
-      }),
-    },
+      })
+    })
 
-    "command.execute.before": async (input, output) => {
-      if (input.command !== COMMAND) return
+    await ctx.command.transform((editor) => {
+      editor.add({
+        name: COMMAND,
+        description: "repeat one prompt each turn until it is done, a stop condition is met or the budget runs out",
+        execute: async (invocation) => {
+          const sessionID = invocation.sessionID
+          const state = readState(sessionID)
+          const parsed = parseArguments(invocation.prompt?.text)
+          // The command owns what the model receives: whatever the case decides
+          // is submitted as the turn's prompt, in the delivery the user chose.
+          const reply = (text) => ctx.session.prompt({ sessionID, text, delivery: invocation.delivery })
 
-      const sessionID = input.sessionID
-      const state = readState(sessionID)
-      const parsed = parseArguments(input.arguments)
-      // OpenCode reads the parts array it handed us, so it has to be mutated
-      // in place — replacing output.parts is silently ignored.
-      const reply = (text) => output.parts.splice(0, output.parts.length, { type: "text", text })
+          switch (parsed.action) {
+            case "help":
+            case "error": {
+              const head = parsed.action === "error" ? `/loop: ${parsed.message}` : "/loop usage"
+              holdNextIdle(sessionID, state)
+              await reply(`Show the user this usage text verbatim and do nothing else this turn:\n\n${head}\n\n${USAGE}`)
+              return
+            }
 
-      switch (parsed.action) {
-        case "help":
-        case "error": {
-          const head = parsed.action === "error" ? `/loop: ${parsed.message}` : "/loop usage"
-          holdNextIdle(sessionID, state)
-          reply(`Show the user this usage text verbatim and do nothing else this turn:\n\n${head}\n\n${USAGE}`)
-          return
-        }
+            case "status": {
+              holdNextIdle(sessionID, state)
+              await reply(ackPrompt("The user asked for the loop status.", state))
+              return
+            }
 
-        case "status": {
-          holdNextIdle(sessionID, state)
-          reply(ackPrompt("The user asked for the loop status.", state))
-          return
-        }
+            case "pause": {
+              if (state?.status !== "active") {
+                await reply(ackPrompt("The user asked to pause the loop, but none is active.", state))
+                return
+              }
+              const paused = writeState(sessionID, { ...state, status: "paused", reason: "paused by the user", updatedAt: Date.now() })
+              clearTimer(sessionID)
+              await toast("paused")
+              await reply(ackPrompt("The user paused the loop. Stop repeating the task.", paused))
+              return
+            }
 
-        case "pause": {
-          if (state?.status !== "active") {
-            reply(ackPrompt("The user asked to pause the loop, but none is active.", state))
-            return
+            case "resume": {
+              if (!state || state.status === "active") {
+                holdNextIdle(sessionID, state)
+                await reply(ackPrompt("The user asked to resume the loop.", state))
+                return
+              }
+              if (goalIsActive(sessionID)) {
+                await reply(refuse(sessionID, state, "The user asked to resume the loop, but a goal is active in this session. One session runs one continuation loop at a time; the goal must be paused or cleared first."))
+                return
+              }
+              // A loop stopped by its budget resumes with a fresh window; one that
+              // was paused picks up where it left off.
+              const spent = state.iteration >= state.max || (state.deadline && Date.now() >= state.deadline)
+              const resumed = writeState(sessionID, {
+                ...state,
+                status: "active",
+                reason: null,
+                runtime: RUNTIME,
+                skipNextIdle: false,
+                iteration: spent ? 1 : state.iteration + 1,
+                deadline: state.timeoutMs ? Date.now() + state.timeoutMs : null,
+                pending: false,
+                replies: spent ? [] : state.replies,
+                updatedAt: Date.now(),
+              })
+              await toast("resumed")
+              await reply(continuePrompt(resumed))
+              return
+            }
+
+            case "clear": {
+              clearTimer(sessionID)
+              dropState(sessionID)
+              await toast("cleared")
+              await reply(ackPrompt("The user cleared the loop. Stop repeating the task.", null))
+              return
+            }
+
+            case "set": {
+              if (state?.status === "active") {
+                await reply(refuse(sessionID, state, "The user tried to start a new loop while one is already active in this session. The existing one must be paused or cleared first."))
+                return
+              }
+              if (goalIsActive(sessionID)) {
+                await reply(refuse(sessionID, state, "The user tried to start a loop, but a goal is active in this session. One session runs one continuation loop at a time; the goal must be paused or cleared first."))
+                return
+              }
+              const next = writeState(sessionID, {
+                task: parsed.task,
+                status: "active",
+                reason: null,
+                summary: null,
+                iteration: 1,
+                max: parsed.max ?? DEFAULT_MAX,
+                until: parsed.until,
+                untilStable: parsed.untilStable ?? 0,
+                timeoutMs: parsed.timeoutMs,
+                everyMs: parsed.everyMs,
+                deadline: parsed.timeoutMs ? Date.now() + parsed.timeoutMs : null,
+                nextAt: parsed.everyMs ? Date.now() + parsed.everyMs : null,
+                pending: false,
+                replies: [],
+                runtime: RUNTIME,
+                skipNextIdle: false,
+                lastTurn: null,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+              })
+              clearTimer(sessionID)
+              await toast(`active — ${budgetLine(next)}`, "success")
+              await reply(startPrompt(next))
+              return
+            }
           }
-          const paused = writeState(sessionID, { ...state, status: "paused", reason: "paused by the user", updatedAt: Date.now() })
-          clearTimer(sessionID)
-          await toast("paused")
-          reply(ackPrompt("The user paused the loop. Stop repeating the task.", paused))
-          return
-        }
+        },
+      })
+    })
 
-        case "resume": {
-          if (!state || state.status === "active") {
-            holdNextIdle(sessionID, state)
-            reply(ackPrompt("The user asked to resume the loop.", state))
-            return
-          }
-          if (goalIsActive(sessionID)) {
-            reply(refuse(sessionID, state, "The user asked to resume the loop, but a goal is active in this session. One session runs one continuation loop at a time; the goal must be paused or cleared first."))
-            return
-          }
-          // A loop stopped by its budget resumes with a fresh window; one that
-          // was paused picks up where it left off.
-          const spent = state.iteration >= state.max || (state.deadline && Date.now() >= state.deadline)
-          const resumed = writeState(sessionID, {
-            ...state,
-            status: "active",
-            reason: null,
-            runtime: RUNTIME,
-            skipNextIdle: false,
-            iteration: spent ? 1 : state.iteration + 1,
-            deadline: state.timeoutMs ? Date.now() + state.timeoutMs : null,
-            replies: spent ? [] : state.replies,
-            updatedAt: Date.now(),
-          })
-          await toast("resumed")
-          reply(continuePrompt(resumed))
-          return
+    const handleEvent = async (event) => {
+      const data = event.data ?? {}
+      if (event.type === "session.step.ended") {
+        if (data.assistantMessageID) {
+          lastStep.set(data.sessionID, { id: data.assistantMessageID, tokens: data.tokens })
         }
-
-        case "clear": {
-          clearTimer(sessionID)
-          dropState(sessionID)
-          await toast("cleared")
-          reply(ackPrompt("The user cleared the loop. Stop repeating the task.", null))
-          return
-        }
-
-        case "set": {
-          if (state?.status === "active") {
-            reply(refuse(sessionID, state, "The user tried to start a new loop while one is already active in this session. The existing one must be paused or cleared first."))
-            return
-          }
-          if (goalIsActive(sessionID)) {
-            reply(refuse(sessionID, state, "The user tried to start a loop, but a goal is active in this session. One session runs one continuation loop at a time; the goal must be paused or cleared first."))
-            return
-          }
-          const next = writeState(sessionID, {
-            task: parsed.task,
-            status: "active",
-            reason: null,
-            summary: null,
-            iteration: 1,
-            max: parsed.max ?? DEFAULT_MAX,
-            until: parsed.until,
-            untilStable: parsed.untilStable ?? 0,
-            timeoutMs: parsed.timeoutMs,
-            everyMs: parsed.everyMs,
-            deadline: parsed.timeoutMs ? Date.now() + parsed.timeoutMs : null,
-            nextAt: parsed.everyMs ? Date.now() + parsed.everyMs : null,
-            replies: [],
-            runtime: RUNTIME,
-            skipNextIdle: false,
-            lastTurn: null,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          })
-          clearTimer(sessionID)
-          await toast(`active — ${budgetLine(next)}`, "success")
-          reply(startPrompt(next))
-          return
-        }
-      }
-    },
-
-    event: async ({ event }) => {
-      if (event.type === "message.updated") {
-        const info = event.properties?.info
-        if (info?.role === "assistant") lastAssistant.set(info.sessionID, info)
         return
       }
-      if (event.type === "session.status") {
-        const { sessionID, status } = event.properties
-        if (status?.type === "idle") busy.delete(sessionID)
-        else busy.add(sessionID)
+      if (event.type === "session.execution.started") {
+        busy.add(data.sessionID)
         return
       }
-      if (event.type !== "session.idle") return
+      if (event.type === "session.execution.failed" || event.type === "session.execution.interrupted") {
+        busy.delete(data.sessionID)
+        const failed = readState(data.sessionID)
+        if (failed?.status === "active") {
+          await stop(data.sessionID, failed, "paused", "the turn was aborted or failed")
+        }
+        return
+      }
+      if (event.type !== "session.execution.succeeded") return
 
-      const sessionID = event.properties.sessionID
+      const sessionID = data.sessionID
       busy.delete(sessionID)
       const state = readState(sessionID)
       if (!state || state.status !== "active") return
@@ -539,13 +569,10 @@ export const plugin = ({ tool }) => async ({ client }) => {
         return
       }
 
-      const last = lastAssistant.get(sessionID)
-      if (last?.error) {
-        await stop(sessionID, state, "paused", "the turn was aborted or failed")
-        return
-      }
-      // Idle can be reported more than once for the same turn; the message that
-      // just finished identifies the iteration so it is only ever continued once.
+      const last = lastStep.get(sessionID)
+      // The turn that just finished identifies the iteration, so a second
+      // delivery of the same turn-end — or the plugin's other instances seeing
+      // it too — only ever continues once.
       if (last?.id && last.id === state.lastTurn) return
 
       let replies = state.replies
@@ -589,12 +616,21 @@ export const plugin = ({ tool }) => async ({ client }) => {
       // Waiting here rather than in the model is what makes the interval; a
       // manual turn that lands in the gap runs first and re-arms the timer.
       if (withTurn.everyMs && withTurn.nextAt && Date.now() < withTurn.nextAt) {
-        writeState(sessionID, withTurn)
+        writeState(sessionID, { ...withTurn, pending: true })
         armTimer(sessionID, withTurn.nextAt - Date.now())
         return
       }
 
       await dispatch(sessionID, withTurn)
-    },
-  }
+    }
+
+    const controller = new AbortController()
+    void (async () => {
+      for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
+        await handleEvent(event)
+      }
+    })().catch(() => {})
+
+    return () => controller.abort()
+  },
 }

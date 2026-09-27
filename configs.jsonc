@@ -11,9 +11,11 @@
 
       "permission": "allow",
 
-      // OpenCode fetches an unpinned plugin from npm at every start. The TUI
-      // half of a plugin is registered in tui.json by `make setup` instead.
-      "plugin": ["@slkiser/opencode-quota", "@tarquinen/opencode-dcp", "opencode-handoff"],
+      // v2 config key (v1 called it "plugin"). OpenCode fetches an unpinned
+      // plugin from npm at every start; `make setup` registers the TUI half in
+      // cli.json with `opencode plugin add`. quota and handoff stay out until
+      // they ship v2-format plugins — see docs/migrations/2026-09-27-opencode-v2.md.
+      "plugins": ["@tarquinen/opencode-dcp"],
 
       "mcp": {
         // The persistent profile keeps logins across restarts. Chrome locks a

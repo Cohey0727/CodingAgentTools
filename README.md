@@ -47,7 +47,6 @@ bin/style-check.sh               # refuse any name configs.jsonc owns from appea
 bin/model-ref.sh                 # "<route id>/<model>" for one provider, so nothing else spells a model id
 bin/models-update.sh             # fetches the live catalog of every provider that names one (`make update`)
 bin/models-update.py             # rewrites that provider's models in configs.jsonc from it
-bin/opencode-plugin.template     # OpenCode plugin shim; @@IMPL@@ baked in at setup time
 bin/setup.sh                     # provider wizard: pick providers, paste tokens, install (`make setup-providers`)
 bin/pi-global-models.sh          # registers every provider in pi's global models.json (`make pi-global`)
 bin/opencode-global-config.sh    # registers every provider in OpenCode's global config (`make opencode-global`)
@@ -72,13 +71,9 @@ Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; addi
 ## Requirements
 
 - macOS / Linux with `bash`, `make` and `python3` (`bin/models.py` reads the provider configs)
-- [OpenCode](https://opencode.ai) (`opencode` on your PATH) — only OpenCode itself; this repo writes its config. Not bundled by this repo; install it first:
+- [OpenCode](https://opencode.ai) v2 (`opencode` on your PATH) — only OpenCode itself; this repo writes its config. `make setup` installs or upgrades it with the v2 installer:
   ```bash
-  brew install anomalyco/tap/opencode          # macOS (Homebrew)
-  # or
-  npm install -g opencode-ai
-  # or
-  curl -fsSL https://opencode.ai/install | bash
+  curl -fsSL https://opencode.ai/v2/install | bash
   ```
 - [pi](https://pi.dev) (`pi` on your PATH) — only pi itself; like OpenCode it gets the generated `models.json`. Not bundled by this repo either:
   ```bash
@@ -121,7 +116,7 @@ One interactive wizard does everything:
 2. Paste the API token of each checked provider — an empty answer keeps the existing token
 3. `configs.jsonc` is validated before anything is written; `.env` is created from `.env.example` if missing (`chmod 600`), gets any variables added to `.env.example` since, and picks up keys still sitting in the old `providers/<name>/.env` files
 4. pi itself is updated, the [pi packages](#pi-packages) that add `/loop`, `/goal`, MCP and subagents are installed into pi's user settings (`~/.pi/agent/settings.json`), and pi's model catalogs are refreshed, and DeepSeek Harness and Command Code are installed with `npm install -g <package>@latest`. Anything of these already installed is upgraded to its latest version, so re-running `make setup` is also how you update them
-5. Every provider whose key resolves is registered in the global config of every CLI — [one generator each](#generated-configs) — with every model in `configs.jsonc`, not just the tagged ones, and all of them starting on [the default provider](#default-provider). pi also gets the keys OpenCode's `/connect` holds, for [Zen and Go](#usage). Then the [OpenCode plugins](#opencode-plugins-from-npm) are installed or upgraded with `opencode plugin -g --force` when `opencode` is on your PATH
+5. Every provider whose key resolves is registered in the global config of every CLI — [one generator each](#generated-configs) — with every model in `configs.jsonc`, not just the tagged ones, and all of them starting on [the default provider](#default-provider). pi also gets the keys OpenCode's `/connect` holds, for [Zen and Go](#usage). OpenCode itself is installed or upgraded with its v2 installer, and the [OpenCode plugins](#opencode-plugins-from-npm) with `opencode plugin add`
 6. You get a warning if any of the CLIs those configs are for is missing from your PATH
 7. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/loop`](#loops-in-opencode) and [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode`, and pi gets its [dashboard](#pi-dashboard) in `~/.pi/agent/extensions` ([details below](#skills-and-global-instructions))
 
@@ -290,16 +285,17 @@ Anything else OpenCode's config takes goes there too, written in OpenCode's own 
 
 ### OpenCode plugins from npm
 
-`make setup` installs four community plugins into OpenCode:
+`make setup` installs two community plugins into OpenCode:
 
 | Plugin | Adds |
 |--------|------|
 | [`oc-tps`](https://github.com/Tarquinen/oc-tps) | Live tokens per second and time to first token in the session prompt |
-| [`@slkiser/opencode-quota`](https://github.com/slkiser/opencode-quota) | The quota left on OpenCode Go and other subscriptions in the sidebar, `/quota`, and token reports such as `/tokens_today` |
 | [`@tarquinen/opencode-dcp`](https://github.com/Opencode-DCP/opencode-dynamic-context-pruning) | A `compress` tool the model uses to summarize finished parts of a session, and pruning of repeated or failed tool calls. Its settings are in `~/.config/opencode/dcp.jsonc`, written on first run |
-| [`opencode-handoff`](https://github.com/joshuadavidthomas/opencode-handoff) | `/handoff <goal>` drafts a prompt that continues the work in a new session, and `read_session` reads the old one back |
 
-A plugin has a server half, listed under `plugin` in `opencode.json`, and a TUI half, listed under `plugin` in `~/.config/opencode/tui.json`. The server halves are in `opencode.overrides.plugin` in `configs.jsonc`, so `make opencode-global` keeps them. `make setup` then runs `opencode plugin -g --force` for every plugin in `OPENCODE_PLUGINS` in `bin/setup.sh`. That registers the TUI halves and replaces each installed plugin with its latest version. A new plugin with a server half goes in both lists.
+A plugin has a server half, listed under `plugins` in `opencode.json`, and a TUI half, listed under `plugins` in `~/.config/opencode/cli.json`. The server halves are in `opencode.overrides.plugins` in `configs.jsonc`, so `make opencode-global` keeps them. `make setup` then runs `opencode plugin add` for every plugin in `OPENCODE_PLUGINS` in `bin/setup.sh`, and `opencode plugin update` brings each to its latest. A new plugin with a server half goes in both lists.
+
+`@slkiser/opencode-quota` and `opencode-handoff` are out until they ship
+v2-format plugins — see `docs/migrations/2026-09-27-opencode-v2.md`.
 
 ### pi packages
 
@@ -890,22 +886,20 @@ Skills cover what every CLI can read. OpenCode's own extension points live in
 | Target | What goes there |
 |--------|-----------------|
 | `~/.config/opencode/command/<name>.md` | a symlink to `opencode/command/<name>.md` — a slash command |
-| `~/.config/opencode/plugin/<name>.js` | a generated shim importing `opencode/plugin/<name>.js` — a plugin |
+| `~/.config/opencode/plugin/<name>.js` | a symlink to `opencode/plugin/<name>.js` — a plugin |
 
-Commands are plain markdown and are linked like everything else. Plugins are
-not: OpenCode resolves a plugin's npm imports from where the file really lives,
-and a symlinked plugin resolves them inside this repo, where
-`@opencode-ai/plugin` is not installed. So `make setup-skills` writes a small
-shim from `bin/opencode-plugin.template` into the config dir — OpenCode installs
-the package there itself — and the shim passes `tool` into the implementation,
-which stays here and stays editable:
+Commands are plain markdown; plugins default-export a v2 definition
+(`{ id, setup }`), which OpenCode validates but does not wrap. A plugin that
+imports nothing from npm — everything a plugin needs arrives on the `ctx` that
+`setup(ctx)` receives — resolves from wherever the file really lives, so it is
+symlinked like the commands and stays editable here:
 
 ```js
-export const plugin = ({ tool }) => async ({ client }) => ({ /* hooks */ })
+export default { id: "example", async setup(ctx) { /* ctx.command, ctx.tool, ctx.event */ } }
 ```
 
 A file in either directory that this repo did not put there is left alone —
-shims are recognised by their first line, commands by pointing back here.
+both are recognised by pointing back here.
 
 ### pi extensions and subagents
 
@@ -926,9 +920,9 @@ in, and the skill will tell you when it is missing.
 
 ## Troubleshooting
 
-**`'opencode' is not on your PATH — install OpenCode first`** — the generated config is only read by OpenCode itself, which this repo does not install. See [Requirements](#requirements):
+**`'opencode' is not on your PATH — install OpenCode first`** — the generated config is only read by OpenCode itself, and the installer in `make setup` failed or was skipped. Install it by hand:
 ```bash
-brew install anomalyco/tap/opencode   # or: npm install -g opencode-ai
+curl -fsSL https://opencode.ai/v2/install | bash
 ```
 
 **`opencode` lists none of the providers** — the config is generated, not read live. Run `make opencode-global` (or `make setup`) and check `opencode models`. A key rotated in `.env` also needs the re-run: the config references the copy under `~/.config/opencode/claude-compatibles/`.
