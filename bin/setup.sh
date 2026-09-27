@@ -7,8 +7,9 @@
 # configs.jsonc lists every provider and refers to its secrets as "${NAME}";
 # the .env beside it holds those values and is the only file with a key in it.
 # At a prompt, pressing Enter with no input keeps whatever is already set.
-# The checkbox also has a "dsh web" row, which sets SERVE_HOST for `make serve`;
-# once it is set, the nginx `make serve` runs is installed with Homebrew too.
+# The checkbox also has "dsh web" and "opencode web" rows, which set the
+# hostnames `make serve` serves those under; once one is set, the nginx
+# `make serve` runs is installed with Homebrew too.
 # Keys still sitting in the old providers/<name>/.env files are carried over
 # first. Then pi is updated, the pi packages in $PI_PACKAGES are installed into
 # pi's user settings and pi's model catalogs are refreshed, DeepSeek Harness and
@@ -51,14 +52,28 @@ current_token() { # <provider> -> its resolved key, maybe ""
   ( models_resolve "$1" 2>/dev/null && printf '%s' "$M_API_KEY" )
 }
 
-DSH_ITEM='dsh web' # the checkbox row after the providers that sets SERVE_HOST
+SERVE_ITEMS=('dsh web' 'opencode web') # the checkbox rows after the providers
+
+serve_var() { # <checkbox row> -> the .env variable holding its `make serve`
+              # hostname, or nothing for a provider
+  case $1 in
+    'dsh web') printf 'SERVE_HOST' ;;
+    'opencode web') printf 'SERVE_OPENCODE_HOST' ;;
+  esac
+}
 
 item_section() { # <checkbox row> -> the heading shown beside it
-  if [ "$1" = "$DSH_ITEM" ]; then printf 'DeepSeek Harness'; else provider_section "$1"; fi
+  case $1 in
+    'dsh web') printf 'DeepSeek Harness' ;;
+    'opencode web') printf 'OpenCode' ;;
+    *) provider_section "$1" ;;
+  esac
 }
 
 item_value() { # <checkbox row> -> the value that earns it a ✅, maybe ""
-  if [ "$1" = "$DSH_ITEM" ]; then env_value SERVE_HOST; else current_token "$1"; fi
+  local var
+  var=$(serve_var "$1")
+  if [ -n "$var" ]; then env_value "$var"; else current_token "$1"; fi
 }
 
 api_key_url() { # <provider> -> the signup URL commented above its variable in
@@ -307,11 +322,12 @@ prompt_token() { # <provider>
   )
 }
 
-prompt_dsh_host() { # -> SERVE_HOST in .env: the hostname `make serve` trusts
-  local host new
-  host=$(env_value SERVE_HOST)
-  section "$DSH_ITEM"
-  note 'SERVE_HOST in .env — the hostname a Cloudflare Tunnel publishes `make serve` under'
+prompt_serve_host() { # <checkbox row> -> its hostname for `make serve` in .env
+  local row=$1 var host new
+  var=$(serve_var "$row")
+  host=$(env_value "$var")
+  section "$row"
+  note "$var in .env — the hostname a Cloudflare Tunnel publishes $row under (\`make serve\`)"
   if [ -n "$host" ]; then
     printf '  %shost%s [%s — Enter to keep]: ' "$B" "$RST" "$host"
   else
@@ -319,18 +335,18 @@ prompt_dsh_host() { # -> SERVE_HOST in .env: the hostname `make serve` trusts
   fi
   IFS= read -r new || new=''
   new=$(printf '%s' "$new" | tr -d '[:space:]')
-  # --trusted-host takes an authority, so a pasted URL is cut down to one.
+  # nginx matches a bare hostname, so a pasted URL is cut down to one.
   new=${new#*://}
   new=${new%%/*}
   if [ -z "$new" ]; then
     if [ -n "$host" ]; then
       ok 'kept existing host'
     else
-      warn "left empty — 'make serve' starts nothing until SERVE_HOST is set"
+      warn "left empty — 'make serve' leaves $row out until $var is set"
     fi
   else
-    set_env_var SERVE_HOST "$new"
-    ok "host updated — 'make serve' serves dsh web at https://$new"
+    set_env_var "$var" "$new"
+    ok "host updated — 'make serve' serves $row at https://$new"
   fi
 }
 
@@ -476,11 +492,12 @@ install_npm_cli() { # <command> <package> <display name> <Node.js requirement>
   fi
 }
 
-# `make serve` puts nginx in front of dsh web, so it is installed once
-# SERVE_HOST says that is in use. `brew install` also upgrades an outdated one.
+# `make serve` puts nginx in front of the apps it serves, so it is installed
+# once a hostname says that is in use. `brew install` also upgrades an outdated
+# one.
 install_serve_nginx() {
   local before= version
-  [ -n "$(env_value SERVE_HOST)" ] || return 0
+  [ -n "$(env_value SERVE_HOST)$(env_value SERVE_OPENCODE_HOST)" ] || return 0
   section 'installing nginx for make serve'
   if command -v nginx >/dev/null 2>&1; then
     before=$(nginx -v 2>&1 | sed 's|.*/||')
@@ -564,7 +581,7 @@ AGENTS
 # -------------------------------------------------------------------- main
 
 main() {
-  local providers=() all=() p i generator dsh=
+  local providers=() all=() serve=() p i generator
 
   banner
 
@@ -592,14 +609,14 @@ main() {
       echo "setup: configs.jsonc lists no providers" >&2
       exit 1
     fi
-    all+=("$DSH_ITEM")
+    all+=("${SERVE_ITEMS[@]}")
     ensure_env
     sync_env_keys
     CHECKED=()
     for i in "${!all[@]}"; do CHECKED[$i]=0; done
     pick_providers "${all[@]}"
     for p in ${SELECTED[@]+"${SELECTED[@]}"}; do
-      if [ "$p" = "$DSH_ITEM" ]; then dsh=1; else providers+=("$p"); fi
+      if [ -n "$(serve_var "$p")" ]; then serve+=("$p"); else providers+=("$p"); fi
     done
   fi
 
@@ -609,7 +626,9 @@ main() {
   for p in ${providers[@]+"${providers[@]}"}; do
     prompt_token "$p"
   done
-  if [ -n "$dsh" ]; then prompt_dsh_host; fi
+  for p in ${serve[@]+"${serve[@]}"}; do
+    prompt_serve_host "$p"
+  done
 
   install_pi_packages
   install_opencode_cli
