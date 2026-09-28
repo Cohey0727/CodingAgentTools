@@ -12,7 +12,7 @@
       "notes": "外部LLMの回答を読む前に、独立したレビューを自分で書き切ること (回答を見た後だと引きずられる)"
     },
     {
-      "name": "deepseek-go",
+      "name": "deepseek-commandcode",
       "label": "DeepSeek V4.1 Flash (Command Code)",
       "enabled": true,
       "schema": "stdin",
@@ -30,7 +30,7 @@
       "notes": "--agent plan で read-only"
     },
     {
-      "name": "glm-flash-go",
+      "name": "glm-flash-commandcode",
       "label": "Zhipu AI GLM-5.3 Flash (Command Code)",
       "enabled": true,
       "schema": "stdin",
