@@ -39,6 +39,15 @@
       "notes": "--agent plan で read-only"
     },
     {
+      "name": "mimo-flash-go",
+      "label": "MiMo-V2.6-Flash (OpenCode Go)",
+      "enabled": true,
+      "schema": "stdin",
+      "command": "opencode run --model opencode-go/mimo-v2.6-flash --agent plan",
+      "timeout_ms": 1200000,
+      "notes": "--agent plan で read-only"
+    },
+    {
       "name": "deepseek",
       "label": "DeepSeek (直接契約)",
       "enabled": false,
