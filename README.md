@@ -1,13 +1,12 @@
 # CodingAgentTools
 
-> Run OpenCode, pi, Crush, Reasonix, Codewhale and DeepSeek Harness on the LLM backends you pay for (DeepSeek · GLM · Kimi · Command Code · your own llama.cpp) — one repo, one `make setup`, one `configs.jsonc` driving all six CLIs, and the skills and global instruction file they share.
+> Run OpenCode, pi, Crush, Reasonix, Codewhale and DeepSeek Harness on the LLM backends you pay for (DeepSeek · Kimi · Command Code · your own llama.cpp) — one repo, one `make setup`, one `configs.jsonc` driving all six CLIs, and the skills and global instruction file they share.
 
 One repo that generates the global config of six CLIs covering every provider — [OpenCode](https://opencode.ai), the [pi coding agent](https://pi.dev), [Crush](https://github.com/charmbracelet/crush), [Reasonix](https://github.com/esengine/DeepSeek-Reasonix), [Codewhale](https://codewhale.net) and [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness):
 
 | Heading | Provider | Endpoint | API | Flagship model |
 |---------|----------|----------|-----|----------------|
 | Subscriptions | DeepSeek | `https://api.deepseek.com/anthropic` | anthropic | `deepseek-v4-pro` |
-| Subscriptions | GLM (Z.ai) | `https://api.z.ai/api/anthropic` | anthropic | `glm-5.3` |
 | Subscriptions | Kimi (Moonshot) | `https://api.kimi.com/coding` | anthropic | `kimi-k3` |
 | Subscriptions | Local (llama.cpp) | `http://127.0.0.1:11301` | anthropic | `default` |
 | Subscriptions | gtr (llama.cpp behind Cloudflare) | `https://gtr-halogen.spaghetti-monster.com` | openai | `default` |
@@ -179,7 +178,7 @@ dsh web           # DeepSeek Harness — every configured provider is in the Web
 
 ```bash
 pi                                         # starts on the default provider's model
-pi --model Z.AI/glm-5.3                    # or pick at launch time
+pi --model DeepSeek/deepseek-v4-pro            # or pick at launch time
 pi --model commandcode/claude-opus-5
 ```
 
@@ -190,13 +189,13 @@ pi --model opencode-go/deepseek-v4.1-flash     # OpenCode Go, on the key OpenCod
 pi --list-models opencode                      # what Zen and Go serve
 ```
 
-The two generators otherwise start you on the same provider; `pi.overrides` points pi at Z.AI's GLM-5.3 Flash instead. See [Default provider](#default-provider). For pi that means `defaultProvider` / `defaultModel` in `~/.pi/agent/settings.json`, the two keys Ctrl+S in `/model` writes — so a re-run replaces a pick you saved there. The rest of that file is left as it is. Writing them needs `python3`; without it the two keys are skipped and pi starts wherever it was.
+The two generators otherwise start you on the default provider; `pi.overrides` points pi at OpenCode Go's DeepSeek V4.1 Flash instead, the model `opencode.overrides` starts OpenCode on. See [Default provider](#default-provider). For pi that means `defaultProvider` / `defaultModel` in `~/.pi/agent/settings.json`, the two keys Ctrl+S in `/model` writes — so a re-run replaces a pick you saved there. The rest of that file is left as it is. Writing them needs `python3`; without it the two keys are skipped and pi starts wherever it was.
 
 `make setup` (and `make opencode-global`) write every provider that has a token into the global `~/.config/opencode/opencode.json`, so a bare `opencode` starts with all of them and `/models` switches mid-session — each under the heading `configs.jsonc` files it under, beside OpenCode's own Zen and Go (see [OpenCode's model dialog](#opencodes-model-dialog)):
 
 ```bash
 opencode                                                  # starts on the default provider's model
-opencode --model glm-anthropic/glm-5.3                    # or pick at launch time
+opencode --model deepseek-anthropic/deepseek-v4-pro   # or pick at launch time
 opencode --model commandcode-openai/deepseek/deepseek-v4.1-flash
 ```
 
@@ -280,7 +279,7 @@ machine can also reach `127.0.0.1:3081` directly.
 Every generated global config starts on whichever provider is marked `primary` in `configs.jsonc`:
 
 ```jsonc
-"glm": {
+"deepseek": {
   "primary": true,
   ...
 }
@@ -299,13 +298,13 @@ OpenCode can start somewhere else. `make opencode-global` deep-merges the top-le
 }
 ```
 
-pi works the same way. `make pi-global` deep-merges the top-level `pi.overrides` into `~/.pi/agent/settings.json` after writing the default provider's model there, so pi starts on Z.AI's GLM-5.3 Flash instead. Any other key of pi's [settings](https://pi.dev/docs/settings) can go there, written in pi's own form:
+pi works the same way. `make pi-global` deep-merges the top-level `pi.overrides` into `~/.pi/agent/settings.json` after writing the default provider's model there, so pi starts on OpenCode Go's DeepSeek V4.1 Flash instead. Any other key of pi's [settings](https://pi.dev/docs/settings) can go there, written in pi's own form:
 
 ```jsonc
 "pi": {
   "overrides": {
-    "defaultProvider": "Z.AI",
-    "defaultModel": "glm-5.3-flash"
+    "defaultProvider": "opencode-go",
+    "defaultModel": "deepseek-v4.1-flash"
   }
 }
 ```
@@ -602,7 +601,7 @@ models speak, as the route `<name>-<api>`; `make list` prints the name.
 
 | Field | Meaning |
 |-------|---------|
-| `label` | Leads each model's name in OpenCode's model dialog (`Z.AI glm-5.3`), which tells providers sharing a heading apart, names the route in DeepSeek Harness, and is the provider's id in pi. Omit it where the heading already says whose models they are |
+| `label` | Leads each model's name in OpenCode's model dialog (`DeepSeek deepseek-v4-pro`), which tells providers sharing a heading apart, names the route in DeepSeek Harness, and is the provider's id in pi. Omit it where the heading already says whose models they are |
 | `API_KEY` | **Required.** A `${VAR}` reference to the key |
 | `BASE_URL` | **Required.** The root both APIs hang off — `/v1/messages` or `/v1/chat/completions` is appended — as `${VAR:-default}` so `.env` can route it elsewhere |
 | `api` | **Required.** `"anthropic"` (Anthropic Messages) or `"openai"` (OpenAI Chat Completions): what every model speaks unless it sets its own. May be a `${VAR:-default}` reference where the shape depends on the route, as `gtr`'s does |
@@ -682,7 +681,6 @@ Command Code          providers."Command Code"
 OpenCode Go           OpenCode's own, from /connect
 Subscriptions         providers.Subscriptions
   DeepSeek deepseek-v4-pro
-  Z.AI glm-5.3
   Moonshot kimi-k3
   Local default
 ```
@@ -700,7 +698,7 @@ OpenCode Zen and OpenCode Go are OpenCode's own services: `/connect` stores thei
 key in OpenCode's `auth.json`, and nothing here generates them. They serve some
 of the same model ids as the providers here, so the heading, not the id, says
 whose quota a request draws on. The prompt footer prints the model with its
-heading — `Z.AI glm-5.3 Subscriptions` against `GLM-5.3 OpenCode Go`.
+heading — `deepseek/deepseek-v4.1-flash Command Code` against `DeepSeek V4.1 Flash OpenCode Go`.
 
 ### `.env`
 
@@ -1058,13 +1056,11 @@ Where each provider's key comes from:
 | Provider | API key |
 |----------|---------|
 | DeepSeek | https://platform.deepseek.com/ |
-| GLM (Z.ai) | https://z.ai/manage-apikey/apikey-list |
 | Kimi (Moonshot) | https://platform.moonshot.ai/console/api-keys |
 | Command Code | https://commandcode.ai/studio/ (not on the Go plan) |
 | Local / gtr | No account and no key; `API_KEY` is a placeholder the CLIs only require to be non-empty |
 
 - [DeepSeek: Claude Code Integration Guide](https://api-docs.deepseek.com/guides/agent_integrations/claude_code) — where its Anthropic endpoint is documented
-- [Z.ai / GLM Claude Code docs](https://docs.z.ai/devpack/tool/claude) — likewise
 - [Command Code: Provider API](https://commandcode.ai/docs/provider)
 - [Kimi / Moonshot AI Platform](https://platform.moonshot.ai/docs)
 - [OpenCode: Config](https://opencode.ai/docs/config/) / [Providers](https://opencode.ai/docs/providers/)

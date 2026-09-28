@@ -41,8 +41,8 @@
   // here wins over the startup model the primary provider would give.
   "pi": {
     "overrides": {
-      "defaultProvider": "Z.AI",
-      "defaultModel": "glm-5.3-flash"
+      "defaultProvider": "opencode-go",
+      "defaultModel": "deepseek-v4.1-flash"
     }
   },
 
@@ -73,27 +73,6 @@
         "models": [
           { "id": "deepseek-v4-pro", "tags": ["default"] },
           { "id": "deepseek-flash", "tags": ["small"] }
-        ]
-      },
-
-      "glm": {
-        "label": "Z.AI",
-        "API_KEY": "${GLM_API_KEY}",
-        "BASE_URL": "${GLM_BASE_URL:-https://api.z.ai/api/anthropic}",
-        "api": "anthropic",
-
-        "defaults": {
-          "context_window": 1000000,
-          "max_tokens": 131072,
-          "reasoning": true,
-          "input": ["text"]
-        },
-
-        "models": [
-          // The "[1m]" ids exist only on the coding-plan route; this BASE_URL
-          // rejects them with "modelCode: does not exist".
-          { "id": "glm-5.3", "tags": ["default"] },
-          { "id": "glm-5.3-flash", "tags": ["small"] }
         ]
       },
 
