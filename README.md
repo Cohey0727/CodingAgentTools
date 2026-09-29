@@ -1,13 +1,12 @@
 # CodingAgentTools
 
-> Run OpenCode, pi, Crush, Reasonix, Codewhale and DeepSeek Harness on the LLM backends you pay for (DeepSeek · Kimi · Command Code · your own llama.cpp) — one repo, one `make setup`, one `configs.jsonc` driving all six CLIs, and the skills and global instruction file they share.
+> Run OpenCode, pi, Crush, Reasonix, Codewhale and DeepSeek Harness on the LLM backends you pay for (DeepSeek · Command Code · your own llama.cpp) — one repo, one `make setup`, one `configs.jsonc` driving all six CLIs, and the skills and global instruction file they share.
 
 One repo that generates the global config of six CLIs covering every provider — [OpenCode](https://opencode.ai), the [pi coding agent](https://pi.dev), [Crush](https://github.com/charmbracelet/crush), [Reasonix](https://github.com/esengine/DeepSeek-Reasonix), [Codewhale](https://codewhale.net) and [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness):
 
 | Heading | Provider | Endpoint | API | Flagship model |
 |---------|----------|----------|-----|----------------|
 | Subscriptions | DeepSeek | `https://api.deepseek.com/anthropic` | anthropic | `deepseek-v4-pro` |
-| Subscriptions | Kimi (Moonshot) | `https://api.kimi.com/coding` | anthropic | `kimi-k3` |
 | Subscriptions | Local (llama.cpp) | `http://127.0.0.1:11301` | anthropic | `default` |
 | Subscriptions | gtr (llama.cpp behind Cloudflare) | `https://gtr-halogen.spaghetti-monster.com` | openai | `default` |
 | Command Code | Command Code | `https://api.commandcode.ai/provider` | openai, and anthropic for Claude | `deepseek/deepseek-v4.1-flash` |
@@ -15,8 +14,6 @@ One repo that generates the global config of six CLIs covering every provider �
 `make setup` writes every provider into each CLI's global config, so a bare `opencode` gets them all under `/models`, a bare `pi` under `/model`, `crush`, `reasonix` and `codewhale` each start with the whole set, and so does `dsh web` — `dsh` has no default profile, so a bare `dsh` only answers `--profile <name> is required`.
 
 There is no proxy or translation layer: each CLI talks to each endpoint in the API it already speaks — Anthropic Messages (`/v1/messages`) or OpenAI Chat Completions (`/v1/chat/completions`), chosen per model. Every model any of them can reach is declared in one place: `configs.jsonc` at the repo root, in git, grouped by the [heading](#opencodes-model-dialog) it sits under in OpenCode's model dialog, with [tags](#tags) naming the model each CLI starts on. It holds no secret — an API key is written there as `${DEEPSEEK_API_KEY}` and read from the single gitignored `.env` beside it.
-
-> **Note:** Kimi has two endpoints. The default `https://api.kimi.com/coding` is for the **coding subscription plan**. For **pay-as-you-go (metered) billing**, switch `KIMI_BASE_URL` to `https://api.moonshot.ai/anthropic` in `.env`.
 
 > **Note:** Local is not a hosted service — it points at a `llama-server` on your own machine, which serves the Anthropic shape on `/v1/messages`. Here that server is LlamaGate (`~/Workspace/LlamaGate`): `just start` brings it up on `127.0.0.1:11301`, `just profiles` lists the models it can load and `just start <profile>` swaps to one. There is no account and no key, so its `API_KEY` is a placeholder the CLIs merely require to be non-empty. Both llama.cpp providers use the fixed model id `default`: llama-server answers with whatever it has loaded and ignores the requested name, so swapping the model on the server needs no edit here. Keep `context_window` at or below the server's `--ctx-size`.
 
@@ -552,11 +549,7 @@ happens when they do not. A secret has no sensible default and is written the
 first way; an endpoint ships the second, so `configs.jsonc` carries a working
 default and `.env` can point the provider somewhere else — a regional host, a
 metered endpoint, a proxy or gateway in front of it — without editing a
-git-tracked file:
-
-```bash
-KIMI_BASE_URL=https://api.moonshot.ai/anthropic
-```
+git-tracked file.
 
 A provider whose `API_KEY` resolves to nothing is left out of every generated
 config rather than breaking it.
@@ -681,7 +674,6 @@ Command Code          providers."Command Code"
 OpenCode Go           OpenCode's own, from /connect
 Subscriptions         providers.Subscriptions
   DeepSeek deepseek-v4-pro
-  Moonshot kimi-k3
   Local default
 ```
 
@@ -1056,13 +1048,11 @@ Where each provider's key comes from:
 | Provider | API key |
 |----------|---------|
 | DeepSeek | https://platform.deepseek.com/ |
-| Kimi (Moonshot) | https://platform.moonshot.ai/console/api-keys |
 | Command Code | https://commandcode.ai/studio/ (not on the Go plan) |
 | Local / gtr | No account and no key; `API_KEY` is a placeholder the CLIs only require to be non-empty |
 
 - [DeepSeek: Claude Code Integration Guide](https://api-docs.deepseek.com/guides/agent_integrations/claude_code) — where its Anthropic endpoint is documented
 - [Command Code: Provider API](https://commandcode.ai/docs/provider)
-- [Kimi / Moonshot AI Platform](https://platform.moonshot.ai/docs)
 - [OpenCode: Config](https://opencode.ai/docs/config/) / [Providers](https://opencode.ai/docs/providers/)
 - [pi: Custom models](https://pi.dev/docs/latest/models) / [Providers](https://pi.dev/docs/latest/providers) / [DeepSeek's pi integration guide](https://api-docs.deepseek.com/quick_start/agent_integrations/pi_mono/)
 - [Crush: Configuration](https://github.com/charmbracelet/crush/blob/main/docs/config/README.md) — the `crushrc` builtins and the legacy JSON form

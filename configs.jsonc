@@ -39,12 +39,11 @@
 
   // Deep-merged, key by key, into pi's ~/.pi/agent/settings.json last, so a key
   // here wins over the startup model the primary provider would give. OpenCode
-  // Zen's free tier is not in configs.jsonc — pi gets its key from OpenCode's
-  // own auth.
+  // Go is not in configs.jsonc — pi gets its key from OpenCode's own auth.
   "pi": {
     "overrides": {
-      "defaultProvider": "opencode",
-      "defaultModel": "mimo-v2.6-flash-free"
+      "defaultProvider": "opencode-go",
+      "defaultModel": "deepseek-v4.1-flash"
     }
   },
 
@@ -75,25 +74,6 @@
         "models": [
           { "id": "deepseek-v4-pro", "tags": ["default"] },
           { "id": "deepseek-flash", "tags": ["small"] }
-        ]
-      },
-
-      "kimi": {
-        "label": "Moonshot",
-        "picker": false,
-        "API_KEY": "${KIMI_API_KEY}",
-        "BASE_URL": "${KIMI_BASE_URL:-https://api.kimi.com/coding}",
-        "api": "anthropic",
-
-        "defaults": {
-          "context_window": 1048576,
-          "max_tokens": 131072,
-          "reasoning": true,
-          "input": ["text", "image"]
-        },
-
-        "models": [
-          { "id": "kimi-k3", "tags": ["default", "small"] }
         ]
       },
 
