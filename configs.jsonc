@@ -38,11 +38,13 @@
   },
 
   // Deep-merged, key by key, into pi's ~/.pi/agent/settings.json last, so a key
-  // here wins over the startup model the primary provider would give.
+  // here wins over the startup model the primary provider would give. OpenCode
+  // Zen's free tier is not in configs.jsonc — pi gets its key from OpenCode's
+  // own auth.
   "pi": {
     "overrides": {
-      "defaultProvider": "opencode-go",
-      "defaultModel": "deepseek-v4.1-flash"
+      "defaultProvider": "opencode",
+      "defaultModel": "mimo-v2.6-flash-free"
     }
   },
 
