@@ -12,11 +12,11 @@
       "notes": "外部LLMの回答を読む前に、独立したレビューを自分で書き切ること (回答を見た後だと引きずられる)"
     },
     {
-      "name": "deepseek-commandcode",
-      "label": "DeepSeek V4.1 Flash (Command Code)",
+      "name": "deepseek-go",
+      "label": "DeepSeek V4.1 Flash (OpenCode Go)",
       "enabled": true,
       "schema": "stdin",
-      "command": "opencode run --model commandcode-openai/deepseek/deepseek-v4.1-flash --agent plan",
+      "command": "opencode run --model opencode-go/deepseek-v4.1-flash --agent plan",
       "timeout_ms": 1200000,
       "notes": "--agent plan で read-only"
     },
@@ -30,11 +30,11 @@
       "notes": "--agent plan で read-only"
     },
     {
-      "name": "glm-flash-commandcode",
-      "label": "Zhipu AI GLM-5.3 Flash (Command Code)",
+      "name": "glm-flash-go",
+      "label": "Zhipu AI GLM-5.3 Flash (OpenCode Go)",
       "enabled": true,
       "schema": "stdin",
-      "command": "opencode run --model commandcode-openai/z-ai/glm-5.3-flash --agent plan",
+      "command": "opencode run --model opencode-go/glm-5.3-flash --agent plan",
       "timeout_ms": 1200000,
       "notes": "--agent plan で read-only"
     },
