@@ -7,21 +7,23 @@ description: 1つの議題について複数LLMが3周のディスカッショ�
 
 1つの議題 (方針・設計判断・意見が割れる問い) に対し、複数LLMが**独立に意見を出し、対立点をぶつけ合い、モデレータが裁定して1つの成果物に集約する**。fusion-review が「同じ依頼を並列に1回投げて統合する」のに対し、discussion は反論のラウンドを挟んで意見の当否を詰める。
 
-**モデレータはこのセッションのLLM自身**。llms.json に載るのは討論者 (モデレータ以外) だけで、`schema: self` は使わない。集約・裁定・問いの投入はモデレータが行い、多数決では決めない。
+**モデレータはこのセッションのLLM自身**。討論者はモデレータ以外の外部LLMだけ。集約・裁定・問いの投入はモデレータが行い、多数決では決めない。
 
-## 設定ファイル (有効LLMの管理)
+## 設定ファイル (討論者の管理)
 
-有効なLLMの一覧は**このスキルディレクトリの `llms.json`** で管理する:
+討論者は fusion-review のレビュアーと同じモデルを使う。discussion は自分の llms.json を持たず、**fusion-review の `llms.json`** を読む:
 
-- 原本: `<repo>/skills/discussion/llms.json` (CodingAgentTools レポ、Git管理)
-- 実行時パス: `~/.claude/skills/discussion/llms.json` (make setup-skills のシンボリックリンク経由で同一実体)
+- 原本: `<repo>/skills/fusion-review/llms.json` (CodingAgentTools レポ、Git管理)
+- 実行時パス: `~/.claude/skills/fusion-review/llms.json` (make setup-skills のシンボリックリンク経由で同一実体)
+
+討論者にするのは `enabled: true` かつ `schema: "stdin"` のエントリだけ。`schema: "self"` のエントリ (ホストLLM自身) は、このスキルではモデレータの役なので討論者に含めない。
 
 | フィールド | 意味 |
 |-----------|------|
 | `name` | 短い識別子。中間成果物のファイル名や map.md の参加者名に使う |
 | `label` | モデルの説明 (人間向け)。最終出力のメタ情報検査にも使う |
-| `enabled` | `true` のものだけ討論者にする。無効化はここを `false` にするだけ |
-| `schema` | `stdin` のみ (下表) |
+| `enabled` | `true` のものだけ討論者にする |
+| `schema` | `stdin` のエントリだけ使う (下表) |
 | `command` | 起動コマンド |
 | `timeout_ms` | 実行時のタイムアウト。shell の `timeout` コマンドに秒換算で渡す |
 | `notes` | モデルの特性・注意点 |
@@ -30,13 +32,13 @@ description: 1つの議題について複数LLMが3周のディスカッショ�
 |--------|---------|
 | `stdin` | 任意コマンド。`command` をそのまま実行し、stdin にプロンプト・stdout に回答 |
 
-討論者は OpenCode に統一する。追加は llms.json にエントリを1つ足すだけで、`schema: "stdin"` + `command: "opencode run --model <provider>/<id> --agent plan"` を書く (`--agent plan` が read-only を担保する)。使えるモデルは `opencode models` で確認し、無ければ configs.jsonc に足して `make opencode-global` を回す。編集はレポ側のファイルに対して行い、コミットする (シンボリックリンクなのでどちらのパスを編集しても実体は同じ)。
+討論者の追加・無効化は fusion-review の llms.json に対して行う (手順は fusion-review の SKILL.md)。fusion-review のレビュアーも同時に変わる。
 
 ## 実行手順
 
 ### 1. 設定を読む
 
-`~/.claude/skills/discussion/llms.json` を Read し、`enabled: true` のLLMだけを討論者にする。0個ならその旨を伝えて終了する。討論者が1人でも進行するが、対立が構造的に生まれないため「討論」ではなく単独意見の整理になる。
+`~/.claude/skills/fusion-review/llms.json` を Read し、`enabled: true` かつ `schema: "stdin"` のLLMだけを討論者にする。0個ならその旨を伝えて終了する。討論者が1人でも進行するが、対立が構造的に生まれないため「討論」ではなく単独意見の整理になる。
 
 ### 2. 議題を決める
 
@@ -253,12 +255,12 @@ cd <tmp>/discussion-wt && cat <tmp>/r1-prompt.md | timeout <timeout_ms/1000>s <c
 **出力へのメタ情報混入は禁止 (fusion-review と同じ方針)**: 最終出力 (`conclusion.md` / チャットの報告文) に次を一切含めない:
 
 - スキル名・手法名 (「discussion」「ディスカッション」「討論」「マルチモデル」「モデレータ」等)
-- 討論者名 — llms.json の有効なエントリの `name` / `label`
+- 討論者名 — 討論者にしたエントリの `name` / `label`
 - 参加人数 (「N人」「3モデル中2」)・合意状況 (「全員一致」「N対M」「単独意見」)
 - モデル間の対立の記述 (「AはXと言ったがBはY」)
 - 複数参加者の存在を匂わせる表現
 
-書き出し前に、上記の語と llms.json の有効エントリ全ての `name` / `label` で最終出力を grep し、1件でもヒットしたら書き直す。中間成果物 (`r1-*`, `map.md`, `r2-*`, `draft.md`, `r3-*`) にはこれらの情報を書いてよい。
+書き出し前に、上記の語と討論者にしたエントリ全ての `name` / `label` で最終出力を grep し、1件でもヒットしたら書き直す。中間成果物 (`r1-*`, `map.md`, `r2-*`, `draft.md`, `r3-*`) にはこれらの情報を書いてよい。
 
 ### 12. 後片付け
 
@@ -275,4 +277,4 @@ git worktree remove --force <tmp>/discussion-wt
 - **read-only**: 外部LLMにファイルを書かせない。llms.json の command は read-only 前提のフラグを維持する
 - **コスト**: 呼ぶたびに (討論者数 × 3ラウンド) 分の API 料金が発生する。意見が割れる議題に絞る
 - **モデレータの独立性**: 自分の結論を1周目のプロンプトに混ぜない。2周目の問いも結論を誘導しない (判断材料の確認に留める)
-- **設定変更はレポ側で**: llms.json を `~/.claude/skills/` 配下の別ファイルとして作り直さない (Git 管理から外れる)
+- **設定変更はレポ側で**: fusion-review の llms.json を `~/.claude/skills/` 配下の別ファイルとして作り直さない (Git 管理から外れる)。discussion 専用の llms.json も作らない (fusion-review と討論者がずれる)
