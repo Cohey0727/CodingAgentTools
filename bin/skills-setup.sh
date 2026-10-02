@@ -14,6 +14,9 @@
 #   existing real file/directory  -> skipped, never overwritten
 #   nothing there                 -> created
 #
+# In OpenCode's command and plugin directories, a symlink that still points
+# somewhere outside this repo is someone else's, and is skipped as well.
+#
 # A skill named in bin/removed-skills.txt gets its symlink deleted instead, so
 # a rename or removal there does not leave a dangling link behind.
 
@@ -85,7 +88,7 @@ install_opencode() { # OpenCode's global slash commands and plugins
   dir=$(opencode_command_dir)
   mkdir -p "$dir"
   while IFS= read -r name; do
-    link_item "$OPENCODE_SRC/command/$name" "$dir/$name" "command/$name"
+    link_opencode_item "$OPENCODE_SRC/command/$name" "$dir/$name" "command/$name"
   done < <(opencode_command_names)
 
   dir=$(opencode_plugin_dir)
@@ -96,8 +99,19 @@ install_opencode() { # OpenCode's global slash commands and plugins
     if [ -f "$dir/$name" ] && [ ! -L "$dir/$name" ] && shim_from_repo "$dir/$name"; then
       rm "$dir/$name"
     fi
-    link_item "$OPENCODE_SRC/plugin/$name" "$dir/$name" "plugin/$name"
+    link_opencode_item "$OPENCODE_SRC/plugin/$name" "$dir/$name" "plugin/$name"
   done < <(opencode_plugin_names)
+}
+
+link_opencode_item() { # <src> <target> <label> — link_item, leaving a live
+                       # symlink that points outside this repo alone
+  if [ -L "$2" ] && [ -e "$2" ] && ! linked_to_repo "$2"; then
+    N_SKIPPED=$((N_SKIPPED + 1))
+    printf '  %s⚠%s %-30s %sskipped — links somewhere else%s\n' \
+      "$YLW" "$RST" "$3" "$YLW" "$RST"
+    return 0
+  fi
+  link_item "$@"
 }
 
 install_pi() { # pi's global extensions and subagent definitions
