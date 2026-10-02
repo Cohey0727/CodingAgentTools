@@ -50,8 +50,12 @@ provider に新しい属性が要るなら、順序は必ずこう:
 `bin/style-check.sh` が禁止語を `configs.jsonc` から生成して、実行されるファイルを
 走査する。禁止語リストは script に書かれていない —
 `bin/models.py vocabulary` が `configs.jsonc` から作るので、provider を足せば
-その名前が自動的に禁止語になる。3 文字以下の provider 名は、値として使われた
-形（引用符や `=` の右）でのみ検出する。
+その名前が自動的に禁止語になる。`${VAR:-fallback}` は、検査するシェルの環境に
+関係なく fallback の値で数える。3 文字以下の provider 名と、機構が別の意味で使う
+語と同じ綴りの provider 名（`local` `default` `small` `main` `command` `exec`
+`name`）は、値として使われた形（引用符や `=` の右）でのみ検出する。3 文字以下の
+モデル id・endpoint・route id と、タグと同じ綴りのモデル id `default` は、一般語と
+区別できないので禁止語にしない。
 
 走査対象はこのレポの機構 — `bin/` `Makefile` `lefthook.yml` `opencode/` `pi/`
 `.claude/*.json` — と staged の新規ファイル。`README.md` / `docs/` /

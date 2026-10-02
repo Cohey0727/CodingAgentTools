@@ -431,7 +431,8 @@ def vocabulary():
         words.update(model["id"] for model in config["models"])
         words.add(config["base_url"])
         words.update(f"{name}-{api}" for api in config["apis"])
-    # A name shorter than this cannot be searched for without matching prose.
+    # A name shorter than this cannot be searched for without matching prose,
+    # and "default" is a tag every provider carries as well as a model id.
     return "\n".join(sorted(w for w in words if len(w) >= 4 and w != "default"))
 
 
