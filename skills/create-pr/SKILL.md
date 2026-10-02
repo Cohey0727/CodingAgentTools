@@ -45,8 +45,7 @@ git remote -v
 
 **汎用ブランチにいる場合:**
 
-1. 変更内容
-   db/artifact-status-migrationを `git diff` と `git diff --cached` で分析する
+1. 変更内容を `git diff` と `git diff --cached` で分析する
 2. 変更内容に基づいて適切なブランチ名を自動生成する:
    - フォーマット: `<type>/<短い説明>`
    - type: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`
@@ -66,27 +65,29 @@ git checkout -b feat/add-user-auth
 
 **汎用ブランチでない場合:** そのまま続行する。
 
-### Step 3: Commit Changes
+### Step 3: Verify Branch and Commit
 
-`/commit` スキルを呼び出してコミットを実行する。
-
-`/commit` が失敗またはユーザーがキャンセルした場合はワークフローを停止する。
-
-### Step 4: Verify Branch and Push
-
-プッシュ前に現在のブランチが汎用ブランチでないことを再確認する:
+`/commit` はコミットの直後にプッシュまで行う。呼び出す前に、現在のブランチが汎用ブランチでないことを再確認する:
 
 ```bash
 CURRENT=$(git branch --show-current)
 ```
 
-汎用ブランチ（main, master, develop, development, staging, release）の場合はプッシュを中止し、ユーザーに報告する。
+汎用ブランチ（main, master, develop, development, staging, release）の場合はワークフローを中止し、ユーザーに報告する。
 
-安全が確認できたらリモートにプッシュする:
+安全が確認できたら `/commit` スキルを呼び出してコミットとプッシュを実行する。
+
+`/commit` が失敗またはユーザーがキャンセルした場合はワークフローを停止する。
+
+### Step 4: Verify Push
+
+`/commit` がプッシュまで済ませている。upstream があり、プッシュしていないコミットが残っていないことを確認する:
 
 ```bash
-git push -u origin $(git branch --show-current)
+git status -sb
 ```
+
+残っていれば `git push -u origin $(git branch --show-current)` でプッシュする。失敗したら理由をユーザーに報告して停止する。
 
 ### Step 5: Detect PR Template
 
@@ -202,8 +203,8 @@ PRタイトル・本文・コミットメッセージの記述言語は、明示
 ```
 1. Branch: main (generic branch)
 2. Diff analysis → auto create branch: feat/add-password-reset
-3. /commit → "feat: パスワードリセット機能を追加 @feat/add-password-reset"
-4. Verify branch is not generic → push
+3. Verify branch is not generic → /commit → "feat: パスワードリセット機能を追加 @feat/add-password-reset" (pushed)
+4. Verify push
 5. PR template found → .github/pull_request_template.md
 6. No existing PR → proceed
 7. Collect diff and commits against base
@@ -216,8 +217,8 @@ PRタイトル・本文・コミットメッセージの記述言語は、明示
 ```
 1. Branch: feat/user-auth (not a generic branch)
 2. Continue as-is
-3. /commit → "fix: トークン検証のエッジケースを修正 @feat/user-auth"
-4. Verify branch → push
+3. Verify branch → /commit → "fix: トークン検証のエッジケースを修正 @feat/user-auth" (pushed)
+4. Verify push
 5. PR already exists → notify user, skip PR creation
 6. Done
 ```
@@ -227,8 +228,8 @@ PRタイトル・本文・コミットメッセージの記述言語は、明示
 ```
 1. Branch: feat/user-auth (not a generic branch)
 2. Continue as-is
-3. /commit → "feat: ユーザー認証を実装 @feat/user-auth"
-4. Verify branch → push
+3. Verify branch → /commit → "feat: ユーザー認証を実装 @feat/user-auth" (pushed)
+4. Verify push
 5. No PR template → use default format
 6. No existing PR → proceed
 7. Collect diff and commits

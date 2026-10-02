@@ -144,7 +144,7 @@
 
       "commandcode": {
         "API_KEY": "${COMMAND_CODE_API_KEY}",
-        "BASE_URL": "https://api.commandcode.ai/provider",
+        "BASE_URL": "${COMMAND_CODE_BASE_URL:-https://api.commandcode.ai/provider}",
         // Claude is served only on /messages and everything else only on
         // /chat/completions; the wrong one answers 400.
         "api": "openai",

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Terminal output shared by every script under bin/. Sourced, never executed.
 
-# Colors only on a TTY, and never when NO_COLOR is set.
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
   B=$'\033[1m'; DIM=$'\033[2m'; GRN=$'\033[32m'; YLW=$'\033[33m'; CYN=$'\033[36m'; RST=$'\033[0m'
 else

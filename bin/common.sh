@@ -406,9 +406,8 @@ headers_json() { # <ref fn> -> `"Name": "<ref>"` members, comma-separated; empty
 secret_command() { # <variable name> [<fallback>] -> a command that prints the
                    # value at the time it runs, so a generated config can carry
                    # the reference rather than the secret. The fallback goes in
-                   # as a bare word, so a value that would need quoting inside
-                   # the single-quoted command is refused; the caller writes the
-                   # resolved literal instead.
+                   # as a bare word: models.py refuses a configs.jsonc whose
+                   # fallback is anything else, and so does this.
   case ${2:-} in
     '') printf "bash -c '. %s; env_value %s'" "$COMMON_DIR/common.sh" "$1" ;;
     *[!A-Za-z0-9._:/-]*) return 1 ;;
@@ -431,12 +430,16 @@ crush_secret_ref() { # <variable name> [<fallback>] -> the substitution Crush ru
   printf '$(%s)' "$command"
 }
 
-route_id() { # [<api>] -> "<provider>-<api>", the id every generated config files
-             # one route under (the resolved route's api by default). Each CLI
-             # ships a catalog of its own and merges or refuses an entry whose
-             # id matches one there, so the suffix also keeps a provider apart
-             # from a catalog entry of the same name.
-  printf '%s-%s' "$M_NAME" "${1:-$M_API}"
+route_id() { # [<api>] -> the id every generated config files the route of that
+             # api under (the resolved route's by default), as models.py builds it
+  local api=${1:-$M_API} pair
+  for pair in $M_ROUTE_IDS; do
+    if [ "${pair%%=*}" = "$api" ]; then
+      printf '%s' "${pair#*=}"
+      return 0
+    fi
+  done
+  return 1
 }
 
 pi_provider_json() { # <apiKey reference> [<header ref fn>] — one models.json

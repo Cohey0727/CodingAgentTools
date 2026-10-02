@@ -8,11 +8,6 @@
 # Comments count. A comment naming a model goes stale the moment configs.jsonc
 # changes, and it teaches the next reader the wrong place to look.
 #
-# A provider NAME is refused only in this repo's own machinery. A skill config
-# names a provider to select one as a reviewer or a target; that is its job, and
-# it holds no provider knowledge — the model id and the endpoint still come from
-# configs.jsonc. Everything else in the vocabulary is refused everywhere.
-#
 # A line that genuinely has to carry one ends with "style-check: allow".
 
 set -uo pipefail
@@ -34,17 +29,19 @@ tracked_and_staged() {
   {
     git -C "$ROOT" ls-files -- "$@"
     git -C "$ROOT" diff --cached --name-only --diff-filter=A -- "$@"
-  } | sort -u | grep -v -E '^bin/opencode-lean-prompt\.md$'
+  } | sort -u
 }
 
-vocabulary=$("$PYTHON" "$ROOT/bin/models.py" vocabulary) || exit 1
+# An empty environment, so a "${VAR:-fallback}" counts as its fallback — what
+# configs.jsonc itself says — whatever the shell running the check exports.
+vocabulary=$(env -i PATH="$PATH" "$PYTHON" "$ROOT/bin/models.py" vocabulary) || exit 1
 [ -n "$vocabulary" ] || exit 0
 
 report() { # <file> <grep output>
   local hit
   while IFS= read -r hit; do
     [ -n "$hit" ] || continue
-    case $hit in *'style-check: allow'*) continue ;; esac
+    case $hit in *'style-check: allow') continue ;; esac
     printf '%s\t%s\n' "$1" "${hit%%:*}"
   done
 }
@@ -61,14 +58,19 @@ while IFS= read -r word; do
   done < <(scanned)
 done <<<"$vocabulary"
 
-# Provider names, in the machinery only. A name too brief to grep for on its own
-# is still refused where it is used as a value — quoted, or after "=".
+# Provider names, in the machinery only. A name too brief to grep for on its
+# own, or spelled like a word the machinery uses for something else — a shell
+# builtin, a tag, a role, a field — is refused where it is used as a value:
+# quoted, or after "=".
 while IFS= read -r name; do
   [ -n "$name" ] || continue
-  case $name in local|default|small|main|command|exec|name) continue ;; esac
+  case $name in
+    local|default|small|main|command|exec|name) as_value=1 ;;
+    *) as_value=$(( ${#name} < 4 )) ;;
+  esac
   while IFS= read -r file; do
     [ -f "$ROOT/$file" ] || continue
-    if [ "${#name}" -lt 4 ]; then
+    if [ "$as_value" = 1 ]; then
       report "$file" < <(grep -En -- "[\"'=]${name}([^A-Za-z0-9_-]|\$)" "$ROOT/$file" 2>/dev/null)
     else
       report "$file" < <(grep -Fn -- "$name" "$ROOT/$file" 2>/dev/null)

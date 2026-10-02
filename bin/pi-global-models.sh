@@ -32,8 +32,7 @@ if [ -f "$OUT" ] && ! generated_here "$OUT"; then
 fi
 
 # A value configs.jsonc points at a variable for is referenced, never copied. One
-# written literally there, or whose fallback cannot be a bare word in the
-# command, is already in git, so it is passed through resolved.
+# written literally there is already in git, so it is passed through as written.
 pi_api_key_ref() {
   if [ -n "$M_API_KEY_VAR" ] && pi_secret_ref "$M_API_KEY_VAR" "$M_API_KEY_FALLBACK"; then
     return 0
@@ -98,14 +97,18 @@ echo "  Wrote $OUT (${#entries[@]} providers)"
 # top-level pi.overrides is merged in after them, so its keys win.
 settings="$AGENT_DIR/settings.json"
 if command -v python3 >/dev/null 2>&1; then
-  python3 - "$settings" "$start_provider" "$start_model" <<'EOF'
+  if python3 - "$settings" "$start_provider" "$start_model" <<'EOF'
 import json, os, sys
 path, provider, model = sys.argv[1:4]
 try:
     with open(path) as f:
         data = json.load(f)
-except (FileNotFoundError, ValueError):
+except FileNotFoundError:
     data = {}
+except ValueError as exc:
+    print(f"  {path} is not valid JSON ({exc}) — left as it is, so pi keeps its"
+          " startup model; fix it and re-run 'make pi-global'", file=sys.stderr)
+    sys.exit(1)
 data["defaultProvider"] = provider
 data["defaultModel"] = model
 tmp = path + ".tmp"
@@ -114,10 +117,12 @@ with open(tmp, "w") as f:
     f.write("\n")
 os.replace(tmp, path)
 EOF
-  merged=$("$PYTHON" "$ROOT/bin/models.py" pi-merge <"$settings")
-  printf '%s\n' "$merged" >"$settings.tmp" && mv "$settings.tmp" "$settings"
-  startup=$("$PYTHON" -c 'import json, sys; d = json.load(open(sys.argv[1])); print(d.get("defaultProvider"), d.get("defaultModel"), sep="/")' "$settings")
-  echo "  Set pi's startup model to $startup"
+  then
+    merged=$("$PYTHON" "$ROOT/bin/models.py" pi-merge <"$settings")
+    printf '%s\n' "$merged" >"$settings.tmp" && mv "$settings.tmp" "$settings"
+    startup=$("$PYTHON" -c 'import json, sys; d = json.load(open(sys.argv[1])); print(d.get("defaultProvider"), d.get("defaultModel"), sep="/")' "$settings")
+    echo "  Set pi's startup model to $startup"
+  fi
 else
   echo "  pi's startup model needs python3 — pick it with /model then Ctrl+S" >&2
 fi
