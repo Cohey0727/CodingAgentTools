@@ -31,14 +31,11 @@ gh pr view <url> --json number,url,headRefName,baseRefName,title,state
 
 **何も指定されていない場合:**
 
-直前に作成したPRを対象とする:
+現在のブランチのPRを対象とする:
 
 ```bash
 # 現在のブランチのPRを確認
 gh pr view --json number,url,headRefName,baseRefName,title,state 2>/dev/null
-
-# なければ最新のPRを取得
-gh pr list --author "@me" --state open --limit 1 --json number,url,headRefName,baseRefName,title
 ```
 
 PRが見つからない場合はユーザーに通知して終了する。
@@ -46,21 +43,26 @@ PRがクローズ済みまたはマージ済みの場合はその旨を伝えて
 
 ### Step 2: Checkout PR Branch
 
-PRのブランチに切り替える（まだの場合）:
+PRのブランチにいなければ切り替える。確認・切り替え・pull は、それぞれ結果を見てから次に進む:
 
-```bash
-CURRENT=$(git branch --show-current)
-PR_BRANCH=<headRefName from Step 1>
+1. 現在のブランチと未コミットの変更を確認する:
 
-if [ "$CURRENT" != "$PR_BRANCH" ]; then
-  # 未コミットの変更を先に確認する
-  git status --porcelain
+   ```bash
+   git branch --show-current
+   git status --porcelain
+   ```
 
-  # 変更がなければチェックアウト
-  git checkout "$PR_BRANCH"
-  git pull origin "$PR_BRANCH"
-fi
-```
+2. 現在のブランチが Step 1 の `headRefName` と違い、未コミットの変更も無ければ切り替える:
+
+   ```bash
+   git checkout <headRefName>
+   ```
+
+3. 切り替えたブランチで、引数なしで pull する:
+
+   ```bash
+   git pull
+   ```
 
 **重要:** 未コミットの変更がある場合は、チェックアウトの前にユーザーに通知してスタッシュまたはコミットを提案する。変更を失わないよう、必ずチェックアウト前に確認する。
 

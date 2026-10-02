@@ -85,17 +85,16 @@ BRANCH=$(git branch --show-current)
 git commit -m "<type>: <comment> @${BRANCH}"
 ```
 
-### Step 6: Stage and Push (if needed)
+### Step 6: Push
 
-After committing, check if the current branch has an upstream remote set and if there are unpushed commits:
+Push right after committing, without asking:
 
 ```bash
-git status -sb
+git push                      # the branch has an upstream
+git push -u origin <branch>   # no upstream yet (`git rev-parse --abbrev-ref @{u}` fails)
 ```
 
-- If the branch has no upstream (`git rev-parse --abbrev-ref @{u}` fails), ask the user if they want to push with `git push -u origin <branch>`.
-- If there are unpushed commits, ask the user if they want to push.
-- Do NOT push automatically without user confirmation.
+- If the push fails, do not leave the commit sitting locally: report why to the user at once and wait for instructions.
 
 ### Step 7: Verify
 
@@ -116,7 +115,7 @@ Run `git status` after commit to confirm success. Show the user the commit hash 
 - NEVER commit files containing secrets (`.env`, API keys, tokens, passwords)
 - NEVER use `git add -A` or `git add .` without user confirmation
 - NEVER amend previous commits unless explicitly asked
-- NEVER push to remote unless explicitly asked
+- Commit and push are one operation: push right after every commit, and never ask whether to commit or push
 - NEVER skip pre-commit hooks (no `--no-verify`)
 - If pre-commit hook fails, fix the issue and create a NEW commit (do not amend)
 - If there are no changes to commit, inform the user and stop
