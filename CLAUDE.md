@@ -21,15 +21,17 @@
 
 **agent / CLI レベルの具象は直書きしてよい。** 次はすべて許される:
 
-- `configs.jsonc` の `agents` セクションそのもの（provider 名を除く全部）
+- `configs.jsonc` の `opencode` / `pi` セクション（各 CLI の設定へ最後に
+  deep-merge する `overrides`）そのもの
 - 各 CLI の設定ディレクトリ・ファイル名・環境変数（`bin/common.sh`）
 - 各 CLI の設定ファイルのキー名や記法。`bin/opencode-global-config.sh` は
   OpenCode の設定を書くための script なので、その形式はそこの主題であって
   隠れた設定ではない
 - agent 名で引くテーブル（`bin/skills-common.sh`）、agent ごとの make ターゲット
 
-agent は 3 つで、CLI ごとに generator が 1 本ずつある。そこを抽象化しても
-読みにくくなるだけで、`configs.jsonc` が単一の真実である性質は変わらない。
+generator は CLI ごとに 1 本ずつある（pi / OpenCode / Crush / Reasonix /
+Codewhale / DeepSeek Harness）。そこを抽象化しても読みにくくなるだけで、
+`configs.jsonc` が単一の真実である性質は変わらない。
 
 ### provider の値をどう取るか
 
@@ -38,13 +40,13 @@ agent は 3 つで、CLI ごとに generator が 1 本ずつある。そこを�
 | モデル id（`<route id>/<model>`） | `bin/model-ref.sh <provider> [main\|small]` |
 | route id | `models_resolve` の後に `route_id [<api>]`（`M_ROUTE_IDS` を引く） |
 | provider ごとの値 | `models_resolve <provider> [<api>]` → `M_*` |
-| agent ごとの値 | `settings_resolve <agent>` → `S_*` |
-| provider / agent の一覧 | `provider_names` / `agent_names` |
+| agent ごとの上書き | `models.py opencode-merge` / `pi-merge`（`<agent>.overrides`） |
+| provider の一覧 | `provider_names` |
 
 provider に新しい属性が要るなら、順序は必ずこう:
 
 1. `configs.jsonc` にキーを足す
-2. `bin/models.py` が検証して `M_*` / `S_*` に載せる
+2. `bin/models.py` が検証して `M_*` に載せる
 3. shell 側はその変数を読むだけ
 
 ### 強制
@@ -61,8 +63,9 @@ provider に新しい属性が要るなら、順序は必ずこう:
 
 走査対象はこのレポの機構 — `bin/` `Makefile` `lefthook.yml` `opencode/` `pi/`
 `.claude/*.json` — と staged の新規ファイル。`README.md` / `docs/` /
-`AGENTS.md` は provider を説明するのが役割、`skills/` は使いたい provider を
-名指しするのが役割なので、どちらも対象外。
+`AGENTS.md` / `.env.example` は provider を説明するのが役割（`.env.example` は
+`configs.jsonc` が参照する変数と、各鍵の取得 URL の置き場所）、`skills/` は
+使いたい provider を名指しするのが役割なので、どちらも対象外。
 
 `lefthook` の pre-commit が `make check` を回す。違反があるとコミットできない
 （`make hooks` で導入）。
