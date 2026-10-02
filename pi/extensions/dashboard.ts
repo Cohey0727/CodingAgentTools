@@ -186,8 +186,6 @@ export default function dashboard(pi: ExtensionAPI) {
 			}
 		}
 
-		// An active /goal objective wins, then the session name, then the
-		// first prompt on this branch.
 		const topic = goal ?? (name ? { text: name, source: "name" as const } : firstPrompt);
 		snapshot = { totals, topic };
 		snapshotKey = key;

@@ -95,7 +95,7 @@ install_opencode() { # OpenCode's global slash commands and plugins
   mkdir -p "$dir"
   while IFS= read -r name; do
     # v2 plugins need no npm imports, so they are linked like the commands; a
-    # v1-era shim this repo generated is replaced by the link.
+    # plugin shim generated from this repo (shim_from_repo) is replaced by the link.
     if [ -f "$dir/$name" ] && [ ! -L "$dir/$name" ] && shim_from_repo "$dir/$name"; then
       rm "$dir/$name"
     fi

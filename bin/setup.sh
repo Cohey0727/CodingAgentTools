@@ -130,10 +130,9 @@ sync_env_keys() { # append variables added to .env.example since .env was writte
   rm -f "$tmp"
 }
 
-# The layout before configs.jsonc kept one .env per provider, holding the key as
-# API_TOKEN and any extra headers as "Name: Value" lines in HEADERS. Values
-# still sitting there are moved into the single .env, once, and only into
-# variables that are still empty.
+# providers/<name>/.env, where one exists, holds the key as API_TOKEN and any
+# extra headers as "Name: Value" lines in HEADERS. Those values are moved into
+# the single .env once, and only into variables that are still empty.
 raw_headers() { # <old provider .env> -> its HEADERS value, one "Name: Value" per
                 # line, quotes removed and any $(...) left unevaluated
   awk '

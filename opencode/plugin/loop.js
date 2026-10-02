@@ -148,7 +148,6 @@ function parseArguments(raw) {
   let timeoutMs = null
   let everyMs = null
 
-  // A leading duration is the omitted --every: `/loop 5m <task>`.
   const leading = parseDuration(rest[0])
   if (leading !== null) {
     everyMs = leading

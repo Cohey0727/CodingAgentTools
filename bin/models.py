@@ -200,7 +200,6 @@ def agent_overrides(agent):
 
 
 def deep_merge(base, overrides):
-    """base with overrides laid over it: objects merge key by key, anything else is replaced."""
     merged = dict(base)
     for key, value in overrides.items():
         if isinstance(value, dict) and isinstance(merged.get(key), dict):
@@ -350,7 +349,6 @@ def load(name):
 
 
 def route_models(config, api):
-    """The provider's models, or only those spoken to over api when one is given."""
     if not api:
         return config["models"]
     if api not in config["apis"]:
