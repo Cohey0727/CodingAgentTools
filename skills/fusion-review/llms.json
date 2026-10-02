@@ -23,7 +23,7 @@
     {
       "name": "qwen-max-go",
       "label": "Qwen3.8-Max (OpenCode Go)",
-      "enabled": true,
+      "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model opencode-go/qwen3.8-max --agent plan",
       "timeout_ms": 1200000,
@@ -32,7 +32,7 @@
     {
       "name": "glm-flash-go",
       "label": "Zhipu AI GLM-5.3 Flash (OpenCode Go)",
-      "enabled": true,
+      "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model opencode-go/glm-5.3-flash --agent plan",
       "timeout_ms": 1200000,
