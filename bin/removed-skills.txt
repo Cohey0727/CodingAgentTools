@@ -2,6 +2,8 @@
 # `make setup-skills` deletes the symlink each name left behind in
 # <root>/skills/ (~/.claude and ~/.agents) when the link points back here.
 # Add the old name whenever a skill is removed or renamed.
+ask-mmx
+codex
 dev-hotl
 dev-issue-create
 dev-issue-implement
@@ -9,7 +11,10 @@ dev-issue-review
 dev-pr-review
 dev-pr-review-resolve
 evidence-redteam
+funsion-review
 git-workflow
 google-calendar
+read-aloud
 resolve-conflict
+resolve-review
 semantic-stacked-pr
