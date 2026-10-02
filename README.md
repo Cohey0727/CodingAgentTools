@@ -554,6 +554,13 @@ git-tracked file.
 A provider whose `API_KEY` resolves to nothing is left out of every generated
 config rather than breaking it.
 
+`API_KEY` and each `REQUEST_HEADERS` value travel into the generated configs as
+references, so each is one reference standing alone — a header value may be a
+plain literal instead — and its fallback uses only letters, digits and `.` `_`
+`:` `/` `-`, since the generated command takes it as a bare word. `make check`
+refuses anything else: a reference inside a longer string, or a fallback that
+needs quoting, would leave a generator nothing to write but the resolved secret.
+
 `//` line comments are allowed, so the constraints behind a value can sit next
 to it. Every model listed is offered by OpenCode's `/models` and pi's `/model`,
 whether or not it carries a tag.
@@ -581,7 +588,7 @@ an error rather than a label — `make setup` refuses to install until it is fix
 | `api` | `"anthropic"` or `"openai"` — overrides the provider's `api` for this model |
 | `tags` | Which slots this model fills; see [Tags](#tags) |
 | `context_window`, `max_tokens` | **Required.** Every generated config carries them — pi otherwise assumes 128k / 16k, and OpenCode never compacts a session on a model without a context limit |
-| `reasoning`, `input` | Whether the model supports extended thinking (default `true`) and what it accepts (`["text"]` or `["text", "image"]`) |
+| `reasoning`, `input` | Whether the model supports extended thinking (`true` or `false`, default `true`) and what it accepts (`["text"]` or `["text", "image"]`) |
 
 `defaults` at the top level supplies any of these but `id`, `api` and `tags` to
 every model that does not set it itself.
@@ -595,11 +602,11 @@ models speak, as the route `<name>-<api>`; `make list` prints the name.
 | Field | Meaning |
 |-------|---------|
 | `label` | Leads each model's name in OpenCode's model dialog (`DeepSeek deepseek-v4-pro`), which tells providers sharing a heading apart, names the route in DeepSeek Harness, and is the provider's id in pi. Omit it where the heading already says whose models they are |
-| `API_KEY` | **Required.** A `${VAR}` reference to the key |
+| `API_KEY` | **Required.** A `${VAR}` reference to the key, standing alone |
 | `BASE_URL` | **Required.** The root both APIs hang off — `/v1/messages` or `/v1/chat/completions` is appended — as `${VAR:-default}` so `.env` can route it elsewhere |
 | `api` | **Required.** `"anthropic"` (Anthropic Messages) or `"openai"` (OpenAI Chat Completions): what every model speaks unless it sets its own. May be a `${VAR:-default}` reference where the shape depends on the route, as `gtr`'s does |
 | `catalog` | Path GET with `BASE_URL` listing the provider's models, in OpenAI's `/v1/models` shape. `make update` rewrites the provider's `models` from it, so a provider with one is not maintained by hand |
-| `REQUEST_HEADERS` | Extra request headers as a `{ "Name": "value" }` object, sent by every CLI — e.g. a Cloudflare Access service token in front of a self-hosted server. A value written as `${VAR}` is referenced wherever the CLI's format can express a reference |
+| `REQUEST_HEADERS` | Extra request headers as a `{ "Name": "value" }` object, sent by every CLI — e.g. a Cloudflare Access service token in front of a self-hosted server. A value is a literal or one `${VAR}` reference standing alone, and a reference is carried wherever the CLI's format can express one |
 | `primary` | `true` on at most one provider — the one every generated config starts on |
 | `picker` | `false` keeps the provider out of the checkbox list `make setup` starts from — configure it by naming it directly (`bin/setup.sh <name>`). A key that resolves still registers it like any other provider |
 | `opencode.lean` | `true` gives the provider [a lean agent of its own](#lean-agents) |

@@ -53,6 +53,10 @@ AGENT_ROOT_KEYS = {"overrides"}
 
 REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
 
+# A fallback that travels with a reference goes into the command a generated
+# config runs as a bare word (secret_command in bin/common.sh).
+BARE_WORD = re.compile(r"[A-Za-z0-9._:/-]*")
+
 
 class ConfigError(Exception):
     pass
@@ -106,6 +110,24 @@ def sole_reference(value):
     """
     match = REFERENCE.fullmatch(value or "")
     return (match.group(1), match.group(2) or "") if match else ("", "")
+
+
+def carried_reference(where, value):
+    """(variable, fallback) of a value the generators carry by reference, or
+    ("", "") for a literal.
+
+    A reference inside a longer string, or one whose fallback is not a bare word,
+    cannot be carried, and the generators would copy the resolved value — a
+    secret from .env — into their configs instead.
+    """
+    if not isinstance(value, str):
+        raise ConfigError(f"{where} must be a string")
+    var, fallback = sole_reference(value)
+    if not var and REFERENCE.search(value):
+        raise ConfigError(f"{where}: a ${{NAME}} reference must be the whole value")
+    if not BARE_WORD.fullmatch(fallback):
+        raise ConfigError(f"{where}: the fallback {fallback!r} may only use letters, digits and . _ : / -")
+    return var, fallback
 
 
 def _check_keys(where, obj, allowed):
@@ -190,7 +212,13 @@ def deep_merge(base, overrides):
 
 def primary_provider():
     """The provider marked "primary" — the one every generated config starts on."""
-    marked = [name for name, raw in load_file().items() if raw.get("primary")]
+    marked = []
+    for name, (heading, raw) in sections().items():
+        primary = raw.get("primary", False)
+        if not isinstance(primary, bool):
+            raise ConfigError(f"{CONFIGS}: providers.{heading}.{name}: primary must be a boolean")
+        if primary:
+            marked.append(name)
     if len(marked) > 1:
         raise ConfigError(
             f"{CONFIGS}: more than one provider is primary ({', '.join(marked)})"
@@ -233,13 +261,23 @@ def load(name):
         raise ConfigError(f"{where}: REQUEST_HEADERS must be an object")
     headers = []
     for key, value in headers_raw.items():
-        var, fallback = sole_reference(value)
+        var, fallback = carried_reference(f"{where}: REQUEST_HEADERS.{key}", value)
         headers.append({"name": key, "var": var, "fallback": fallback, "value": expand(value)})
 
     defaults = raw.get("defaults") or {}
     _check_keys(f"{where}.defaults", defaults, MODEL_KEYS - {"id", "api", "tags"})
     opencode = raw.get("opencode") or {}
+    if not isinstance(opencode, dict):
+        raise ConfigError(f"{where}: opencode must be an object")
     _check_keys(f"{where}.opencode", opencode, OPENCODE_KEYS)
+    lean = opencode.get("lean", False)
+    if not isinstance(lean, bool):
+        raise ConfigError(f"{where}.opencode: lean must be a boolean")
+    opencode_caps = {
+        key: _int(f"{where}.opencode", opencode[key], key)
+        for key in ("context_window", "max_tokens")
+        if key in opencode
+    }
 
     entries = raw.get("models")
     if not isinstance(entries, list) or not entries:
@@ -260,6 +298,9 @@ def load(name):
         tags = merged.get("tags") or []
         if not isinstance(tags, list):
             raise ConfigError(f"{at}: tags must be an array")
+        reasoning = merged.get("reasoning", True)
+        if not isinstance(reasoning, bool):
+            raise ConfigError(f"{at}: reasoning must be a boolean")
         input_kinds = merged.get("input", ["text"])
         if not isinstance(input_kinds, list) or not all(k in ("text", "image") for k in input_kinds):
             raise ConfigError(f"{at}: input must be an array of \"text\" / \"image\"")
@@ -269,7 +310,7 @@ def load(name):
             "tags": tags,
             "context_window": _int(at, merged.get("context_window"), "context_window"),
             "max_tokens": _int(at, merged.get("max_tokens"), "max_tokens"),
-            "reasoning": bool(merged.get("reasoning", True)),
+            "reasoning": reasoning,
             "input": input_kinds,
         }
         for tag in tags:
@@ -283,21 +324,24 @@ def load(name):
     if "default" not in by_tag:
         raise ConfigError(f"{where}: no model is tagged 'default'")
 
-    api_key_var, api_key_fallback = sole_reference(raw.get("API_KEY") or "")
+    api_key = raw.get("API_KEY", "")
+    api_key_var, api_key_fallback = carried_reference(f"{where}: API_KEY", api_key)
+    if not api_key_var:
+        raise ConfigError(f"{where}: API_KEY must be a ${{NAME}} or ${{NAME:-fallback}} reference")
     return {
         "name": name,
         "section": heading,
         "label": label,
         "picker": picker,
-        "api_key": expand(raw.get("API_KEY") or ""),
+        "api_key": expand(api_key),
         "api_key_var": api_key_var,
         "api_key_fallback": api_key_fallback,
         "base_url": base_url,
         "catalog": catalog,
         "headers": headers,
-        "lean": bool(opencode.get("lean", False)),
-        "opencode_context_window": opencode.get("context_window"),
-        "opencode_max_tokens": opencode.get("max_tokens"),
+        "lean": lean,
+        "opencode_context_window": opencode_caps.get("context_window"),
+        "opencode_max_tokens": opencode_caps.get("max_tokens"),
         "models": models,
         "apis": list(dict.fromkeys(model["api"] for model in models)),
         "default_model": by_tag["default"],
@@ -315,6 +359,16 @@ def route_models(config, api):
             f" (its apis: {', '.join(config['apis'])})"
         )
     return [model for model in config["models"] if model["api"] == api]
+
+
+def route_id(name, api):
+    """The id every generated config files the route of api under.
+
+    Each CLI ships a catalog of its own and merges or refuses an entry whose id
+    matches one there, so the suffix also keeps a provider apart from a catalog
+    entry of the same name.
+    """
+    return f"{name}-{api}"
 
 
 def pi_id(config):
@@ -404,6 +458,7 @@ def shell(config, api=""):
             "\x1f".join((h["name"], h["var"], h["fallback"], h["value"])) for h in config["headers"]
         ),
         "M_APIS": " ".join(config["apis"]),
+        "M_ROUTE_IDS": " ".join(f"{a}={route_id(config['name'], a)}" for a in config["apis"]),
         "M_API": api,
         "M_DEFAULT_MODEL": config["default_model"]["id"],
         "M_DEFAULT_API": config["default_model"]["api"],
@@ -430,7 +485,7 @@ def vocabulary():
         config = load(name)
         words.update(model["id"] for model in config["models"])
         words.add(config["base_url"])
-        words.update(f"{name}-{api}" for api in config["apis"])
+        words.update(route_id(name, api) for api in config["apis"])
     # A name shorter than this cannot be searched for without matching prose,
     # and "default" is a tag every provider carries as well as a model id.
     return "\n".join(sorted(w for w in words if len(w) >= 4 and w != "default"))

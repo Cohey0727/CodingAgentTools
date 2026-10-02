@@ -10,7 +10,8 @@
 - provider 名を、分岐・値・ルックアップのキーとして使うこと
 - モデル id
 - provider の endpoint
-- provider id の組み立て規則（provider 名に接尾辞を足す類）
+- provider id の組み立て規則（provider 名に接尾辞を足す類）。route id と pi の id は、
+  解決機構の `bin/models.py` だけが組み立てる
 - `configs.jsonc` が決めるべき provider 側の既定値（fallback の provider など）
 
 判定基準: **`configs.jsonc` の provider を書き換えたときに、そのファイルが黙って
@@ -35,6 +36,7 @@ agent は 3 つで、CLI ごとに generator が 1 本ずつある。そこを�
 | 欲しいもの | 取り方 |
 |---|---|
 | モデル id（`<route id>/<model>`） | `bin/model-ref.sh <provider> [main\|small]` |
+| route id | `models_resolve` の後に `route_id [<api>]`（`M_ROUTE_IDS` を引く） |
 | provider ごとの値 | `models_resolve <provider> [<api>]` → `M_*` |
 | agent ごとの値 | `settings_resolve <agent>` → `S_*` |
 | provider / agent の一覧 | `provider_names` / `agent_names` |

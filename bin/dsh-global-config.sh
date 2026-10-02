@@ -44,7 +44,7 @@ js_quote() { # <text> -> a double-quoted JavaScript string
 
 header_yaml() { # <header name> -> its value: a `!!js` expression running the
                 # command that prints it, or the literal when configs.jsonc
-                # writes one or its fallback cannot be a bare word in the command
+                # writes one
   local var command
   var=$(header_var "$1")
   if [ -n "$var" ] && command=$(secret_command "$var" "$(header_fallback "$1")"); then

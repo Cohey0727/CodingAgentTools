@@ -28,8 +28,7 @@ if [ -f "$OUT" ] && ! generated_here "$OUT"; then
 fi
 
 # A value configs.jsonc points at a variable for is referenced, never copied. One
-# written literally there, or whose fallback cannot be a bare word in the
-# command, is already in git, so it is passed through resolved.
+# written literally there is already in git, so it is passed through as written.
 crush_api_key() {
   if [ -n "$M_API_KEY_VAR" ] && crush_secret_ref "$M_API_KEY_VAR" "$M_API_KEY_FALLBACK"; then
     return 0
