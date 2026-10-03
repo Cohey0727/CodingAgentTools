@@ -33,6 +33,7 @@ opencode/command/<name>.md       # an OpenCode slash command (none yet), linked 
 opencode/plugin/<name>.js        # an OpenCode plugin, linked into ~/.config/opencode/plugin
 pi/extensions/<name>.ts          # a pi extension, linked into ~/.pi/agent/extensions
 pi/agents/<name>.md              # a pi subagent definition, linked into ~/.pi/agent/agents
+claude/mods/<name>/              # a Claude Code mod (function hooks), loaded with --plugin-dir or CLAUDE_CODE_PLUGIN_DIRS
 configs.jsonc                    # every provider by heading: endpoint, API, models, tags, ${VAR} references (in git)
 .env                             # the values those references point at (gitignored, chmod 600)
 .env.example                     # the same variables, empty (in git)
@@ -412,6 +413,55 @@ Tokens per second is measured from the first streamed token, so waiting for the
 provider does not count. A live estimate shows while a reply streams and the
 provider's own output count replaces it when the reply ends. Replies shorter
 than a couple of dozen tokens leave the last figure in place.
+
+### Claude Code dashboard
+
+`claude/mods/dashboard/` is a Claude Code mod: a plugin of function hooks that
+docks a pane beside the transcript with the session's figures and its to-do
+list. `make setup` does not install it; load it for one session with
+
+```
+claude --plugin-dir claude/mods/dashboard
+```
+
+or for every session by putting the folder's absolute path in
+`CLAUDE_CODE_PLUGIN_DIRS` under `env` in `~/.claude/settings.json`.
+
+| Part | What it shows |
+|------|---------------|
+| Header | Model and effort, session time, git branch with ahead/behind and changed files, lines added and removed, the first prompt |
+| Context | The window as one bar split by content (system prompt, tools, messages, …) with the auto-compact point and the reserve after it, the fill per request, the requests left before auto-compaction, compactions and the tokens they freed |
+| To-do | Progress and each item's time; the item in progress counts up live |
+| Speed | Tokens per second of each response as a braille graph, the average, the peak and the wait for the response to start |
+| Tokens | Cache reads, cache writes, fresh input and output as one bar; the cache hit rate of the last request and of the session, cache misses, how long the cache stays warm while idle; input and output tokens per minute; cost, cost per hour and the last turn's cost |
+| Limits | On a subscription, the 5-hour and 7-day windows: their fill with a cursor where the window's time stands, `◆` ahead of that pace, `◇` behind it, `◈` on it, the reset, and where the window ends up at this pace once that passes 90% |
+| Activity | The running turn and the tools running, model time against tool time, the last 24 tool calls as ✓ or ✗, and calls, failures and average time per tool |
+| Agents, Files | Subagents with their model, time and tokens; the files edited with the lines added and removed |
+
+| Command or key | What it does |
+|----------------|--------------|
+| `/dashboard` | Open or close the pane. It also opens by itself when a session starts in a terminal at least 144 columns wide |
+| `/dashboard reset` | Zero the figures |
+| `1`–`8` in the focused pane (ctrl+x tab) | Fold or unfold a section. Folds are kept for the next session |
+
+While the pane is out of sight its gist stays in the status line. A toast says
+when the context passes 80%, when a rate-limit window passes 75%, 90% and 95%
+(once per window, whichever session sees it), and when the last to-do is done.
+
+The to-do list follows Claude Code's own `TodoWrite` or task tools when the
+session has them; otherwise the mod gives the model a `todo` tool of its own.
+
+Tokens per second runs from the first streamed piece of a response to its end,
+so thinking that streams no visible text counts as generation time rather than
+making the text that follows look fast. The cache is assumed to expire after
+5 minutes until a hit after a longer pause shows a 1-hour TTL. A cache miss is a
+request that wrote back to the cache more than the conversation grew by — at
+least 2,000 tokens and 5% of the prompt, the threshold Claude Code itself uses.
+The figures count from the moment the mod loads, so a resumed session starts
+them at zero.
+
+`claude plugin validate claude/mods/dashboard` and
+`claude plugin test claude/mods/dashboard` check it.
 
 ### Loops in OpenCode
 

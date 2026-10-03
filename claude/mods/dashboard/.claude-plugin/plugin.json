@@ -1,0 +1,6 @@
+{
+  "name": "dashboard",
+  "version": "0.1.0",
+  "description": "A pane with live token usage, tokens/s, context window fill and the session's to-do list",
+  "types": "./types/index.d.ts"
+}

@@ -19,3 +19,7 @@ bin/__pycache__/
 # opencode / commandcode をリポジトリ内で実行したときのローカル状態
 /.opencode/
 /.commandcode/
+
+# What Claude Code lays beside a mod each time it loads one from here
+claude/mods/*/.claude-plugin/types/
+claude/mods/*/tsconfig.json
