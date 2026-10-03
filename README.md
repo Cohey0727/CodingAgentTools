@@ -138,7 +138,8 @@ mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/mig
 [2026-09-18 — pi から OpenCode Zen / Go を使う](docs/migrations/2026-09-18-pi-opencode-auth.md),
 [2026-09-18 — pi の MCP・サブエージェントと起動モデル](docs/migrations/2026-09-18-pi-mcp-subagents.md),
 [2026-09-18 — pi の provider id を label に揃える](docs/migrations/2026-09-18-pi-provider-labels.md),
-and [2026-09-27 — OpenCode v2 移行](docs/migrations/2026-09-27-opencode-v2.md).
+[2026-09-27 — OpenCode v2 移行](docs/migrations/2026-09-27-opencode-v2.md),
+and [2026-10-03 — pi 1.0](docs/migrations/2026-10-03-pi-1.0.md).
 
 ### Make targets
 
@@ -325,7 +326,8 @@ v2-format plugins — see `docs/migrations/2026-09-27-opencode-v2.md`.
 
 ### pi packages
 
-pi keeps its core small and ships no loop of its own, nor subagents or MCP.
+pi keeps its core small and ships no loop of its own, nor subagents. Its
+built-in MCP cannot read OpenCode's servers, so MCP comes from a package too.
 Everything of that kind lives in [pi packages](https://pi.dev/packages), so
 `make setup` installs four of them:
 
@@ -350,12 +352,18 @@ PI_PACKAGES="npm:pi-reactor=/reactor" make setup
 ```
 
 **MCP.** pi runs the same MCP servers as OpenCode. `make pi-global` adds an
-`opencode` import to `~/.pi/agent/mcp.json`, and the adapter reads the `mcp`
-entries of the generated `~/.config/opencode/opencode.json`, which come from
-`opencode.overrides.mcp` in `configs.jsonc`. Parallel Search gives pi web
-search and fetch with no key, and Playwright drives the same persistent
-browser profile. Only one agent at a time can drive that profile. `/mcp` shows
-each server and its tools. Other keys in `mcp.json` are kept.
+`opencode` import to the adapter's `~/.pi/agent/mcp-adapter.json`, and the
+adapter reads the `mcp` entries of the generated
+`~/.config/opencode/opencode.json`, which come from `opencode.overrides.mcp` in
+`configs.jsonc`. Parallel Search gives pi web search and fetch with no key, and
+Playwright drives the same persistent browser profile. Only one agent at a time
+can drive that profile. `/mcp` shows each server and its tools. Other keys in
+`mcp-adapter.json` are kept.
+
+`~/.pi/agent/mcp.json` is pi's built-in MCP config. The adapter replaces the
+built-in: on its first start it adds `"-builtin:mcp"` to `extensions` in pi's
+`settings.json`, and it still reads the servers `pi mcp add` writes to
+`mcp.json`, but ignores an `imports` there.
 
 **Subagents.** The skills written for Claude Code's `Agent` tool, such as
 `deep-review` and `fanout`, run in pi unchanged. The
@@ -964,7 +972,7 @@ npm install -g @earendil-works/pi-coding-agent   # or: curl -fsSL https://pi.dev
 ```
 
 **pi answers `401 ... Your api key: ****f2- is invalid`** — the generated
-`models.json` holds the token as a `!`-prefixed shell command, which pi 0.8x
+`models.json` holds the token as a `!`-prefixed shell command, which pi
 runs at request time. The deprecated `@mariozechner` package (0.73 and older)
 resolves references differently and sends the text itself as the key.
 Install `@earendil-works/pi-coding-agent`.

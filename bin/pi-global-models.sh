@@ -142,9 +142,11 @@ else
 fi
 
 # pi-mcp-adapter reads OpenCode's MCP servers from its generated opencode.json,
-# so configs.jsonc's opencode.overrides.mcp is the one list both CLIs run.
-# Anything else in pi's mcp.json is kept.
-"$PYTHON" - "$AGENT_DIR/mcp.json" <<'EOF'
+# so configs.jsonc's opencode.overrides.mcp is the one list both CLIs run. The
+# import goes in the adapter's own mcp-adapter.json: pi's mcp.json belongs to
+# pi's built-in MCP, and the adapter ignores imports there. Anything else in
+# mcp-adapter.json is kept.
+"$PYTHON" - "$AGENT_DIR/mcp-adapter.json" <<'EOF'
 import json, os, sys
 path = sys.argv[1]
 try:
@@ -161,4 +163,4 @@ if "opencode" not in imports:
         f.write("\n")
     os.replace(tmp, path)
 EOF
-echo "  Pointed pi's MCP servers at OpenCode's config in $AGENT_DIR/mcp.json"
+echo "  Pointed pi's MCP servers at OpenCode's config in $AGENT_DIR/mcp-adapter.json"
