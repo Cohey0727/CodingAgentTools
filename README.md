@@ -33,7 +33,7 @@ opencode/command/<name>.md       # an OpenCode slash command (none yet), linked 
 opencode/plugin/<name>.js        # an OpenCode plugin, linked into ~/.config/opencode/plugin
 pi/extensions/<name>.ts          # a pi extension, linked into ~/.pi/agent/extensions
 pi/agents/<name>.md              # a pi subagent definition, linked into ~/.pi/agent/agents
-claude/mods/<name>/              # a Claude Code mod (function hooks), loaded with --plugin-dir or CLAUDE_CODE_PLUGIN_DIRS
+claude/mods/<name>/              # a Claude Code mod (function hooks), loaded through CLAUDE_CODE_PLUGIN_DIRS in ~/.claude/settings.json
 configs.jsonc                    # every provider by heading: endpoint, API, models, tags, ${VAR} references (in git)
 .env                             # the values those references point at (gitignored, chmod 600)
 .env.example                     # the same variables, empty (in git)
@@ -59,7 +59,7 @@ bin/skills-common.sh             # where skills, subagents, AGENTS.md and the Op
 bin/skills-setup.sh              # links them there (`make setup-skills`)
 bin/removed-skills.txt           # skills no longer shipped; setup deletes their old links
 bin/skills-list.sh               # their install status (part of `make list`)
-bin/skills-uninstall.sh          # removes only the symlinks pointing back here (part of `make uninstall`)
+bin/skills-uninstall.sh          # removes only the symlinks pointing back here and the claude/mods entry (part of `make uninstall`)
 bin/list.sh                      # everything this repo manages (`make list`)
 bin/help.sh                      # target overview (`make help`)
 docs/migrations/                 # upgrade notes for existing checkouts
@@ -146,9 +146,9 @@ and [2026-10-03 — pi 1.0](docs/migrations/2026-10-03-pi-1.0.md).
 
 | Target | What it does |
 |--------|--------------|
-| `make setup` | Both halves: the provider wizard, then the skill, `AGENTS.md`, OpenCode extension and pi extension install |
+| `make setup` | Both halves: the provider wizard, then the skill, `AGENTS.md`, OpenCode extension, pi extension and Claude Code mod install |
 | `make setup-providers` | The wizard above only: tokens, `.env` upkeep, pi packages, DeepSeek Harness, Command Code, OpenCode plugins, and every global config |
-| `make setup-skills` | The shared assets only: `skills/`, `agents/`, `AGENTS.md`, `opencode/` and `pi/` into every agent CLI |
+| `make setup-skills` | The shared assets only: `skills/`, `agents/`, `AGENTS.md`, `opencode/` and `pi/` into every agent CLI, and `claude/mods/` into Claude Code's `CLAUDE_CODE_PLUGIN_DIRS` |
 | `make check` | Validate `configs.jsonc`, then refuse any concrete name outside it (see `CLAUDE.md`). What the pre-commit hook runs |
 | `make hooks` | Install the lefthook pre-commit hook that runs `make check` |
 | `make list` | Every provider with its heading, endpoint and models with their tags, then every skill, subagent, OpenCode extension and pi extension with its install status |
@@ -160,7 +160,7 @@ and [2026-10-03 — pi 1.0](docs/migrations/2026-10-03-pi-1.0.md).
 | `make codewhale-global` | Re-generate Codewhale's global `~/.codewhale/config.toml`, keys included, written at 600 |
 | `make dsh-global` | Re-generate DeepSeek Harness's home patch `~/.dsh/cordis.patch.yml`, and the keys it reads from `~/.dsh/.env` |
 | `make serve` | Run `dsh web` and OpenCode behind nginx for the hostnames `SERVE_HOST` and `SERVE_OPENCODE_HOST` name, so each opens there without a login of its own — see [dsh web and OpenCode through a Cloudflare Tunnel](#dsh-web-and-opencode-through-a-cloudflare-tunnel). Each starts only when its hostname is set |
-| `make uninstall` | Remove the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
+| `make uninstall` | Remove the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, the `claude/mods` entry in Claude Code's `CLAUDE_CODE_PLUGIN_DIRS`, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
 | `make help` | The target list above, on the terminal |
 
 ## Usage
@@ -418,14 +418,19 @@ than a couple of dozen tokens leave the last figure in place.
 
 `claude/mods/dashboard/` is a Claude Code mod: a plugin of function hooks that
 docks a pane beside the transcript with the session's figures and its to-do
-list. `make setup` does not install it; load it for one session with
+list. `make setup` (and `make setup-skills`) loads it, and every mod beside it,
+by adding this repo's `claude/mods` to `CLAUDE_CODE_PLUGIN_DIRS` under `env` in
+`~/.claude/settings.json`, at the path the repo has on that machine. Claude Code
+reads that variable from no other settings file and loads each child of a
+folder of plugins, so a new mod needs only a new session. The file is merged,
+not rewritten: the keys Claude Code keeps there and any other folder in the
+variable stay, and `make uninstall` takes out only this entry. A session that
+was already running when setup ran does not have the mod; to try one without
+setup, start a session with
 
 ```
 claude --plugin-dir claude/mods/dashboard
 ```
-
-or for every session by putting the folder's absolute path in
-`CLAUDE_CODE_PLUGIN_DIRS` under `env` in `~/.claude/settings.json`.
 
 | Part | What it shows |
 |------|---------------|

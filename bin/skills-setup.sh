@@ -19,6 +19,10 @@
 #
 # A skill named in bin/removed-skills.txt gets its symlink deleted instead, so
 # a rename or removal there does not leave a dangling link behind.
+#
+# Claude Code's mods under claude/mods/ are not linked: the folder is added to
+# CLAUDE_CODE_PLUGIN_DIRS in ~/.claude/settings.json, so a new mod needs no
+# re-run, only a new Claude Code session.
 
 set -euo pipefail
 
@@ -127,6 +131,29 @@ install_pi() { # pi's global extensions and subagent definitions
   done
 }
 
+install_mods() { # Claude Code's mods: their folder in CLAUDE_CODE_PLUGIN_DIRS
+  local label='env.CLAUDE_CODE_PLUGIN_DIRS' status
+  [ -d "$MODS_SRC" ] || return 0
+
+  section "$(tilde "$CLAUDE_SETTINGS")"
+  if ! status=$(claude_plugin_dirs add); then
+    N_SKIPPED=$((N_SKIPPED + 1))
+    printf '  %s⚠%s %-30s %sskipped — not valid JSON%s\n' \
+      "$YLW" "$RST" "$label" "$YLW" "$RST"
+    return 0
+  fi
+  case $status in
+    added)
+      printf '  %s✔%s %-30s %s%sadded %s%s\n' \
+        "$GRN" "$RST" "$label" "$B" "$GRN" "$(tilde "$MODS_SRC")" "$RST"
+      ;;
+    present)
+      printf '  %s✔%s %-30s %salready names %s%s\n' \
+        "$GRN" "$RST" "$label" "$DIM" "$(tilde "$MODS_SRC")" "$RST"
+      ;;
+  esac
+}
+
 install_context() { # the shared AGENTS.md, under whatever name each CLI expects
   local target
   [ -f "$CONTEXT_SRC" ] || return 0
@@ -193,7 +220,7 @@ report_readers() { # which installed CLIs actually pick up what we linked
 }
 
 main() {
-  local root n_skills n_agents n_commands n_plugins n_pi n_pi_agents roots='' line
+  local root n_skills n_agents n_commands n_plugins n_pi n_pi_agents n_mods roots='' line
 
   banner
 
@@ -203,6 +230,7 @@ main() {
   n_plugins=$(opencode_plugin_names | wc -l | tr -d ' ')
   n_pi=$(pi_names extensions | wc -l | tr -d ' ')
   n_pi_agents=$(pi_names agents | wc -l | tr -d ' ')
+  n_mods=$(mod_names | wc -l | tr -d ' ')
 
   for root in "${TARGET_ROOTS[@]}"; do
     install_root "$root"
@@ -212,6 +240,7 @@ main() {
 
   install_opencode
   install_pi
+  install_mods
   install_context
 
   section 'summary'
@@ -222,6 +251,8 @@ main() {
     "$(tilde "$(opencode_config_dir)")"
   printf '  %s%s pi extensions%s · %s%s pi subagents%s %s->%s %s\n' \
     "$B" "$n_pi" "$RST" "$B" "$n_pi_agents" "$RST" "$DIM" "$RST" "$(tilde "$(pi_agent_dir)")"
+  printf '  %s%s Claude Code mods%s %s->%s %s\n' \
+    "$B" "$n_mods" "$RST" "$DIM" "$RST" "$(tilde "$CLAUDE_SETTINGS")"
   printf '  %sAGENTS.md%s %s->%s %s targets\n' \
     "$B" "$RST" "$DIM" "$RST" "${#CONTEXT_TARGETS[@]}"
   printf '  %slinked %s · updated %s · removed %s · skipped %s%s\n' \

@@ -14,7 +14,7 @@ banner
 section 'targets'
 target 'make setup' 'both halves: the provider wizard, then the skill symlinks'
 target 'make setup-providers' 'pick providers, paste tokens, install dsh, Command Code and every global config'
-target 'make setup-skills' 'link skills/, agents/, AGENTS.md, opencode/ and pi/ into every agent CLI'
+target 'make setup-skills' 'link skills/, agents/, AGENTS.md, opencode/ and pi/ into every agent CLI, and claude/mods/ into Claude Code'
 target 'make check' 'validate configs.jsonc, then refuse any name only it may hold outside it'
 target 'make hooks' 'install the lefthook pre-commit hook that runs make check'
 target 'make list' 'every provider, skill, subagent and OpenCode extension, with its install status'
@@ -26,7 +26,7 @@ target 'make reasonix-global' "re-generate Reasonix's global config from configs
 target 'make codewhale-global' "re-generate Codewhale's global config from configs.jsonc"
 target 'make dsh-global' "re-generate DeepSeek Harness's home patch from configs.jsonc"
 target 'make serve' "run dsh web and OpenCode behind nginx for SERVE_HOST / SERVE_OPENCODE_HOST, no app login there"
-target 'make uninstall' 'remove the generated configs and symlinks this repo installed'
+target 'make uninstall' 'remove the generated configs, symlinks and Claude Code mods entry this repo installed'
 target 'make help' 'this screen'
 
 section 'notes'

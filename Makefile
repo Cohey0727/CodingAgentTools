@@ -19,7 +19,8 @@ setup-providers:
 
 # Symlink every skill under skills/ and every subagent under agents/ into
 # ~/.claude (Claude Code) and ~/.agents (Codex and other agent CLIs), and
-# AGENTS.md into whatever name each CLI reads it under.
+# AGENTS.md into whatever name each CLI reads it under. Claude Code's mods load
+# from claude/mods, named in CLAUDE_CODE_PLUGIN_DIRS in its user settings.
 setup-skills:
 	@"$(ROOT)/bin/skills-setup.sh"
 

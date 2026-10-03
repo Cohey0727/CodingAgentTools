@@ -4,7 +4,8 @@
 # Only symlinks pointing back into this repo, and plugin shims generated from
 # it, are removed — anything installed from elsewhere is left untouched. That
 # includes pi's extensions and agents directories: files you put there
-# yourself stay.
+# yourself stay. In ~/.claude/settings.json only this repo's claude/mods is
+# taken out of CLAUDE_CODE_PLUGIN_DIRS.
 
 set -euo pipefail
 
@@ -71,6 +72,13 @@ for target in "${CONTEXT_TARGETS[@]}"; do
   ok "removed $(tilde "$target")"
 done
 [ "$N_REMOVED" -gt "$before" ] || note 'nothing linked from this repo'
+
+section "$(tilde "$CLAUDE_SETTINGS")"
+status=$(claude_plugin_dirs remove) || status=invalid
+case $status in
+  removed) ok "removed $(tilde "$MODS_SRC") from CLAUDE_CODE_PLUGIN_DIRS" ;;
+  absent) note 'nothing set from this repo' ;;
+esac
 
 section 'summary'
 printf '  %s%s symlink(s)%s removed\n' "$B" "$N_REMOVED" "$RST"

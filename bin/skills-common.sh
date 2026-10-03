@@ -32,6 +32,13 @@ PI_KINDS="extensions agents"
 # location the other agent CLIs read skills from.
 TARGET_ROOTS=("$HOME/.claude" "$HOME/.agents")
 
+# Claude Code's mods, claude/mods/<name>/, load from the folders named in
+# CLAUDE_CODE_PLUGIN_DIRS. Claude Code reads that variable from the environment
+# or from the env block of its user settings — never a project's — and a folder
+# of plugins loads each child, so naming claude/mods once covers every mod.
+MODS_SRC="$ROOT/claude/mods"
+CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+
 # One global instruction file, linked to wherever each CLI looks for it. Claude
 # Code does not read AGENTS.md itself, so it gets the CLAUDE.md name, and Crush
 # reads CRUSH.md beside its own config.
@@ -105,6 +112,72 @@ opencode_plugin_names() { # every opencode/plugin/*.js file in the repo
     [ -e "$f" ] && basename "$f"
   done
   return 0
+}
+
+mod_names() { # every claude/mods/<name>/ directory in the repo
+  local d
+  for d in "$MODS_SRC"/*/; do
+    [ -d "$d" ] && basename "$d"
+  done
+  return 0
+}
+
+claude_plugin_dirs() { # add|remove -> added | present | removed | absent
+  # Puts MODS_SRC into CLAUDE_CODE_PLUGIN_DIRS in Claude Code's user settings,
+  # or takes it out. Claude Code writes that file itself (/model, /effort, the
+  # rules you allow), so it is merged, never rewritten: every other key and
+  # every other folder in the variable stays.
+  "$PYTHON" - "$1" "$CLAUDE_SETTINGS" "$MODS_SRC" <<'EOF'
+import json, os, sys
+action, path, folder = sys.argv[1:4]
+var = "CLAUDE_CODE_PLUGIN_DIRS"
+try:
+    with open(path) as f:
+        data = json.load(f)
+except FileNotFoundError:
+    data = {}
+except ValueError as exc:
+    print(f"  {path} is not valid JSON ({exc}) — left as it is", file=sys.stderr)
+    sys.exit(1)
+
+def same(entry):
+    return os.path.normpath(os.path.expanduser(entry.strip())) == folder
+
+env = data.get("env", {})
+dirs = [d for d in env.get(var, "").split(os.pathsep) if d.strip()]
+named = any(same(d) for d in dirs)
+if action == "add":
+    if named:
+        print("present")
+        sys.exit(0)
+    dirs.append(folder)
+    status = "added"
+else:
+    if not named:
+        print("absent")
+        sys.exit(0)
+    dirs = [d for d in dirs if not same(d)]
+    status = "removed"
+
+if dirs:
+    env[var] = os.pathsep.join(dirs)
+else:
+    env.pop(var, None)
+if env:
+    data["env"] = env
+else:
+    data.pop("env", None)
+
+# A settings.json linked in from elsewhere (a dotfiles repo) keeps its link.
+path = os.path.realpath(path)
+os.makedirs(os.path.dirname(path), exist_ok=True)
+tmp = path + ".tmp"
+with open(tmp, "w") as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+    f.write("\n")
+os.replace(tmp, path)
+print(status)
+EOF
 }
 
 pi_kind_dir() { # <kind> -> where pi reads that kind from
