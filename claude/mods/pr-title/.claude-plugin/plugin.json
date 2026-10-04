@@ -1,0 +1,5 @@
+{
+  "name": "pr-title",
+  "version": "0.1.0",
+  "description": "Names the session and its tmux window \"#<number> <title>\" once gh pr create opens a PR"
+}

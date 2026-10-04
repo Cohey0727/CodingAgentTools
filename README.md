@@ -468,6 +468,20 @@ them at zero.
 `claude plugin validate claude/mods/dashboard` and
 `claude plugin test claude/mods/dashboard` check it.
 
+### Claude Code PR title
+
+`claude/mods/pr-title/` names the session after the PR it opened. When a Bash
+call runs `gh pr create` and prints the new PR's URL, the mod reads the PR's
+number and title with `gh pr view` and renames the tmux window the session runs
+in to `#<number> <title>` right away (`tmux rename-window`, which also turns off
+`automatic-rename` for that window). The session itself gets the same name
+through `/rename` once the turn ends: Claude Code does not run a slash command
+from inside the tool call that holds the turn. Outside tmux only the session is
+renamed. It loads like the dashboard, through `claude/mods`.
+
+`claude plugin validate claude/mods/pr-title` and
+`claude plugin test claude/mods/pr-title` check it.
+
 ### Loops in OpenCode
 
 OpenCode runs one turn per message, so `/loop` is this repo's own, like
