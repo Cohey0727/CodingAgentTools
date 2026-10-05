@@ -48,6 +48,42 @@
       "notes": "--agent plan で read-only"
     },
     {
+      "name": "deepseek-commandcode",
+      "label": "DeepSeek V4.1 Flash (Command Code)",
+      "enabled": false,
+      "schema": "stdin",
+      "command": "opencode run --model commandcode-openai/deepseek/deepseek-v4.1-flash --agent plan",
+      "timeout_ms": 1200000,
+      "notes": "--agent plan で read-only"
+    },
+    {
+      "name": "qwen-max-commandcode",
+      "label": "Qwen3.8-Max (Command Code)",
+      "enabled": false,
+      "schema": "stdin",
+      "command": "opencode run --model commandcode-openai/Qwen/Qwen3.8-Max --agent plan",
+      "timeout_ms": 1200000,
+      "notes": "--agent plan で read-only"
+    },
+    {
+      "name": "glm-flash-commandcode",
+      "label": "Zhipu AI GLM-5.3 Flash (Command Code)",
+      "enabled": false,
+      "schema": "stdin",
+      "command": "opencode run --model commandcode-openai/z-ai/glm-5.3-flash --agent plan",
+      "timeout_ms": 1200000,
+      "notes": "--agent plan で read-only"
+    },
+    {
+      "name": "mimo-flash-commandcode",
+      "label": "MiMo-V2.6-Flash (Command Code)",
+      "enabled": false,
+      "schema": "stdin",
+      "command": "opencode run --model commandcode-openai/xiaomi/mimo-v2.6-flash --agent plan",
+      "timeout_ms": 1200000,
+      "notes": "--agent plan で read-only"
+    },
+    {
       "name": "deepseek",
       "label": "DeepSeek (直接契約)",
       "enabled": false,
