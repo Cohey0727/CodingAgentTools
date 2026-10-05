@@ -364,7 +364,9 @@ can drive that profile. `/mcp` shows each server and its tools. Other keys in
 `~/.pi/agent/mcp.json` is pi's built-in MCP config. The adapter replaces the
 built-in: on its first start it adds `"-builtin:mcp"` to `extensions` in pi's
 `settings.json`, and it still reads the servers `pi mcp add` writes to
-`mcp.json`, but ignores an `imports` there.
+`mcp.json`, but ignores an `imports` there and warns at every start.
+`make pi-global` moves such an `imports` into `mcp-adapter.json`, and removes
+`mcp.json` if nothing else is left in it.
 
 **Subagents.** The skills written for Claude Code's `Agent` tool, such as
 `deep-review` and `fanout`, run in pi unchanged. The
