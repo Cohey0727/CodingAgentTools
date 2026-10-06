@@ -189,7 +189,7 @@ pi --model opencode-go/deepseek-v4.1-flash     # OpenCode Go, on the key OpenCod
 pi --list-models opencode                      # what Zen and Go serve
 ```
 
-The two generators otherwise start you on the default provider; `pi.overrides` points pi at OpenCode Go's DeepSeek V4.1 Flash instead, and `opencode.overrides` starts OpenCode on OpenCode Zen's free MiMo V2.6 Flash. See [Default provider](#default-provider). For pi that means `defaultProvider` / `defaultModel` in `~/.pi/agent/settings.json`, the two keys Ctrl+S in `/model` writes — so a re-run replaces a pick you saved there. The rest of that file is left as it is. Writing them needs `python3`; without it the two keys are skipped and pi starts wherever it was.
+The two generators otherwise start you on the default provider; `pi.overrides` points pi at OpenCode Go's DeepSeek V4.1 Flash instead, and `opencode.overrides` starts OpenCode on OpenCode Go's MiMo V2.6 Flash. See [Default provider](#default-provider). For pi that means `defaultProvider` / `defaultModel` in `~/.pi/agent/settings.json`, the two keys Ctrl+S in `/model` writes — so a re-run replaces a pick you saved there. The rest of that file is left as it is. Writing them needs `python3`; without it the two keys are skipped and pi starts wherever it was.
 
 `make setup` (and `make opencode-global`) write every provider that has a token into the global `~/.config/opencode/opencode.json`, so a bare `opencode` starts with all of them and `/models` switches mid-session — each under the heading `configs.jsonc` files it under, beside OpenCode's own Zen and Go (see [OpenCode's model dialog](#opencodes-model-dialog)):
 
@@ -287,12 +287,12 @@ Every generated global config starts on whichever provider is marked `primary` i
 
 At most one provider may say so. When none does, or it has no token, the first configured one wins instead, so a fresh checkout still gets a working one. It sets OpenCode's `model` and `small_model`, pi's `defaultProvider` / `defaultModel`, and DeepSeek Harness's `agent-default-model`.
 
-OpenCode can start somewhere else. `make opencode-global` deep-merges the top-level `opencode.overrides` in `configs.jsonc` into the generated `opencode.json` last, key by key, so its keys win. That is how OpenCode starts on a model of OpenCode Zen, and titles sessions with one of OpenCode Go — both come in through `/connect` and are not providers here:
+OpenCode can start somewhere else. `make opencode-global` deep-merges the top-level `opencode.overrides` in `configs.jsonc` into the generated `opencode.json` last, key by key, so its keys win. That is how OpenCode starts on a model of OpenCode Go and titles sessions with another — Go comes in through `/connect` and is not a provider here:
 
 ```jsonc
 "opencode": {
   "overrides": {
-    "model": "opencode/mimo-v2.6-flash-free",
+    "model": "opencode-go/mimo-v2.6-flash",
     "small_model": "opencode-go/deepseek-v4.1-flash"
   }
 }
