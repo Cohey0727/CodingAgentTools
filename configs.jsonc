@@ -43,7 +43,7 @@
   "pi": {
     "overrides": {
       "defaultProvider": "opencode-go",
-      "defaultModel": "deepseek-v4.1-flash"
+      "defaultModel": "muse-spark-1.3-contributor"
     }
   },
 
