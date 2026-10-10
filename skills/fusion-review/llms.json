@@ -113,7 +113,7 @@
     {
       "name": "glm-inco",
       "label": "Zhipu AI GLM-5.3 (Inco)",
-      "enabled": true,
+      "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model inco/glm-5.3 --agent plan",
       "timeout_ms": 1800000,
