@@ -109,6 +109,15 @@
       "command": "opencode run --model glm-anthropic/glm-5.3-flash --agent plan",
       "timeout_ms": 1800000,
       "notes": "--agent plan で read-only"
+    },
+    {
+      "name": "glm-inco",
+      "label": "Zhipu AI GLM-5.3 (Inco)",
+      "enabled": true,
+      "schema": "stdin",
+      "command": "opencode run --model inco/glm-5.3 --agent plan",
+      "timeout_ms": 1800000,
+      "notes": "--agent plan で read-only"
     }
   ]
 }
