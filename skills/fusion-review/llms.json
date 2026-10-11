@@ -66,15 +66,6 @@
       "notes": "--agent plan で read-only"
     },
     {
-      "name": "qwen-max-commandcode",
-      "label": "Qwen3.8-Max (Command Code)",
-      "enabled": true,
-      "schema": "stdin",
-      "command": "opencode run --model commandcode-openai/Qwen/Qwen3.8-Max --agent plan",
-      "timeout_ms": 1800000,
-      "notes": "--agent plan で read-only"
-    },
-    {
       "name": "glm-flash-commandcode",
       "label": "Zhipu AI GLM-5.3 Flash (Command Code)",
       "enabled": true,
