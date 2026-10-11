@@ -6,8 +6,8 @@
   // here wins.
   "opencode": {
     "overrides": {
-      "model": "opencode-go/muse-spark-1.3-contributor",
-      "small_model": "opencode-go/muse-spark-1.3-contributor",
+      "model": "commandcode-openai/deepseek/deepseek-v4.1-flash",
+      "small_model": "commandcode-openai/deepseek/deepseek-v4.1-flash",
 
       "permission": "allow",
 
@@ -38,12 +38,11 @@
   },
 
   // Deep-merged, key by key, into pi's ~/.pi/agent/settings.json last, so a key
-  // here wins over the startup model the primary provider would give. OpenCode
-  // Go is not in configs.jsonc — pi gets its key from OpenCode's own auth.
+  // here wins over the startup model the primary provider would give.
   "pi": {
     "overrides": {
-      "defaultProvider": "opencode-go",
-      "defaultModel": "muse-spark-1.3-contributor"
+      "defaultProvider": "commandcode",
+      "defaultModel": "deepseek/deepseek-v4.1-flash"
     }
   },
 
