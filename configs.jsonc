@@ -6,7 +6,9 @@
   // here wins.
   "opencode": {
     "overrides": {
-      "model": "commandcode-openai/deepseek/deepseek-v4.1-flash",
+      // `#<variant>` pins the session's thinking variant; without one OpenCode
+      // starts on the variant last picked. `high` is the top this model offers.
+      "model": "commandcode-openai/deepseek/deepseek-v4.1-flash#high",
       "small_model": "commandcode-openai/deepseek/deepseek-v4.1-flash",
 
       "permission": "allow",
@@ -42,7 +44,9 @@
   "pi": {
     "overrides": {
       "defaultProvider": "commandcode",
-      "defaultModel": "deepseek/deepseek-v4.1-flash"
+      "defaultModel": "deepseek/deepseek-v4.1-flash",
+      // pi clamps this to the highest level the model supports.
+      "defaultThinkingLevel": "max"
     }
   },
 
