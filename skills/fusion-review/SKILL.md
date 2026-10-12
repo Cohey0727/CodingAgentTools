@@ -25,7 +25,6 @@ description: 同じレビュー依頼を複数 LLM に並列で投げ、全員�
 | `enabled` | `true` のものだけ実行する。無効化はここを `false` にするだけ |
 | `schema` | 実行方式 (下表)。これを見て起動方法を決める |
 | `command` | 起動コマンド。`schema: self` では不要 |
-| `timeout_ms` | 実行時のタイムアウト。shell の `timeout` コマンドに秒換算で渡す |
 | `notes` | モデルの特性・注意点 |
 
 ### schema の種類
@@ -35,7 +34,12 @@ description: 同じレビュー依頼を複数 LLM に並列で投げ、全員�
 | `self` | **このセッションのホストLLM自身**がレビュアーの1人として直接レビューを書く。外部プロセスは起動しない |
 | `stdin` | 任意コマンド。`command` をそのまま実行し、stdin にプロンプト・stdout に回答 |
 
-外部レビュアーは OpenCode に統一する。追加は llms.json にエントリを1つ足すだけで、`schema: "stdin"` + `command: "opencode run --model <provider>/<id> --agent plan"` を書く (`--agent plan` が read-only を担保する)。使えるモデルは `opencode models` で確認し、無ければ configs.jsonc に足して `make opencode-global` を回す。編集はレポ側のファイルに対して行い、コミットする (シンボリックリンクなのでどちらのパスを編集しても実体は同じ)。
+外部レビュアーは OpenCode か pi で起動する。追加は llms.json にエントリを1つ足すだけで、`schema: "stdin"` と read-only を担保する `command` を書く:
+
+- OpenCode: `opencode run --model <provider>/<id> --agent plan` (`--agent plan` が read-only を担保する)。使えるモデルは `opencode models` で確認し、無ければ configs.jsonc に足して `make opencode-global` を回す
+- pi: `pi -p --model <provider>/<id> --tools read,grep,find,ls --no-mcp` (`--tools` で書き込み系ツールを外し、`--no-mcp` で MCP ツールも外す)。使えるモデルは `pi --list-models` で確認し、無ければ configs.jsonc に足して `make pi-global` を回す
+
+編集はレポ側のファイルに対して行い、コミットする (シンボリックリンクなのでどちらのパスを編集しても実体は同じ)。
 
 ## 実行手順
 
@@ -123,10 +127,10 @@ worktree (とユーザー環境) から、レビュー基準になるドキュ�
 
 ```bash
 # worktree を cwd にして起動する (リポジトリ探索を可能にする)
-cd <tmp>/fusion-wt && cat <tmp>/prompt.md | timeout <timeout_ms/1000>s <command> > <tmp>/review-<name>.md 2> <tmp>/err-<name>.log
+cd <tmp>/fusion-wt && cat <tmp>/prompt.md | timeout 1h <command> > <tmp>/review-<name>.md 2> <tmp>/err-<name>.log
 ```
 
-- タイムアウトは llms.json の `timeout_ms` を shell の `timeout` コマンド (秒に換算) で強制する。Bash ツールの `timeout` パラメータは上限 10 分で `timeout_ms` がそれを超えうるため、ツール側ではなく shell 側で制御する
+- タイムアウトは全LLM共通で 1 時間。shell の `timeout` コマンドで強制する。Bash ツールの `timeout` パラメータは上限 10 分なので、ツール側ではなく shell 側で制御する
 - 全LLMの起動を済ませてから完了を待つ (逐次実行しない)
 - 起動直後に落ちたら `err-<name>.log` を確認してから扱いを決める。インフラ起因の衝突 (例: opencode が共有するローカル DB の `database is locked` — 並列起動同士のロック競合) はモデルの失敗ではないため、他の起動の完了後に**直列で 1 回だけ**再起動してよい。モデル応答の失敗・タイムアウト・空出力は §7 のとおりリトライせずスキップする
 - cwd を worktree にするのは、レビュアーにコード全体を探索させるためと、万一書き込まれても使い捨ての worktree で済ませるため

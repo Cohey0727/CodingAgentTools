@@ -25,7 +25,6 @@ description: 1つの議題について複数LLMが3周のディスカッショ�
 | `enabled` | `true` のものだけ討論者にする |
 | `schema` | `stdin` のエントリだけ使う (下表) |
 | `command` | 起動コマンド |
-| `timeout_ms` | 実行時のタイムアウト。shell の `timeout` コマンドに秒換算で渡す |
 | `notes` | モデルの特性・注意点 |
 
 | schema | 実行方法 |
@@ -80,11 +79,11 @@ done
 
 ```bash
 # worktree がある場合は cwd にして起動する (リポジトリ探索を可能にする)
-cd <tmp>/discussion-wt && cat <tmp>/r1-prompt.md | timeout <timeout_ms/1000>s <command> > <tmp>/r1-<name>.md 2> <tmp>/err-r1-<name>.log
+cd <tmp>/discussion-wt && cat <tmp>/r1-prompt.md | timeout 1h <command> > <tmp>/r1-<name>.md 2> <tmp>/err-r1-<name>.log
 ```
 
 - 回答は中間成果物として1ファイルずつ吐き出す。ファイル名はラウンドと `name` を組み合わせる
-- タイムアウトは llms.json の `timeout_ms` を shell の `timeout` コマンド (秒に換算) で強制する。Bash ツールの `timeout` パラメータは上限 10 分で `timeout_ms` がそれを超えうるため、ツール側ではなく shell 側で制御する
+- タイムアウトは全LLM共通で 1 時間。shell の `timeout` コマンドで強制する。Bash ツールの `timeout` パラメータは上限 10 分なので、ツール側ではなく shell 側で制御する
 - 失敗・タイムアウト・空出力の討論者は**リトライせずスキップ**する。全員が揃うまで次のラウンドに進まない (ラウンドは本質的に逐次)
 - あるラウンドの回答が0件になったら `err-*.log` を添えて報告し、続行可否を判断する。1周目で0件なら終了する
 

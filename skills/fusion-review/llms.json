@@ -17,7 +17,6 @@
       "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model opencode-go/deepseek-v4.1-flash --agent plan",
-      "timeout_ms": 1800000,
       "notes": "--agent plan で read-only"
     },
     {
@@ -26,7 +25,6 @@
       "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model opencode-go/qwen3.8-max --agent plan",
-      "timeout_ms": 1800000,
       "notes": "--agent plan で read-only"
     },
     {
@@ -35,7 +33,6 @@
       "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model opencode-go/glm-5.3-flash --agent plan",
-      "timeout_ms": 1800000,
       "notes": "--agent plan で read-only"
     },
     {
@@ -44,7 +41,6 @@
       "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model opencode-go/mimo-v2.6-flash --agent plan",
-      "timeout_ms": 1800000,
       "notes": "--agent plan で read-only"
     },
     {
@@ -53,7 +49,6 @@
       "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model opencode-go/muse-spark-1.3-contributor --agent plan",
-      "timeout_ms": 1800000,
       "notes": "--agent plan で read-only"
     },
     {
@@ -62,7 +57,6 @@
       "enabled": true,
       "schema": "stdin",
       "command": "opencode run --model commandcode-openai/deepseek/deepseek-v4.1-flash --agent plan",
-      "timeout_ms": 1800000,
       "notes": "--agent plan で read-only"
     },
     {
@@ -71,17 +65,15 @@
       "enabled": true,
       "schema": "stdin",
       "command": "opencode run --model commandcode-openai/z-ai/glm-5.3-flash --agent plan",
-      "timeout_ms": 1800000,
       "notes": "--agent plan で read-only"
     },
     {
-      "name": "mimo-flash-commandcode",
-      "label": "MiMo-V2.6-Flash (Command Code)",
+      "name": "mimo-pro-commandcode",
+      "label": "MiMo-V2.6-Pro (Command Code)",
       "enabled": true,
       "schema": "stdin",
-      "command": "opencode run --model commandcode-openai/xiaomi/mimo-v2.6-flash --agent plan",
-      "timeout_ms": 1800000,
-      "notes": "--agent plan で read-only"
+      "command": "pi -p --model commandcode/xiaomi/mimo-v2.6-pro --tools read,grep,find,ls --no-mcp",
+      "notes": "--tools read,grep,find,ls と --no-mcp で read-only"
     },
     {
       "name": "deepseek",
@@ -89,7 +81,6 @@
       "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model deepseek-anthropic/deepseek-flash --agent plan",
-      "timeout_ms": 1800000,
       "notes": "--agent plan で read-only"
     },
     {
@@ -98,7 +89,6 @@
       "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model glm-anthropic/glm-5.3-flash --agent plan",
-      "timeout_ms": 1800000,
       "notes": "--agent plan で read-only"
     },
     {
@@ -107,7 +97,6 @@
       "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model inco/glm-5.3 --agent plan",
-      "timeout_ms": 1800000,
       "notes": "--agent plan で read-only"
     }
   ]
