@@ -189,7 +189,7 @@ pi --model opencode-go/deepseek-v4.1-flash     # OpenCode Go, on the key OpenCod
 pi --list-models opencode                      # what Zen and Go serve
 ```
 
-The two generators otherwise start you on the default provider; `pi.overrides` points pi at OpenCode Go's DeepSeek V4.1 Flash instead, and `opencode.overrides` starts OpenCode on OpenCode Zen's free MiMo V2.6 Flash. See [Default provider](#default-provider). For pi that means `defaultProvider` / `defaultModel` in `~/.pi/agent/settings.json`, the two keys Ctrl+S in `/model` writes — so a re-run replaces a pick you saved there. The rest of that file is left as it is. Writing them needs `python3`; without it the two keys are skipped and pi starts wherever it was.
+The two generators otherwise start you on the default provider; `pi.overrides` and `opencode.overrides` in `configs.jsonc` can point them elsewhere. See [Default provider](#default-provider). For pi that means `defaultProvider` / `defaultModel` in `~/.pi/agent/settings.json`, the two keys Ctrl+S in `/model` writes — so a re-run replaces a pick you saved there. The rest of that file is left as it is. Writing them needs `python3`; without it the two keys are skipped and pi starts wherever it was.
 
 `make setup` (and `make opencode-global`) write every provider that has a token into the global `~/.config/opencode/opencode.json`, so a bare `opencode` starts with all of them and `/models` switches mid-session — each under the heading `configs.jsonc` files it under, beside OpenCode's own Zen and Go (see [OpenCode's model dialog](#opencodes-model-dialog)):
 
@@ -287,27 +287,36 @@ Every generated global config starts on whichever provider is marked `primary` i
 
 At most one provider may say so. When none does, or it has no token, the first configured one wins instead, so a fresh checkout still gets a working one. It sets OpenCode's `model` and `small_model`, pi's `defaultProvider` / `defaultModel`, and DeepSeek Harness's `agent-default-model`.
 
-OpenCode can start somewhere else. `make opencode-global` deep-merges the top-level `opencode.overrides` in `configs.jsonc` into the generated `opencode.json` last, key by key, so its keys win. That is how OpenCode starts on a model of OpenCode Zen, and titles sessions with one of OpenCode Go — both come in through `/connect` and are not providers here:
+OpenCode can start somewhere else. `make opencode-global` deep-merges the top-level `opencode.overrides` in `configs.jsonc` into the generated `opencode.json` last, key by key, so its keys win. That is how OpenCode can start on a model of OpenCode Zen or Go, which come in through `/connect` and are not providers here:
 
 ```jsonc
 "opencode": {
   "overrides": {
-    "model": "opencode/mimo-v2.6-flash-free",
-    "small_model": "opencode-go/deepseek-v4.1-flash"
+    "model": "<provider>/<model>#<variant>",
+    "small_model": "<provider>/<model>"
   }
 }
 ```
 
-pi works the same way. `make pi-global` deep-merges the top-level `pi.overrides` into `~/.pi/agent/settings.json` after writing the default provider's model there, so pi starts on OpenCode Go's DeepSeek V4.1 Flash instead. Any other key of pi's [settings](https://pi.dev/docs/settings) can go there, written in pi's own form:
+`model` takes OpenCode's `<provider>/<model>#<variant>` form. The suffix pins the
+thinking variant the session starts on — `high` where the model offers
+`low`/`medium`/`high`, `max` where it offers Anthropic's `high`/`max`. Without
+it the session follows the variant last picked.
+
+pi works the same way. `make pi-global` deep-merges the top-level `pi.overrides` into `~/.pi/agent/settings.json` after writing the default provider's model there, so its keys win. Any other key of pi's [settings](https://pi.dev/docs/settings) can go there, written in pi's own form:
 
 ```jsonc
 "pi": {
   "overrides": {
-    "defaultProvider": "opencode-go",
-    "defaultModel": "deepseek-v4.1-flash"
+    "defaultProvider": "<provider>",
+    "defaultModel": "<model>",
+    "defaultThinkingLevel": "max"
   }
 }
 ```
+
+`defaultThinkingLevel` is one of `off`, `minimal`, `low`, `medium`, `high`,
+`xhigh` and `max`; pi clamps it to the highest level the model supports.
 
 Anything else OpenCode's config takes goes there too, written in OpenCode's own form. The permission policy does: `"permission": "allow"` runs every tool without an approval prompt, so a session never stops to ask. Its MCP servers do — today the [Playwright MCP](https://github.com/microsoft/playwright-mcp), started on the persistent profile `~/playwright/profiles/default` so a login survives restarts, and Parallel Search, a remote server at `https://search.parallel.ai/mcp` that searches and fetches the web with no key. OpenCode expands `{env:HOME}` in the command itself, so the same entry works on every machine. Chrome locks a profile to one browser, so while another agent drives that profile, OpenCode's Playwright cannot start one. `opencode mcp list` shows whether each connected.
 
@@ -364,7 +373,9 @@ can drive that profile. `/mcp` shows each server and its tools. Other keys in
 `~/.pi/agent/mcp.json` is pi's built-in MCP config. The adapter replaces the
 built-in: on its first start it adds `"-builtin:mcp"` to `extensions` in pi's
 `settings.json`, and it still reads the servers `pi mcp add` writes to
-`mcp.json`, but ignores an `imports` there.
+`mcp.json`, but ignores an `imports` there and warns at every start.
+`make pi-global` moves such an `imports` into `mcp-adapter.json`, and removes
+`mcp.json` if nothing else is left in it.
 
 **Subagents.** The skills written for Claude Code's `Agent` tool, such as
 `deep-review` and `fanout`, run in pi unchanged. The

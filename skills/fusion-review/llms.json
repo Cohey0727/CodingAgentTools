@@ -12,30 +12,66 @@
       "notes": "外部LLMの回答を読む前に、独立したレビューを自分で書き切ること (回答を見た後だと引きずられる)"
     },
     {
+      "name": "deepseek-go",
+      "label": "DeepSeek V4.1 Flash (OpenCode Go)",
+      "enabled": false,
+      "schema": "stdin",
+      "command": "opencode run --model opencode-go/deepseek-v4.1-flash --agent plan",
+      "timeout_ms": 1800000,
+      "notes": "--agent plan で read-only"
+    },
+    {
+      "name": "qwen-max-go",
+      "label": "Qwen3.8-Max (OpenCode Go)",
+      "enabled": false,
+      "schema": "stdin",
+      "command": "opencode run --model opencode-go/qwen3.8-max --agent plan",
+      "timeout_ms": 1800000,
+      "notes": "--agent plan で read-only"
+    },
+    {
+      "name": "glm-flash-go",
+      "label": "Zhipu AI GLM-5.3 Flash (OpenCode Go)",
+      "enabled": false,
+      "schema": "stdin",
+      "command": "opencode run --model opencode-go/glm-5.3-flash --agent plan",
+      "timeout_ms": 1800000,
+      "notes": "--agent plan で read-only"
+    },
+    {
+      "name": "mimo-flash-go",
+      "label": "MiMo-V2.6-Flash (OpenCode Go)",
+      "enabled": false,
+      "schema": "stdin",
+      "command": "opencode run --model opencode-go/mimo-v2.6-flash --agent plan",
+      "timeout_ms": 1800000,
+      "notes": "--agent plan で read-only"
+    },
+    {
+      "name": "muse-contributor-go",
+      "label": "Muse Spark 1.3 Contributor (OpenCode Go)",
+      "enabled": false,
+      "schema": "stdin",
+      "command": "opencode run --model opencode-go/muse-spark-1.3-contributor --agent plan",
+      "timeout_ms": 1800000,
+      "notes": "--agent plan で read-only"
+    },
+    {
       "name": "deepseek-commandcode",
       "label": "DeepSeek V4.1 Flash (Command Code)",
       "enabled": true,
       "schema": "stdin",
       "command": "opencode run --model commandcode-openai/deepseek/deepseek-v4.1-flash --agent plan",
-      "timeout_ms": 1200000,
-      "notes": "--agent plan で read-only"
-    },
-    {
-      "name": "qwen-max-commandcode",
-      "label": "Qwen3.8-Max (Command Code)",
-      "enabled": false,
-      "schema": "stdin",
-      "command": "opencode run --model commandcode-openai/Qwen/Qwen3.8-Max --agent plan",
-      "timeout_ms": 1200000,
+      "timeout_ms": 1800000,
       "notes": "--agent plan で read-only"
     },
     {
       "name": "glm-flash-commandcode",
       "label": "Zhipu AI GLM-5.3 Flash (Command Code)",
-      "enabled": false,
+      "enabled": true,
       "schema": "stdin",
       "command": "opencode run --model commandcode-openai/z-ai/glm-5.3-flash --agent plan",
-      "timeout_ms": 1200000,
+      "timeout_ms": 1800000,
       "notes": "--agent plan で read-only"
     },
     {
@@ -44,7 +80,7 @@
       "enabled": true,
       "schema": "stdin",
       "command": "opencode run --model commandcode-openai/xiaomi/mimo-v2.6-flash --agent plan",
-      "timeout_ms": 1200000,
+      "timeout_ms": 1800000,
       "notes": "--agent plan で read-only"
     },
     {
@@ -53,7 +89,7 @@
       "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model deepseek-anthropic/deepseek-flash --agent plan",
-      "timeout_ms": 1200000,
+      "timeout_ms": 1800000,
       "notes": "--agent plan で read-only"
     },
     {
@@ -62,7 +98,16 @@
       "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model glm-anthropic/glm-5.3-flash --agent plan",
-      "timeout_ms": 1200000,
+      "timeout_ms": 1800000,
+      "notes": "--agent plan で read-only"
+    },
+    {
+      "name": "glm-inco",
+      "label": "Zhipu AI GLM-5.3 (Inco)",
+      "enabled": false,
+      "schema": "stdin",
+      "command": "opencode run --model inco/glm-5.3 --agent plan",
+      "timeout_ms": 1800000,
       "notes": "--agent plan で read-only"
     }
   ]

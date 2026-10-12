@@ -6,8 +6,10 @@
   // here wins.
   "opencode": {
     "overrides": {
-      "model": "opencode/mimo-v2.6-flash-free",
-      "small_model": "opencode-go/deepseek-v4.1-flash",
+      // `#<variant>` pins the session's thinking variant; without one OpenCode
+      // starts on the variant last picked. `high` is the top this model offers.
+      "model": "commandcode-openai/deepseek/deepseek-v4.1-flash#high",
+      "small_model": "commandcode-openai/deepseek/deepseek-v4.1-flash",
 
       "permission": "allow",
 
@@ -38,12 +40,13 @@
   },
 
   // Deep-merged, key by key, into pi's ~/.pi/agent/settings.json last, so a key
-  // here wins over the startup model the primary provider would give. OpenCode
-  // Go is not in configs.jsonc — pi gets its key from OpenCode's own auth.
+  // here wins over the startup model the primary provider would give.
   "pi": {
     "overrides": {
-      "defaultProvider": "opencode-go",
-      "defaultModel": "deepseek-v4.1-flash"
+      "defaultProvider": "commandcode",
+      "defaultModel": "deepseek/deepseek-v4.1-flash",
+      // pi clamps this to the highest level the model supports.
+      "defaultThinkingLevel": "max"
     }
   },
 

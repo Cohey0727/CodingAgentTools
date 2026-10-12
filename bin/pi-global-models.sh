@@ -144,23 +144,42 @@ fi
 # pi-mcp-adapter reads OpenCode's MCP servers from its generated opencode.json,
 # so configs.jsonc's opencode.overrides.mcp is the one list both CLIs run. The
 # import goes in the adapter's own mcp-adapter.json: pi's mcp.json belongs to
-# pi's built-in MCP, and the adapter ignores imports there. Anything else in
-# mcp-adapter.json is kept.
-"$PYTHON" - "$AGENT_DIR/mcp-adapter.json" <<'EOF'
+# pi's built-in MCP, and the adapter ignores imports there and warns at every
+# start, so any imports in mcp.json move to mcp-adapter.json, and an mcp.json
+# left empty is removed. Anything else in either file is kept.
+"$PYTHON" - "$AGENT_DIR/mcp-adapter.json" "$AGENT_DIR/mcp.json" <<'EOF'
 import json, os, sys
-path = sys.argv[1]
-try:
-    with open(path) as f:
-        data = json.load(f)
-except FileNotFoundError:
-    data = {}
-imports = data.setdefault("imports", [])
-if "opencode" not in imports:
-    imports.append("opencode")
+adapter_path, builtin_path = sys.argv[1], sys.argv[2]
+
+def load(path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+def save(path, data):
     tmp = path + ".tmp"
     with open(tmp, "w") as f:
         json.dump(data, f, indent=2)
         f.write("\n")
     os.replace(tmp, path)
+
+builtin = load(builtin_path)
+moved = builtin.pop("imports", None)
+adapter = load(adapter_path)
+imports = adapter.setdefault("imports", [])
+before = list(imports)
+for name in (moved or []) + ["opencode"]:
+    if name not in imports:
+        imports.append(name)
+if imports != before:
+    save(adapter_path, adapter)
+if moved is not None:
+    if builtin:
+        save(builtin_path, builtin)
+    else:
+        os.remove(builtin_path)
+    print(f"  Moved the imports in {builtin_path} to {adapter_path}")
 EOF
 echo "  Pointed pi's MCP servers at OpenCode's config in $AGENT_DIR/mcp-adapter.json"
