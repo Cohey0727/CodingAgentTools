@@ -70,7 +70,7 @@ PRのブランチにいなければ切り替える。確認・切り替え・pul
 
 ```bash
 # CIステータスの詳細を取得
-gh pr checks <number> --json name,state,description,detailsUrl
+gh pr checks <number> --json name,state,description,link
 ```
 
 各チェックの `state` を確認する:
@@ -152,7 +152,7 @@ CI Status: <passed>/<total> checks passed
 
 **ユーザーの確認を得てから次のステップに進む。**
 
-ただし、以下の「軽微な修正」に該当する場合は確認不要で即座に修正・コミットに進む:
+ただし、修正を指示されていて（「CI直して」「CI修正」や `/resolve-ci` の起動）、以下の「軽微な修正」に該当する場合は確認不要で即座に修正・コミットに進む:
 - フォーマット（Prettier、コードスタイル）
 - リント自動修正（`--fix` で解決するもの）
 - コメントの修正（typo、不要なコメント削除）
@@ -236,21 +236,14 @@ git push origin <branch-name>
 
 ### Step 10: Monitor Re-run
 
-プッシュ後、CIの再実行状況を約2分おきに監視する。全ジョブが完了するまで繰り返す:
+プッシュ後、CI の全ジョブが完了するまで待つ（`--watch` は全ジョブが終わるまで戻らない）:
 
 ```bash
-# 約2分おきにCIステータスを確認（全ジョブ完了まで繰り返す）
-gh pr checks <number>
+gh pr checks <number> --watch
 ```
 
-**監視ループ:**
-
-1. `gh pr checks <number>` でステータスを確認する
-2. まだ `PENDING` / `QUEUED` / `IN_PROGRESS` のジョブがある場合:
-   - 現在の状況をユーザーに簡潔に報告する（例: `3/5 passed, 2 in progress...`）
-   - 約2分待機してから再度確認する
-3. 全ジョブが完了したら最終結果を報告する
-4. 新たに失敗したジョブがあれば、Step 4 に戻って再分析・修正を行う
+1. 全ジョブが完了したら最終結果を報告する
+2. 新たに失敗したジョブがあれば、Step 4 に戻って再分析・修正を行う
 
 **再失敗時の対応:**
 
@@ -286,8 +279,8 @@ PR URL: <url>
 
 ## Rules
 
-- **コード修正後は必ず commit → push まで完了すること。修正だけして commit/push を忘れるのは厳禁。Step 7（修正）→ Step 8（ローカル確認）→ Step 9（commit & push）→ Step 10（CI監視）を必ず一連で実行する。**
-- ユーザーの確認なしにコード修正を適用しない（ただし軽微な修正 — フォーマット、リント自動修正、コメント、インポート順序、空白修正 — は確認不要で即座にコミットする）
+- コードを修正したら、Step 8（ローカル確認）→ Step 9（commit & push）→ Step 10（CI監視）まで続けて実行する。
+- ユーザーの確認なしにコード修正を適用しない（ただし修正を指示されているときの軽微な修正 — フォーマット、リント自動修正、コメント、インポート順序、空白修正 — は確認不要で即座にコミットする）
 - 修正はCI失敗の解決に必要な最小限の変更に留める
 - テスト失敗の場合、まずコード側のバグを疑う（テストを安易に変更しない）
 - `git add -A` や `git add .` は使用しない
@@ -318,7 +311,7 @@ PR URL: <url>
 7. src/auth.ts と src/utils.ts を修正
 8. ローカルでビルド・リント確認
 9. git add src/auth.ts src/utils.ts && git commit && git push
-10. CI再実行中 → PR URL表示
+10. CI の全ジョブ完了を待つ → 全成功 → 最終結果を報告
 ```
 
 ### Flaky testの場合
