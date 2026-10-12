@@ -1,6 +1,6 @@
 ---
 name: resolve-pr
-description: PR の残タスク（CI 失敗とレビューコメント）をまとめて解決する。「PR対応」「PR残タスク」「PR解決」と言われたときに使用。
+description: PR の残タスク（CI 失敗とレビューコメント）をまとめて解決する。「PR対応」「PR解決」と言われたときに使用。
 ---
 
 # Resolve PR Remaining Tasks

@@ -8,7 +8,7 @@ origin: user
 
 A lightweight fan-out runner for **monotonous, full-tree tasks**: "go through every file under X and do Y." Splits the file set across N agents, dispatches them in parallel in a single message, and aggregates results.
 
-Not for: cross-file refactors that need shared state, anything requiring worktree isolation (use `/devfleet`), or recurring/long-running work (use `/loop` or `/autonomous-loops`).
+Not for: cross-file refactors that need shared state, anything requiring worktree isolation, or recurring/long-running work (use `/loop`).
 
 ## Invocation
 
@@ -80,10 +80,7 @@ For `--mode=fix` with > 30 files, **ask the user to confirm** before launching. 
 
 ### 4. Dispatch in parallel
 
-Send a **single assistant message** with K `Agent` tool calls. Use:
-
-- `subagent_type: "Explore"` when `--mode=detect` or `--dry-run` (no edits needed)
-- `subagent_type: "general-purpose"` when `--mode=fix` (needs Edit/Write)
+Send a **single assistant message** with K `Agent` tool calls, each with `subagent_type: "general-purpose"`: every worker has to read and judge whole files. In `detect` and `--dry-run`, the worker prompt's "Do not edit" line keeps the worker read-only.
 
 Do **not** use `isolation: "worktree"`. Workers share the working tree; disjoint file ownership prevents conflicts.
 
@@ -106,7 +103,7 @@ You are fanout worker {i}/{K}.
 - Edit ONLY files in your slice. Reading other files is fine; writing is not.
 - Do NOT create *.bak, *.new, *.old, or _v2 sidecar files.
 - Do NOT run git commands. Do NOT stage or commit.
-- Do NOT run formatters or linters (the orchestrator handles `just ci` after).
+- Do NOT run formatters or linters (the orchestrator runs the project's checks after).
 - If a file is ambiguous or risky, SKIP it and report why — do not guess.
 - {if dry-run}: Do not edit. For each file, describe the change you would make.
 - {if detect}: Do not edit. Report findings as `path:line — <issue>`.
@@ -157,15 +154,15 @@ After all workers return, produce a single Markdown report:
 ### 7. Post-run
 
 - **Do not commit automatically.** Surface the report and let the user inspect.
-- For `--mode=fix`: remind the user to run `just ci` (or the project's equivalent) before committing. If the project is shogi-gpt-app, this is mandatory per CLAUDE.md.
+- For `--mode=fix`: remind the user to run the project's lint/test command before committing.
 - If a worker reports many SKIPs or cross-cutting concerns, suggest a follow-up `/fanout` with a refined instruction rather than chasing edge cases inline.
 
 ## Anti-patterns
 
 - **Don't** use this skill for tasks where files depend on each other (e.g., renaming a function and updating all callers — give that to one agent, not N).
 - **Don't** raise workers above 6 to "go faster." Diminishing returns and high context cost.
-- **Don't** let workers run `git`, `just ci`, formatters, or anything that mutates shared state outside their slice. The orchestrator owns those.
-- **Don't** use worktree isolation. Workers in the same tree on disjoint files is the whole point — isolation defeats the cost model and conflicts with the user's "no rollback / 1-commit" discipline.
+- **Don't** let workers run `git`, the project's checks, formatters, or anything that mutates shared state outside their slice. The orchestrator owns those.
+- **Don't** use worktree isolation. Workers in the same tree on disjoint files is the whole point — isolation defeats the cost model.
 - **Don't** silently expand the slice. If a worker thinks a file outside its slice also needs changes, it reports that in Notes; the orchestrator handles it in a follow-up pass.
 
 ## Examples
@@ -196,7 +193,4 @@ After all workers return, produce a single Markdown report:
 | If you want… | Use |
 |---|---|
 | Disjoint file slices, one-shot, light | **/fanout** (this) |
-| Same task in isolated worktrees, with progress monitoring | `/devfleet` |
-| Multiple harnesses/models in tmux panes | `/dmux-workflows` |
-| Recurring or self-paced loop | `/loop` or `/autonomous-loops` |
-| Pick which agent personas to assemble | `/team-builder` |
+| Recurring or self-paced loop | `/loop` |

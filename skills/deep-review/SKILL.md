@@ -67,14 +67,14 @@ done
 worktree とユーザー環境から、レビュー基準になるものを集める:
 
 - リポジトリの `CLAUDE.md`、`.claude/rules/`、`CONTRIBUTING.md`、`docs/` 配下のスタイルガイド・ADR
-- ユーザーのグローバルルール `~/.claude/rules/`
+- ユーザーのグローバルルール `~/.claude/CLAUDE.md`
 - lint / formatter 設定 (`.eslintrc*`, `biome.json`, `ruff.toml`, `.prettierrc*`, `.editorconfig`) — 明文化された慣習
 
 要点はプロンプトに直接貼る。長大なものはパスだけ示して worktree 内で読ませる。何も無ければ「明文化されたガイドラインなし。既存コードの慣習を基準とする」と明記する。
 
 ### Step 4: 5体を並列起動する
 
-**1つのアシスタントメッセージに5つの `Agent` 呼び出しをまとめる** (逐次起動しない)。`subagent_type: "general-purpose"`、cwd は worktree。
+**1つのアシスタントメッセージに5つの `Agent` 呼び出しをまとめる** (逐次起動しない)。`subagent_type: "general-purpose"`。Agent ツールに cwd の指定は無く、サブエージェントは親と同じ作業ツリーで起動するので、worktree は絶対パスで渡す。
 
 #### 成果物は中間ファイルに吐かせる
 
@@ -110,7 +110,7 @@ worktree とユーザー環境から、レビュー基準になるものを集�
 <diff 全文。巨大な場合は変更ファイル一覧 + 主要差分に絞り、残りは worktree で読ませる>
 
 コード全体は <worktree絶対パス> にチェックアウト済み。
-差分だけで判断せず、必要に応じてリポジトリ内を読んで判断すること。
+差分だけで判断せず、必要に応じてこのパスの中を読んで判断すること。cwd は別の作業ツリーなので、検索と git にはこのパスを指定する (`git -C <worktree絶対パス> ...`)。
 
 # 禁止事項 (厳守)
 - リポジトリ (worktree 含む) は**読み取り専用**。ソースを一切変更しないこと
@@ -136,7 +136,7 @@ worktree とユーザー環境から、レビュー基準になるものを集�
 # 出力ファイルの中身
 ## <観点名>
 
-### 指摘 (重要な順、最大12件)
+### 指摘 (重要な順)
 - [CRITICAL|HIGH|MEDIUM|LOW] path/to/file.ts:123 — <問題点>
   - 根拠: <コード上の事実。親エージェントが検証できるよう、行番号・関数名・実際の値で書く>
   - 修正案: <具体案>
@@ -196,22 +196,7 @@ worktree とユーザー環境から、レビュー基準になるものを集�
 
 #### PRモード
 
-統合結果を**1つのレビュー**として投稿する。行を特定できる指摘はインラインコメント、特定できない指摘とサマリーは本文に入れる:
-
-```bash
-gh api repos/{owner}/{repo}/pulls/{number}/reviews --input review.json
-```
-
-```json
-{
-  "commit_id": "<PRのheadのSHA>",
-  "event": "COMMENT",
-  "body": "<全体評価 + 行を特定できない指摘 + 代替案>",
-  "comments": [
-    { "path": "src/foo.ts", "line": 42, "side": "RIGHT", "body": "[HIGH] 内容\n\n根拠: ...\n\n修正案: ..." }
-  ]
-}
-```
+統合結果を**1つのレビュー**として投稿する。行を特定できる指摘はインラインコメント、特定できない指摘とサマリーは本文に入れる。投稿は `../fusion-review/SKILL.md` の「9. 出力と後片付け」と同じ GraphQL の pending レビューで組み立てる (REST の一括 POST は、差分に無い行が 1 つでも混ざると全体が 422 で落ちる)。
 
 - `event` は `COMMENT` 固定 (approve / request changes の判断は人間に残す)
 - `body` と各コメントに「deep-review」「5観点」「サブエージェント」「並列レビュー」などレビュー手法への言及を書かない。コードの評価・指摘・根拠・修正案だけを書く
@@ -275,7 +260,7 @@ git worktree remove --force <tmp>/deep-review-wt
 - **出力モードを推測で決めない。** PR書き込みとリポジトリ修正は取り返しがつきにくい。文脈が曖昧なら確認する
 - **PR には `event: COMMENT` のみ。** approve / request changes は人間の判断
 - 修正モードで自動コミット・自動pushしない
-- コスト: 5体のサブエージェントを起動するので安くない。軽い確認には `local-reviewer` / `pr-reviewer` エージェントを使う
+- コスト: 5体のサブエージェントを起動するので安くない
 
 ## 関連スキル
 
@@ -283,5 +268,4 @@ git worktree remove --force <tmp>/deep-review-wt
 |---|---|
 | 単一モデル × 5観点で深く見る | **/deep-review** (これ) |
 | 複数モデルの意見を突き合わせる | `/fusion-review` |
-| 未コミット変更をサッと見る | `local-reviewer` エージェント |
 | 同じ作業を多数ファイルに横展開する | `/fanout` |

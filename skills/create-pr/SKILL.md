@@ -32,7 +32,6 @@ git remote -v
 🚨 **worktree の中にいる場合、`git branch --show-current` は自分が作ったブランチしか返さない。判定にならない。**
 必ず `git -C <メインチェックアウト> branch --show-current` を見る。メインが具象ブランチにいるなら、それが作業対象。
 **worktree を新しく作るときも base を `origin/develop` に決め打ちせず、メインが居るブランチの worktree を作る。**
-(2026-09-12、メインが `docs/ai-processing-flow` にいるのに develop から切って 95 コミット古いコードをリファクタし全損)
 
 現在のブランチが以下の汎用ブランチに該当するか判定する:
 
@@ -152,7 +151,6 @@ git diff origin/${BASE_BRANCH}...HEAD --stat
 
 - 70文字以内
 - conventional commit形式: `<type>: <description>`
-- 英語で記述
 
 ### Step 8: Create PR
 
@@ -189,7 +187,7 @@ PRタイトル・本文・コミットメッセージの記述言語は、明示
 - 汎用ブランチへの直接プッシュは行わない。必ず新規ブランチを作成する
 - ブランチ名・PR内容は基本的に自動決定する。変更が大きく複数の機能や不具合にまたがる場合のみ確認を求めてよい
 - PRテンプレートが存在する場合は必ずそれに従う
-- ドラフトPRをデフォルトとし、ユーザーが明示的に指定した場合のみ通常PRにする
+- 通常PRをデフォルトとし、ユーザーが明示的に指定した場合のみドラフトPRにする
 - `git push --force` は絶対に使用しない
 - PRのベースブランチはリモートのデフォルトブランチを自動検出する
 - シークレットを含むファイルはコミットしない
@@ -208,7 +206,7 @@ PRタイトル・本文・コミットメッセージの記述言語は、明示
 5. PR template found → .github/pull_request_template.md
 6. No existing PR → proceed
 7. Collect diff and commits against base
-8. gh pr create --draft --title "feat: add password reset functionality" ...
+8. gh pr create --title "feat: add password reset functionality" ...
 9. → https://github.com/user/repo/pull/42
 ```
 
@@ -233,14 +231,14 @@ PRタイトル・本文・コミットメッセージの記述言語は、明示
 5. No PR template → use default format
 6. No existing PR → proceed
 7. Collect diff and commits
-8. gh pr create --draft --title "feat: implement user authentication" ...
+8. gh pr create --title "feat: implement user authentication" ...
 9. → https://github.com/user/repo/pull/43
 ```
 
-### Explicit non-draft PR
+### Explicit draft PR
 
 ```
-User: /create-pr --no-draft
+User: /create-pr --draft
 1. ... (same workflow)
-8. gh pr create --title "feat: ..." ...  (no --draft flag)
+8. gh pr create --draft --title "feat: ..." ...
 ```

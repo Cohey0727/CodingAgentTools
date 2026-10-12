@@ -1,7 +1,7 @@
 ---
 name: commit
 description: 変更を分析して conventional commit 形式のメッセージを生成しコミットする。「コミット」「変更を保存」と言われたときに使用。
-disable-model-invocation: true
+effort: low
 ---
 
 # Auto Commit
@@ -65,7 +65,6 @@ Analyze all staged changes to determine:
 
 2. **Comment** - 変更理由の簡潔な要約
    - 「何を変えたか」ではなく「なぜ変えたか」に焦点を当てる
-   - 日本語で書く
    - 40文字以内に収める
 
 ### Step 5: Generate and Execute Commit
@@ -110,7 +109,6 @@ Run `git status` after commit to confirm success. Show the user the commit hash 
 
 ## Rules
 
-- コミット作業に時間をかけない。差分の確認・メッセージ生成・実行を素早く完了させる
 - NEVER add a body to the commit message. Subject line only. No exceptions.
 - NEVER commit files containing secrets (`.env`, API keys, tokens, passwords)
 - NEVER use `git add -A` or `git add .` without user confirmation
