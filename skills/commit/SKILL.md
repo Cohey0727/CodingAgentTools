@@ -1,7 +1,6 @@
 ---
 name: commit
 description: 変更を分析して conventional commit 形式のメッセージを生成しコミットする。「コミット」「変更を保存」と言われたときに使用。
-disable-model-invocation: true
 effort: low
 ---
 

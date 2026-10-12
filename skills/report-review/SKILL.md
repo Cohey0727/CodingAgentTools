@@ -201,22 +201,7 @@ Write to `<folder>/report-review-<slug>.md` (create the directory if needed). Do
 
 #### PR inline
 
-Findings whose line is inside the PR diff become inline comments at that exact line. Everything else (cross-cutting findings such as 修正量の乖離, docs updates, and 技術選定 verdicts, plus the summary) goes into the review body:
-
-```bash
-gh api repos/{owner}/{repo}/pulls/{number}/reviews --input review.json
-```
-
-```json
-{
-  "commit_id": "<head SHA of the PR>",
-  "event": "COMMENT",
-  "body": "<Summary + findings that could not be pinned to a diff line>",
-  "comments": [
-    { "path": "src/foo.ts", "line": 42, "side": "RIGHT", "body": "[HIGH] 仕様チェック / 仕様と修正の一致: <title>\n\nEvidence: ...\n\nFix: ..." }
-  ]
-}
-```
+Findings whose line is inside the PR diff become inline comments at that exact line. Everything else (cross-cutting findings such as 修正量の乖離, docs updates, and 技術選定 verdicts, plus the summary) goes into the review body. Post it as one GraphQL pending review, built the same way as step 9 of `../fusion-review/SKILL.md` (a REST batch POST fails as a whole with 422 when any line is outside the diff).
 
 - `line` is a line number within the PR diff (new-file side). Lines outside the diff cannot take inline comments — put those findings in the body.
 - `event` is always `COMMENT`. Approve / request changes stays a human decision.

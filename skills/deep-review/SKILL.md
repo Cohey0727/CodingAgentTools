@@ -196,22 +196,7 @@ worktree とユーザー環境から、レビュー基準になるものを集�
 
 #### PRモード
 
-統合結果を**1つのレビュー**として投稿する。行を特定できる指摘はインラインコメント、特定できない指摘とサマリーは本文に入れる:
-
-```bash
-gh api repos/{owner}/{repo}/pulls/{number}/reviews --input review.json
-```
-
-```json
-{
-  "commit_id": "<PRのheadのSHA>",
-  "event": "COMMENT",
-  "body": "<全体評価 + 行を特定できない指摘 + 代替案>",
-  "comments": [
-    { "path": "src/foo.ts", "line": 42, "side": "RIGHT", "body": "[HIGH] 内容\n\n根拠: ...\n\n修正案: ..." }
-  ]
-}
-```
+統合結果を**1つのレビュー**として投稿する。行を特定できる指摘はインラインコメント、特定できない指摘とサマリーは本文に入れる。投稿は `../fusion-review/SKILL.md` の「9. 出力と後片付け」と同じ GraphQL の pending レビューで組み立てる (REST の一括 POST は、差分に無い行が 1 つでも混ざると全体が 422 で落ちる)。
 
 - `event` は `COMMENT` 固定 (approve / request changes の判断は人間に残す)
 - `body` と各コメントに「deep-review」「5観点」「サブエージェント」「並列レビュー」などレビュー手法への言及を書かない。コードの評価・指摘・根拠・修正案だけを書く
