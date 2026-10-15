@@ -7,8 +7,8 @@
   "opencode": {
     "overrides": {
       // `#<variant>` pins the session's thinking variant; without one OpenCode
-      // starts on the variant last picked. `high` is the top this model offers.
-      "model": "commandcode-openai/deepseek/deepseek-v4.1-flash#high",
+      // starts on the variant last picked. `max` is the top this model offers.
+      "model": "opencode/deepseek-v4.1-flash-free#max",
       "small_model": "commandcode-openai/deepseek/deepseek-v4.1-flash",
 
       "permission": "allow",
