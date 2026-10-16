@@ -14,7 +14,7 @@
     {
       "name": "deepseek-go",
       "label": "DeepSeek V4.1 Flash (OpenCode Go)",
-      "enabled": true,
+      "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model opencode-go/deepseek-v4.1-flash --agent plan",
       "notes": "--agent plan で read-only"
@@ -30,7 +30,7 @@
     {
       "name": "glm-flash-go",
       "label": "Zhipu AI GLM-5.3 Flash (OpenCode Go)",
-      "enabled": true,
+      "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model opencode-go/glm-5.3-flash --agent plan",
       "notes": "--agent plan で read-only"
@@ -46,7 +46,7 @@
     {
       "name": "mimo-pro-go",
       "label": "MiMo-V2.6-Pro (OpenCode Go)",
-      "enabled": true,
+      "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model opencode-go/mimo-v2.6-pro --agent plan",
       "notes": "--agent plan で read-only"
@@ -62,7 +62,7 @@
     {
       "name": "deepseek-commandcode",
       "label": "DeepSeek V4.1 Flash (Command Code)",
-      "enabled": false,
+      "enabled": true,
       "schema": "stdin",
       "command": "opencode run --model commandcode-openai/deepseek/deepseek-v4.1-flash --agent plan",
       "notes": "--agent plan で read-only"
@@ -70,7 +70,7 @@
     {
       "name": "glm-flash-commandcode",
       "label": "Zhipu AI GLM-5.3 Flash (Command Code)",
-      "enabled": false,
+      "enabled": true,
       "schema": "stdin",
       "command": "opencode run --model commandcode-openai/z-ai/glm-5.3-flash --agent plan",
       "notes": "--agent plan で read-only"
@@ -78,7 +78,7 @@
     {
       "name": "mimo-pro-commandcode",
       "label": "MiMo-V2.6-Pro (Command Code)",
-      "enabled": false,
+      "enabled": true,
       "schema": "stdin",
       "command": "pi -p --model commandcode/xiaomi/mimo-v2.6-pro --tools read,grep,find,ls --no-mcp",
       "notes": "--tools read,grep,find,ls と --no-mcp で read-only"
