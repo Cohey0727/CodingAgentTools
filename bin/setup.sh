@@ -12,13 +12,13 @@
 # `make serve` runs is installed with Homebrew too.
 # Keys still sitting in the old providers/<name>/.env files are carried over
 # first. Then pi is updated, the pi packages in $PI_PACKAGES are installed into
-# pi's user settings and pi's model catalogs are refreshed, DeepSeek Harness and
-# Command Code are installed with npm — each of those upgraded to its latest
-# version when already there — OpenCode likewise with its v2 installer script,
-# and every provider whose key resolves is registered in the global config of
-# every agent CLI — one generator each, listed in $GLOBAL_GENERATORS. Last, the
-# OpenCode plugins in $OPENCODE_PLUGINS are installed or upgraded with
-# `opencode plugin add`.
+# pi's user settings and pi's model catalogs are refreshed, DeepSeek Harness is
+# installed with bun and Command Code with npm — each of those upgraded to its
+# latest version when already there — OpenCode likewise with its v2 installer
+# script, and every provider whose key resolves is registered in the global
+# config of every agent CLI — one generator each, listed in $GLOBAL_GENERATORS.
+# Last, the OpenCode plugins in $OPENCODE_PLUGINS are installed or upgraded
+# with `opencode plugin add`.
 
 set -euo pipefail
 
@@ -398,8 +398,12 @@ install_pi_packages() {
 }
 
 # DeepSeek Harness and Command Code ship as npm packages. Every run installs
-# the latest version, so a command already on the PATH is upgraded in place.
+# the latest version, so a command already on the PATH is upgraded in place —
+# dsh with bun, Command Code with npm.
 DSH_PACKAGE='@deepseek-ai/dsh' # style-check: allow
+# bun runs no dependency lifecycle script until its package is trusted by name,
+# and dsh's node-pty spawn helper and koffi native binding are built by theirs.
+DSH_TRUSTED='@deepseek-ai/dsh-subprocess-local koffi' # style-check: allow
 COMMAND_CODE_PACKAGE='command-code'
 
 # OpenCode ships as a single binary. Its installer script drops the latest one
@@ -488,6 +492,46 @@ install_npm_cli() { # <command> <package> <display name> <Node.js requirement>
     ok "$command $version is already the latest"
   else
     ok "$command $before → $version upgraded"
+  fi
+}
+
+install_dsh_cli() {
+  local version before=
+  section 'installing DeepSeek Harness'
+  if command -v dsh >/dev/null 2>&1; then
+    before=$(dsh --version 2>/dev/null || true)
+  fi
+  if ! command -v bun >/dev/null 2>&1; then
+    if [ -n "$before" ]; then
+      warn "dsh $before left as is — 'bun' is not on your PATH, so it cannot be upgraded"
+    else
+      warn "skipped — 'bun' is not on your PATH. Install bun and Node.js ^22.19.0 or >=24.0.0, then re-run."
+    fi
+    return 0
+  fi
+  if ! bun install -g "$DSH_PACKAGE@latest" >/dev/null 2>&1; then
+    warn "failed — run 'bun install -g $DSH_PACKAGE@latest' by hand"
+    return 0
+  fi
+  if ! bun pm -g trust $DSH_TRUSTED >/dev/null 2>&1; then
+    warn "installed, but its native parts are not built — run 'bun pm -g trust $DSH_TRUSTED' by hand"
+  fi
+  hash -r
+  if ! command -v dsh >/dev/null 2>&1; then
+    warn "installed into $(tilde "${BUN_INSTALL:-$HOME/.bun}/bin"), which is not on your PATH"
+    return 0
+  fi
+  version=$(dsh --version 2>/dev/null || true)
+  if [ -z "$version" ]; then
+    warn "installed, but 'dsh --version' failed — it needs Node.js ^22.19.0 or >=24.0.0"
+    return 0
+  fi
+  if [ -z "$before" ]; then
+    ok "dsh $version installed"
+  elif [ "$before" = "$version" ]; then
+    ok "dsh $version is already the latest"
+  else
+    ok "dsh $before → $version upgraded"
   fi
 }
 
@@ -640,7 +684,7 @@ main() {
 
   install_pi_packages
   install_opencode_cli
-  install_npm_cli dsh "$DSH_PACKAGE" 'DeepSeek Harness' '^22.19.0 or >=24.0.0'
+  install_dsh_cli
   install_npm_cli cmd "$COMMAND_CODE_PACKAGE" 'Command Code' '>=22'
   install_serve_nginx
 
