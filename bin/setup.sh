@@ -531,10 +531,12 @@ install_serve_nginx() {
 # keeps them and this only finds them there. Without that file the add would
 # create an opencode.json the generator here does not own, so this runs after
 # the generators. quota and handoff stay out until they ship v2-format plugins.
+# cli.json is OpenCode's own file, so opencode-cli.overrides is merged into it
+# in place once the adds have written it.
 OPENCODE_PLUGINS='oc-tps @tarquinen/opencode-dcp'
 
 install_opencode_plugins() {
-  local module
+  local module cli merged
   section 'installing OpenCode plugins'
   if ! command -v opencode >/dev/null 2>&1; then
     warn "skipped — 'opencode' is not on your PATH. Install it (https://opencode.ai), then re-run."
@@ -555,6 +557,13 @@ install_opencode_plugins() {
     ok 'plugins updated to their latest'
   else
     warn "update failed — run 'opencode plugin update' by hand"
+  fi
+  cli="$(opencode_config_dir)/cli.json"
+  if [ -f "$cli" ] && merged=$("$PYTHON" "$MODELS_PY" opencode-cli-merge <"$cli"); then
+    printf '%s\n' "$merged" >"$cli.tmp" && mv "$cli.tmp" "$cli"
+    ok 'opencode-cli.overrides merged into cli.json'
+  else
+    warn "opencode-cli.overrides not merged — $cli is missing or not valid JSON"
   fi
 }
 

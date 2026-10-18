@@ -319,6 +319,15 @@ pi works the same way. `make pi-global` deep-merges the top-level `pi.overrides`
 `xhigh` and `max`; pi clamps it to the highest level the model supports.
 
 Anything else OpenCode's config takes goes there too, written in OpenCode's own form. The permission policy does: `"permission": "allow"` runs every tool without an approval prompt, so a session never stops to ask. Its MCP servers do — today the [Playwright MCP](https://github.com/microsoft/playwright-mcp), started on the persistent profile `~/playwright/profiles/default` so a login survives restarts, and Parallel Search, a remote server at `https://search.parallel.ai/mcp` that searches and fetches the web with no key. OpenCode expands `{env:HOME}` in the command itself, so the same entry works on every machine. Chrome locks a profile to one browser, so while another agent drives that profile, OpenCode's Playwright cannot start one. `opencode mcp list` shows whether each connected.
+OpenCode's TUI settings are not in `opencode.json` but in `~/.config/opencode/cli.json`, a file OpenCode writes itself — `opencode plugin add` records plugins there. `make setup` deep-merges the top-level `opencode-cli.overrides` into it in place after adding the plugins, so its keys win and the rest of the file is left as it is. Today it turns the tab bar off:
+
+```jsonc
+"opencode-cli": {
+  "overrides": {
+    "tabs": { "mode": "off" }
+  }
+}
+```
 
 ### OpenCode plugins from npm
 

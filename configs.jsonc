@@ -39,6 +39,14 @@
     }
   },
 
+  // Deep-merged, key by key, into OpenCode's ~/.config/opencode/cli.json (its
+  // TUI settings) by `make setup`, so a key here wins.
+  "opencode-cli": {
+    "overrides": {
+      "tabs": { "mode": "off" }
+    }
+  },
+
   // Deep-merged, key by key, into pi's ~/.pi/agent/settings.json last, so a key
   // here wins over the startup model the primary provider would give.
   "pi": {

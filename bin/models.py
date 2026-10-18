@@ -23,6 +23,7 @@ The file is JSON with // line comments allowed.
   models.py providers           one provider name per line
   models.py primary             the provider marked "primary", if any
   models.py opencode-merge      the OpenCode config on stdin, opencode.overrides merged in
+  models.py opencode-cli-merge  OpenCode's cli.json on stdin, opencode-cli.overrides merged in
   models.py pi-merge            pi's settings.json on stdin, pi.overrides merged in
   models.py vocabulary          every concrete name no file but configs.jsonc may hold
   models.py env-vars            every "${NAME}" the file references, with its provider
@@ -515,7 +516,7 @@ def main(argv):
     action = argv[1] if len(argv) > 1 else ""
     argument = argv[2] if len(argv) > 2 else ""
     api = argv[3] if len(argv) > 3 else ""
-    if action not in ("sh", "check", "tags", "providers", "env-vars", "primary", "opencode-merge", "pi-merge", "vocabulary"):
+    if action not in ("sh", "check", "tags", "providers", "env-vars", "primary", "opencode-merge", "opencode-cli-merge", "pi-merge", "vocabulary"):
         print(__doc__.strip(), file=sys.stderr)
         return 2
     try:
@@ -523,7 +524,7 @@ def main(argv):
             print("\n".join(load_file()))
         elif action == "primary":
             print(primary_provider())
-        elif action in ("opencode-merge", "pi-merge"):
+        elif action in ("opencode-merge", "opencode-cli-merge", "pi-merge"):
             config = json.loads(strip_comments(sys.stdin.read()) or "{}")
             merged = deep_merge(config, agent_overrides(action.removesuffix("-merge")))
             print(json.dumps(merged, indent=2, ensure_ascii=False))
@@ -543,6 +544,7 @@ def main(argv):
                     )
             primary_provider()
             agent_overrides("opencode")
+            agent_overrides("opencode-cli")
             agent_overrides("pi")
         elif not argument:
             print(f"models.py {action}: a provider name is required", file=sys.stderr)
