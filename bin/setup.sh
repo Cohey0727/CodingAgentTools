@@ -13,8 +13,8 @@
 # Keys still sitting in the old providers/<name>/.env files are carried over
 # first. Then pi is updated, the pi packages in $PI_PACKAGES are installed into
 # pi's user settings and pi's model catalogs are refreshed, DeepSeek Harness is
-# installed with bun and Command Code with npm — each of those upgraded to its
-# latest version when already there — OpenCode likewise with its v2 installer
+# installed with bun and Command Code with npm — each of those upgraded in
+# place when already there — OpenCode likewise with its v2 installer
 # script, and every provider whose key resolves is registered in the global
 # config of every agent CLI — one generator each, listed in $GLOBAL_GENERATORS.
 # Last, the OpenCode plugins in $OPENCODE_PLUGINS are installed or upgraded
@@ -398,8 +398,8 @@ install_pi_packages() {
 }
 
 # DeepSeek Harness and Command Code ship as npm packages. Every run installs
-# the latest version, so a command already on the PATH is upgraded in place —
-# dsh with bun, Command Code with npm.
+# the newest release — dsh with bun from the `next` dist-tag, Command Code with
+# npm — so a command already on the PATH is upgraded in place.
 DSH_PACKAGE='@deepseek-ai/dsh' # style-check: allow
 # bun runs no dependency lifecycle script until its package is trusted by name,
 # and dsh's node-pty spawn helper and koffi native binding are built by theirs.
@@ -509,8 +509,8 @@ install_dsh_cli() {
     fi
     return 0
   fi
-  if ! bun install -g "$DSH_PACKAGE@latest" >/dev/null 2>&1; then
-    warn "failed — run 'bun install -g $DSH_PACKAGE@latest' by hand"
+  if ! bun install -g "$DSH_PACKAGE@next" >/dev/null 2>&1; then
+    warn "failed — run 'bun install -g $DSH_PACKAGE@next' by hand"
     return 0
   fi
   if ! bun pm -g trust $DSH_TRUSTED >/dev/null 2>&1; then
@@ -529,7 +529,7 @@ install_dsh_cli() {
   if [ -z "$before" ]; then
     ok "dsh $version installed"
   elif [ "$before" = "$version" ]; then
-    ok "dsh $version is already the latest"
+    ok "dsh $version is already up to date"
   else
     ok "dsh $before → $version upgraded"
   fi
