@@ -129,6 +129,10 @@ dsh_global_config_path() { # -> the home patch `make dsh-global` writes. Every
   printf '%s/cordis.patch.yml' "$(dsh_home)"
 }
 
+dsh_set_up() { # — dsh on the PATH, with the home patch `make dsh-global` writes
+  generated_here "$(dsh_global_config_path)" && command -v dsh >/dev/null 2>&1
+}
+
 dsh_env_path() { # -> the .env dsh resolves an apiKeyEnv from after the process
                  # environment, its credentials file and the working directory's
   printf '%s/.env' "$(dsh_home)"

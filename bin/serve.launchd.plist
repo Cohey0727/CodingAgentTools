@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The launchd agent bin/serve-service.sh fills in on macOS to keep bin/serve.sh
+  running. It exits 0 when there is nothing to serve and non-zero when one of
+  its apps exits, so only the latter starts it again. The log holds dsh web's
+  token URL, hence the umask.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>@SERVICE@</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>@SERVE@</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>@HOME@</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>@PATH@</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>Umask</key>
+  <integer>63</integer>
+  <key>StandardOutPath</key>
+  <string>@LOG@</string>
+  <key>StandardErrorPath</key>
+  <string>@LOG@</string>
+</dict>
+</plist>

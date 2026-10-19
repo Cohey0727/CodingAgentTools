@@ -8,8 +8,8 @@
 # the .env beside it holds those values and is the only file with a key in it.
 # At a prompt, pressing Enter with no input keeps whatever is already set.
 # The checkbox also has "dsh web" and "opencode web" rows, which set the
-# hostnames `make serve` serves those under; once one is set, the nginx
-# `make serve` runs is installed too, with Homebrew or apt-get.
+# hostnames bin/serve.sh serves those under; once one is set, the nginx it runs
+# is installed too, with Homebrew or apt-get.
 # Keys still sitting in the old providers/<name>/.env files are carried over
 # first. Then pi is updated, the pi packages in $PI_PACKAGES are installed into
 # pi's user settings and pi's model catalogs are refreshed, DeepSeek Harness is
@@ -17,8 +17,10 @@
 # place when already there — OpenCode likewise with its v2 installer
 # script, and every provider whose key resolves is registered in the global
 # config of every agent CLI — one generator each, listed in $GLOBAL_GENERATORS.
-# Last, the OpenCode plugins in $OPENCODE_PLUGINS are installed or upgraded
-# with `opencode plugin add`.
+# Then the OpenCode plugins in $OPENCODE_PLUGINS are installed or upgraded
+# with `opencode plugin add`. Last, bin/serve.sh is (re)started as a background
+# service while there is something for it to serve, and removed once there is
+# not.
 
 set -euo pipefail
 
@@ -54,7 +56,7 @@ current_token() { # <provider> -> its resolved key, maybe ""
 
 SERVE_ITEMS=('dsh web' 'opencode web') # the checkbox rows after the providers
 
-serve_var() { # <checkbox row> -> the .env variable holding its `make serve`
+serve_var() { # <checkbox row> -> the .env variable holding its bin/serve.sh
               # hostname, or nothing for a provider
   case $1 in
     'dsh web') printf 'SERVE_HOST' ;;
@@ -321,12 +323,12 @@ prompt_token() { # <provider>
   )
 }
 
-prompt_serve_host() { # <checkbox row> -> its hostname for `make serve` in .env
+prompt_serve_host() { # <checkbox row> -> its hostname for bin/serve.sh in .env
   local row=$1 var host new
   var=$(serve_var "$row")
   host=$(env_value "$var")
   section "$row"
-  note "$var in .env — the hostname a Cloudflare Tunnel publishes $row under (\`make serve\`)"
+  note "$var in .env — the hostname a Cloudflare Tunnel publishes $row under"
   if [ -n "$host" ]; then
     printf '  %shost%s [%s — Enter to keep]: ' "$B" "$RST" "$host"
   else
@@ -341,11 +343,11 @@ prompt_serve_host() { # <checkbox row> -> its hostname for `make serve` in .env
     if [ -n "$host" ]; then
       ok 'kept existing host'
     else
-      warn "left empty — 'make serve' leaves $row out until $var is set"
+      warn "left empty — $row stays off the tunnel until $var is set"
     fi
   else
     set_env_var "$var" "$new"
-    ok "host updated — 'make serve' serves $row at https://$new"
+    ok "host updated — $row is served at https://$new"
   fi
 }
 
@@ -535,7 +537,7 @@ install_dsh_cli() {
   fi
 }
 
-# `make serve` puts nginx in front of the apps it serves, so it is installed
+# bin/serve.sh puts nginx in front of the apps it serves, so it is installed
 # once a hostname says that is in use.
 install_serve_nginx() {
   [ -n "$(env_value SERVE_HOST)$(env_value SERVE_OPENCODE_HOST)" ] || return 0
@@ -670,6 +672,7 @@ main() {
   done
 
   install_opencode_plugins
+  "$ROOT/bin/serve-service.sh" || true
 
   check_environment
 }

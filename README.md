@@ -51,8 +51,11 @@ bin/crush-global-config.sh       # registers every provider in Crush's global cr
 bin/reasonix-global-config.sh    # registers every provider in Reasonix's global config.toml (`make reasonix-global`)
 bin/codewhale-global-config.sh   # registers every provider in Codewhale's global config.toml (`make codewhale-global`)
 bin/dsh-global-config.sh         # registers every provider in DeepSeek Harness's home patch (`make dsh-global`)
-bin/serve.sh                     # runs dsh web and OpenCode behind nginx for their hostnames (`make serve`)
-bin/nginx-install.sh             # installs or upgrades that nginx with Homebrew or apt-get (`make setup`, and `make serve` when it is missing)
+bin/serve.sh                     # runs dsh web and OpenCode behind nginx for their hostnames
+bin/serve-service.sh             # keeps it running as a launchd agent or systemd user unit (`make setup`, `make uninstall`)
+bin/serve.launchd.plist          # that launchd agent, filled in by serve-service.sh
+bin/serve.systemd.service        # that systemd user unit, filled in by serve-service.sh
+bin/nginx-install.sh             # installs or upgrades its nginx with Homebrew or apt-get (`make setup`, and serve.sh when it is missing)
 bin/serve.nginx.conf             # that nginx's config; each start fills it in for the run
 bin/serve.dsh.nginx.conf         # its server for dsh web, handing out dsh's startup token
 bin/serve.opencode.nginx.conf    # its server for OpenCode, sending OpenCode's server password
@@ -64,7 +67,7 @@ bin/skills-uninstall.sh          # removes only the symlinks pointing back here 
 bin/list.sh                      # everything this repo manages (`make list`)
 bin/help.sh                      # target overview (`make help`)
 docs/migrations/                 # upgrade notes for existing checkouts
-Makefile                         # setup / setup-providers / setup-skills / list / uninstall / <agent>-global / serve / help
+Makefile                         # setup / setup-providers / setup-skills / list / uninstall / <agent>-global / help
 ```
 
 Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; adding a skill is a new `skills/<name>/SKILL.md` and a `make setup-skills`. An OpenCode slash command is a new `opencode/command/<name>.md`, and a plugin a new `opencode/plugin/<name>.js` default-exporting `{ id, setup }` — same `make setup-skills`. So is a pi extension, a new `pi/extensions/<name>.ts`, and a pi subagent, a new `pi/agents/<name>.md`.
@@ -99,7 +102,7 @@ Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; addi
   ```
 - [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) — one of the two CLIs `make setup` installs itself, with `bun install -g @deepseek-ai/dsh@next`, upgrading a `dsh` already on your PATH. That needs `bun` and Node.js `^22.19.0 || >=24.0.0`. It is a developer preview: read its [safety notice](https://github.com/deepseek-ai/deepseek-harness/blob/main/SAFETY.md) first
 - [Command Code](https://commandcode.ai) (`cmd`) — the other one, installed with `npm install -g command-code@latest`, upgrading a `cmd` already there. That needs `npm` and Node.js `>=22`. It gets no generated config, only the [skills and `AGENTS.md`](#skills-and-global-instructions), and it updates itself in the background (`cmd update` does it on demand)
-- [nginx](https://nginx.org) (`nginx`) — only for [`make serve`](#dsh-web-and-opencode-through-a-cloudflare-tunnel), and `make setup` installs or upgrades it with `brew install nginx` — or `sudo apt-get install nginx` where there is no Homebrew — once `SERVE_HOST` or `SERVE_OPENCODE_HOST` is set. `make serve` installs it the same way when it is missing
+- [nginx](https://nginx.org) (`nginx`) — only for [`dsh web` and OpenCode through a Cloudflare Tunnel](#dsh-web-and-opencode-through-a-cloudflare-tunnel), and `make setup` installs or upgrades it with `brew install nginx` — or `sudo apt-get install nginx` where there is no Homebrew — once `SERVE_HOST` or `SERVE_OPENCODE_HOST` is set. `bin/serve.sh` installs it the same way when it is missing
 
 Every one of these is optional. A generator writes its config whether or not the
 CLI is installed, and `make setup` says which of them it could not find on your
@@ -114,13 +117,14 @@ make setup
 
 One interactive wizard does everything:
 
-1. Check the providers whose token you want to set or change (arrows + Space, Enter to confirm). Providers that already have a token show ✅ and start unchecked, so Enter alone leaves every token as it is. The last two rows, `dsh web` and `opencode web`, are not providers: checking one asks for the hostname [`make serve`](#dsh-web-and-opencode-through-a-cloudflare-tunnel) serves it under
+1. Check the providers whose token you want to set or change (arrows + Space, Enter to confirm). Providers that already have a token show ✅ and start unchecked, so Enter alone leaves every token as it is. The last two rows, `dsh web` and `opencode web`, are not providers: checking one asks for the hostname [`bin/serve.sh`](#dsh-web-and-opencode-through-a-cloudflare-tunnel) serves it under
 2. Paste the API token of each checked provider — an empty answer keeps the existing token
 3. `configs.jsonc` is validated before anything is written; `.env` is created from `.env.example` if missing (`chmod 600`), gets any variables added to `.env.example` since, and picks up keys still sitting in the old `providers/<name>/.env` files
-4. pi itself is updated, the [pi packages](#pi-packages) that add `/loop`, `/goal`, MCP and subagents are installed into pi's user settings (`~/.pi/agent/settings.json`), and pi's model catalogs are refreshed, and DeepSeek Harness is installed with `bun install -g <package>@next` and Command Code with `npm install -g <package>@latest` — and nginx with `brew install nginx`, or `sudo apt-get install nginx` without Homebrew, once `SERVE_HOST` or `SERVE_OPENCODE_HOST` is set, for [`make serve`](#dsh-web-and-opencode-through-a-cloudflare-tunnel). Anything of these already installed is upgraded to the newest release, so re-running `make setup` is also how you update them
+4. pi itself is updated, the [pi packages](#pi-packages) that add `/loop`, `/goal`, MCP and subagents are installed into pi's user settings (`~/.pi/agent/settings.json`), and pi's model catalogs are refreshed, and DeepSeek Harness is installed with `bun install -g <package>@next` and Command Code with `npm install -g <package>@latest` — and nginx with `brew install nginx`, or `sudo apt-get install nginx` without Homebrew, once `SERVE_HOST` or `SERVE_OPENCODE_HOST` is set, for [`bin/serve.sh`](#dsh-web-and-opencode-through-a-cloudflare-tunnel). Anything of these already installed is upgraded to the newest release, so re-running `make setup` is also how you update them
 5. Every provider whose key resolves is registered in the global config of every CLI — [one generator each](#generated-configs) — with every model in `configs.jsonc`, not just the tagged ones, and all of them starting on [the default provider](#default-provider). pi also gets the keys OpenCode's `/connect` holds, for [Zen and Go](#usage). OpenCode itself is installed or upgraded with its v2 installer, and the [OpenCode plugins](#opencode-plugins-from-npm) with `opencode plugin add`
-6. You get a warning if any of the CLIs those configs are for is missing from your PATH
-7. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/loop`](#loops-in-opencode) and [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode`, and pi gets its [dashboard](#pi-dashboard) in `~/.pi/agent/extensions` ([details below](#skills-and-global-instructions))
+6. [`dsh web` and OpenCode's Web UI](#dsh-web-and-opencode-through-a-cloudflare-tunnel) are (re)started in the background as a service of your user's, while dsh is set up or `SERVE_HOST` or `SERVE_OPENCODE_HOST` is set — and the service is removed once none of them is
+7. You get a warning if any of the CLIs those configs are for is missing from your PATH
+8. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/loop`](#loops-in-opencode) and [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode`, and pi gets its [dashboard](#pi-dashboard) in `~/.pi/agent/extensions` ([details below](#skills-and-global-instructions))
 
 To rotate a token, pick up new settings or add a provider later, just re-run `make setup`. `make setup-providers` and `make setup-skills` each run one half on its own; only the provider half prompts.
 
@@ -160,8 +164,7 @@ and [2026-10-03 — pi 1.0](docs/migrations/2026-10-03-pi-1.0.md).
 | `make reasonix-global` | Re-generate Reasonix's global `~/.reasonix/config.toml`, and the keys it reads from `~/.reasonix/.env` |
 | `make codewhale-global` | Re-generate Codewhale's global `~/.codewhale/config.toml`, keys included, written at 600 |
 | `make dsh-global` | Re-generate DeepSeek Harness's home patch `~/.dsh/cordis.patch.yml`, and the keys it reads from `~/.dsh/.env` |
-| `make serve` | Run `dsh web` and OpenCode behind nginx for the hostnames `SERVE_HOST` and `SERVE_OPENCODE_HOST` name, so each opens there without a login of its own — see [dsh web and OpenCode through a Cloudflare Tunnel](#dsh-web-and-opencode-through-a-cloudflare-tunnel). Each starts only when its hostname is set |
-| `make uninstall` | Remove the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, the `claude/mods` entry in Claude Code's `CLAUDE_CODE_PLUGIN_DIRS`, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
+| `make uninstall` | Remove the [background service](#dsh-web-and-opencode-through-a-cloudflare-tunnel) running `dsh web` and OpenCode, the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, the `claude/mods` entry in Claude Code's `CLAUDE_CODE_PLUGIN_DIRS`, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
 | `make help` | The target list above, on the terminal |
 
 ## Usage
@@ -229,18 +232,27 @@ back to disk, so a hand-edit that misspells one is easy to miss.
 
 ### dsh web and OpenCode through a Cloudflare Tunnel
 
-`make serve` runs `dsh web` and OpenCode's Web UI for a browser elsewhere,
-reached through a Cloudflare Tunnel and signed in to by Cloudflare Access alone
-— no dsh token, no OpenCode password. `SERVE_HOST` and `SERVE_OPENCODE_HOST`
-name the tunnel's public hostnames — set them by checking `dsh web` and
-`opencode web` in `make setup`, in `.env`, or in the environment
-(`SERVE_HOST=dsh.example.com make serve`). Each app starts only when its
-hostname is set, except `dsh web`: once `make setup` has installed and
-configured dsh, it starts without `SERVE_HOST` too, on this machine alone and
-behind its own token URL. With nothing set, nothing starts.
+`make setup` keeps `dsh web` and OpenCode's Web UI running in the background
+for a browser elsewhere, reached through a Cloudflare Tunnel and signed in to by
+Cloudflare Access alone — no dsh token, no OpenCode password. `SERVE_HOST` and
+`SERVE_OPENCODE_HOST` name the tunnel's public hostnames — set them by checking
+`dsh web` and `opencode web` in `make setup`, or in `.env`. Each app starts
+only when its hostname is set, except `dsh web`: once `make setup` has
+installed and configured dsh, it starts without `SERVE_HOST` too, on this
+machine alone and behind its own token URL. With nothing set, nothing starts.
+
+`bin/serve.sh` runs them, as a service of your user's that `make setup`
+(re)starts at the end of every run — a launchd agent on macOS, a systemd user
+unit elsewhere — so they come up at login and again whenever one of them exits.
+Each start reads `.env`, so re-run `make setup` after editing it; the apps are
+found on the `PATH` `make setup` last ran with. When nothing is left to serve, `make setup` removes
+the service, and `make uninstall` always does. A systemd user unit stops at
+logout unless lingering is on, so `make setup` turns it on with
+`loginctl enable-linger`, and says so when that needs `sudo`.
 
 ```bash
-make serve
+tail -f ~/Library/Logs/codingagenttools-serve.log    # macOS
+journalctl --user -u codingagenttools-serve -f       # systemd
 # dsh web: http://127.0.0.1:3080/?token=…    ← on this machine
 # dsh web: https://dsh.example.com/ — through the tunnel, no token needed
 # opencode: https://oc.example.com/ — through the tunnel, no password needed
@@ -261,15 +273,15 @@ Neither app lets its login be turned off, so nginx signs you in:
 - dsh mints a new startup token every start and answers a browser without its
   cookie with 401. nginx turns that 401, on a page for `SERVE_HOST`, into a
   redirect to the token URL, which dsh trades for a 30-day cookie.
-- OpenCode asks every API request for its server password. `make serve` makes
-  one up for the run and nginx sends it with every request for
+- OpenCode asks every API request for its server password. `bin/serve.sh`
+  makes one up for each start and nginx sends it with every request for
   `SERVE_OPENCODE_HOST`. OpenCode then takes whatever reaches it as signed in,
   so nginx refuses a request whose Origin is another site.
 
-So `make serve` writes nginx a config for this run, in a directory only you can
-read, removed when it stops. `make setup` installs nginx once either hostname
-is set — with Homebrew, or with apt-get where there is none, disabling again
-the system service Debian's package starts on port 80 — and `make serve`
+So `bin/serve.sh` writes nginx a config for each start, in a directory only you
+can read, removed when it stops. `make setup` installs nginx once either
+hostname is set — with Homebrew, or with apt-get where there is none, disabling
+again the system service Debian's package starts on port 80 — and `bin/serve.sh`
 installs it the same way when it is missing.
 
 That makes Cloudflare Access the only lock on both hostnames, and whoever gets
@@ -810,7 +822,7 @@ One variable per line, named by whatever `configs.jsonc` references.
 `make setup` prompts for the keys. The variables that already have a default in
 `configs.jsonc` ship commented out there — uncomment one to override it. Two
 variables are not a provider's: `SERVE_HOST` and `SERVE_OPENCODE_HOST`, the
-hostnames [`make serve`](#dsh-web-and-opencode-through-a-cloudflare-tunnel) serves under. The file
+hostnames [`bin/serve.sh`](#dsh-web-and-opencode-through-a-cloudflare-tunnel) serves under. The file
 is sourced by bash, so a value can be computed at use time:
 
 ```bash

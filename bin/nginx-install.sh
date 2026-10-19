@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Install or upgrade the nginx `make serve` puts in front of the apps it serves:
+# Install or upgrade the nginx bin/serve.sh puts in front of the apps it serves:
 # with Homebrew where there is one, otherwise with apt-get through sudo.
-# `make setup` runs this once a hostname says nginx is in use, and `make serve`
+# `make setup` runs this once a hostname says nginx is in use, and bin/serve.sh
 # whenever nginx is missing. Exits non-zero when nginx is still not on the PATH.
 
 set -euo pipefail
@@ -18,7 +18,7 @@ nginx_version() { nginx -v 2>&1 | sed 's|.*/||'; }
 before=
 if command -v nginx >/dev/null 2>&1; then before=$(nginx_version); fi
 
-section 'installing nginx for make serve'
+section 'installing nginx for dsh web and opencode web'
 if command -v brew >/dev/null 2>&1; then
   hint='brew install nginx'
   install() { brew install nginx; }
@@ -28,7 +28,7 @@ elif command -v apt-get >/dev/null 2>&1; then
   install() {
     sudo apt-get update && sudo apt-get install -y nginx || return 1
     # The package also starts nginx as a system service on port 80, while
-    # `make serve` runs one of its own on 127.0.0.1.
+    # bin/serve.sh runs one of its own on 127.0.0.1.
     [ -n "$before" ] || sudo systemctl disable --now nginx || true
   }
 else

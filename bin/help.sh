@@ -25,19 +25,19 @@ target 'make crush-global' "re-generate Crush's global config from configs.jsonc
 target 'make reasonix-global' "re-generate Reasonix's global config from configs.jsonc"
 target 'make codewhale-global' "re-generate Codewhale's global config from configs.jsonc"
 target 'make dsh-global' "re-generate DeepSeek Harness's home patch from configs.jsonc"
-target 'make serve' "run dsh web and OpenCode behind nginx for SERVE_HOST / SERVE_OPENCODE_HOST, no app login there"
-target 'make uninstall' 'remove the generated configs, symlinks and Claude Code mods entry this repo installed'
+target 'make uninstall' 'remove the background service, generated configs, symlinks and Claude Code mods entry this repo installed'
 target 'make help' 'this screen'
 
 section 'notes'
 note 'configs.jsonc holds every provider: endpoint, models and the tags naming each slot'
-note '.env holds the values configs.jsonc refers to as ${NAME}, and the make serve hostnames'
+note '.env holds the values configs.jsonc refers to as ${NAME}, and the dsh web / opencode web hostnames'
 note 'skills and AGENTS.md are installed as symlinks — edits here take effect immediately'
 note '~/.claude/skills is read by Claude Code, Crush, opencode and Reasonix'
 note '~/.agents/skills is read by Codex, Command Code, Crush, DeepSeek Harness, opencode, pi and Reasonix'
 note 'opencode/ adds OpenCode-only extensions: /loop repeats one prompt until done, /goal keeps one objective going'
 note 'pi/ adds pi-only extensions and subagents: a dashboard footer (tok/s, context, topic, todo), /panel, and an Explore on your model'
 note 'AGENTS.md is the single global instruction file — Claude Code reads it as ~/.claude/CLAUDE.md'
+note 'make setup keeps dsh web and opencode web running in the background while one is set up or has a hostname'
 note 'real files and directories at a target path are never overwritten'
 note '.env is never touched by uninstall'
 echo

@@ -4,7 +4,7 @@ ROOT          := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 COMMON        := $(ROOT)/bin/common.sh
 
 .PHONY: setup setup-providers setup-skills list uninstall help update pi-global opencode-global \
-	crush-global reasonix-global codewhale-global dsh-global serve check hooks
+	crush-global reasonix-global codewhale-global dsh-global check hooks
 
 # Both halves of the repo: the provider wizard first (it prompts), then the
 # skill symlinks. SKIP_BANNER keeps it to a single banner.
@@ -54,6 +54,7 @@ list:
 	@"$(ROOT)/bin/list.sh"
 
 uninstall:
+	@"$(ROOT)/bin/serve-service.sh" remove
 	@. "$(COMMON)"; for out in $$(generated_config_paths); do \
 		if generated_here "$$out"; then \
 			rm -f "$$out" && echo "  Removed $$out"; \
@@ -96,14 +97,6 @@ codewhale-global:
 
 dsh-global:
 	@"$(ROOT)/bin/dsh-global-config.sh"
-
-# Serve DeepSeek Harness's and OpenCode's Web UIs on 127.0.0.1 behind nginx for
-# the hostnames SERVE_HOST and SERVE_OPENCODE_HOST name (`make setup` sets
-# them), where they open without an app login. Each starts only when its
-# hostname is set, except dsh web, which also starts on this machine alone once
-# dsh is set up. A missing nginx is installed first.
-serve:
-	@"$(ROOT)/bin/serve.sh"
 
 help:
 	@"$(ROOT)/bin/help.sh"

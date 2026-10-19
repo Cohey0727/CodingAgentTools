@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Serve DeepSeek Harness's and OpenCode's Web UIs behind a Cloudflare Tunnel
-# (`make serve`).
+# Serve DeepSeek Harness's and OpenCode's Web UIs behind a Cloudflare Tunnel,
+# as the background service bin/serve-service.sh registers.
 #
 # SERVE_HOST and SERVE_OPENCODE_HOST, from the environment or else .env, are the
 # hostnames the tunnel publishes dsh web and OpenCode under; each app starts
@@ -29,10 +29,7 @@ OPENCODE_PORT=3082
 dsh_host=${SERVE_HOST:-$(env_value SERVE_HOST)}
 opencode_host=${SERVE_OPENCODE_HOST:-$(env_value SERVE_OPENCODE_HOST)}
 dsh=
-if [ -n "$dsh_host" ] ||
-  { generated_here "$(dsh_global_config_path)" && command -v dsh >/dev/null 2>&1; }; then
-  dsh=1
-fi
+if [ -n "$dsh_host" ] || dsh_set_up; then dsh=1; fi
 if [ -z "$dsh$opencode_host" ]; then
   note "SERVE_HOST and SERVE_OPENCODE_HOST are not set and dsh is not set up — check 'dsh web' or 'opencode web' in 'make setup', or set them in .env"
   exit 0
