@@ -100,7 +100,8 @@ dsh-global:
 # Serve DeepSeek Harness's and OpenCode's Web UIs on 127.0.0.1 behind nginx for
 # the hostnames SERVE_HOST and SERVE_OPENCODE_HOST name (`make setup` sets
 # them), where they open without an app login. Each starts only when its
-# hostname is set.
+# hostname is set, except dsh web, which also starts on this machine alone once
+# dsh is set up. A missing nginx is installed first.
 serve:
 	@"$(ROOT)/bin/serve.sh"
 

@@ -4,7 +4,9 @@
 #
 # SERVE_HOST and SERVE_OPENCODE_HOST, from the environment or else .env, are the
 # hostnames the tunnel publishes dsh web and OpenCode under; each app starts
-# only when its hostname is set. Both listen on 127.0.0.1 and nginx in front of
+# only when its hostname is set. dsh web also starts once `make setup` has
+# installed and configured dsh, for this machine alone with its own token URL
+# while SERVE_HOST is unset. Both listen on 127.0.0.1 and nginx in front of
 # them on 127.0.0.1:$RELAY_PORT, where every route of the tunnel points, telling
 # them apart by Host. nginx signs a visitor in to each app, so behind Cloudflare
 # Access nobody handles an app's own login: dsh's startup token is new every
@@ -26,12 +28,22 @@ OPENCODE_PORT=3082
 
 dsh_host=${SERVE_HOST:-$(env_value SERVE_HOST)}
 opencode_host=${SERVE_OPENCODE_HOST:-$(env_value SERVE_OPENCODE_HOST)}
-if [ -z "$dsh_host$opencode_host" ]; then
-  note "SERVE_HOST and SERVE_OPENCODE_HOST are not set — check 'dsh web' or 'opencode web' in 'make setup', or set them in .env"
+dsh=
+if [ -n "$dsh_host" ] ||
+  { generated_here "$(dsh_global_config_path)" && command -v dsh >/dev/null 2>&1; }; then
+  dsh=1
+fi
+if [ -z "$dsh$opencode_host" ]; then
+  note "SERVE_HOST and SERVE_OPENCODE_HOST are not set and dsh is not set up — check 'dsh web' or 'opencode web' in 'make setup', or set them in .env"
   exit 0
 fi
-need=(nginx)
-if [ -n "$dsh_host" ]; then need+=(dsh); fi
+# Debian installs nginx into /usr/sbin, which a regular user's PATH may lack.
+PATH="$PATH:/usr/sbin"
+if [ -n "$dsh_host$opencode_host" ] && ! command -v nginx >/dev/null 2>&1; then
+  "$ROOT/bin/nginx-install.sh" || exit 1
+fi
+need=()
+if [ -n "$dsh" ]; then need+=(dsh); fi
 if [ -n "$opencode_host" ]; then need+=(opencode); fi
 for cmd in "${need[@]}"; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -66,9 +78,11 @@ fill() { # <template> -> it with this run's @NAME@ values
   printf '%s\n' "$conf"
 }
 
-if [ -n "$dsh_host" ]; then
+if [ -n "$dsh" ]; then
+  dsh_args=(--no-open --port "$DSH_PORT")
+  if [ -n "$dsh_host" ]; then dsh_args+=(--trusted-host "$dsh_host"); fi
   mkfifo "$dir/dsh.out"
-  dsh web --no-open --port "$DSH_PORT" --trusted-host "$dsh_host" > "$dir/dsh.out" &
+  dsh web "${dsh_args[@]}" > "$dir/dsh.out" &
   pids+=("$!"); names+=('dsh web')
   exec 3< "$dir/dsh.out"
   token=''
@@ -89,8 +103,10 @@ if [ -n "$dsh_host" ]; then
   # dsh's output keeps coming through, and its pipe drained.
   cat <&3 &
   pids+=("$!"); names+=('dsh web output')
-  fill "$ROOT/bin/serve.dsh.nginx.conf" > "$dir/sites/dsh.conf"
-  printf 'dsh web: https://%s/ — through the tunnel, no token needed\n' "$dsh_host"
+  if [ -n "$dsh_host" ]; then
+    fill "$ROOT/bin/serve.dsh.nginx.conf" > "$dir/sites/dsh.conf"
+    printf 'dsh web: https://%s/ — through the tunnel, no token needed\n' "$dsh_host"
+  fi
 fi
 
 if [ -n "$opencode_host" ]; then
@@ -105,9 +121,11 @@ if [ -n "$opencode_host" ]; then
   printf 'opencode: https://%s/ — through the tunnel, no password needed\n' "$opencode_host"
 fi
 
-fill "$ROOT/bin/serve.nginx.conf" > "$dir/nginx.conf"
-nginx -p "$dir" -c "$dir/nginx.conf" -e stderr &
-pids+=("$!"); names+=("nginx on 127.0.0.1:$RELAY_PORT")
+if [ -n "$dsh_host$opencode_host" ]; then
+  fill "$ROOT/bin/serve.nginx.conf" > "$dir/nginx.conf"
+  nginx -p "$dir" -c "$dir/nginx.conf" -e stderr &
+  pids+=("$!"); names+=("nginx on 127.0.0.1:$RELAY_PORT")
+fi
 
 while true; do
   for i in "${!pids[@]}"; do
