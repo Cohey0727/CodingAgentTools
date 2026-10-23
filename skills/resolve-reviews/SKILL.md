@@ -244,7 +244,7 @@ PR #<number>: <title>
 **確認を挟むかは、対象コメントの投稿者で決める:**
 
 - **人間レビュワー（Step 3 の分類で「他人」）のコメントが 1 件でも含まれる場合**（インラインでないコメントも含む）: ここで止めて**ユーザーの確認を得てから** Step 6 へ進む。人間への返信は相手のいるやり取りで、方針のすり合わせを飛ばすと取り返しがつかない。
-- **AIレビュワー（Bot）と自分名義のコメントだけの場合**: 確認を待たずに Step 6 以降を続行する。分析結果の提示は Step 10 のサマリーと一緒に事後で出す。
+- **AIレビュワー（Bot）と自分名義のコメントだけの場合**: 確認を待たずに Step 6 以降を続行する。分析結果の提示は Step 11 のサマリーと一緒に事後で出す。
 
 ユーザーが個別のコメントについて対応方針を変更したい場合はそれに従う。自走した場合も、ユーザーが後から方針を変えたいと言えば戻せるように、何をどう判定したかはサマリーに必ず残す。
 
@@ -421,7 +421,18 @@ gh api graphql -f query='
 - 既にresolve済み（`isResolved: true`）のスレッドはスキップする
 - レビューコメントが多数ある場合（10件以上）、GitHub APIのレート制限に注意する。必要に応じてリクエスト間に間隔を空ける。
 
-### Step 10: Summary
+### Step 10: Mark PR as Ready
+
+返信と resolve を終えたら、PR が draft なら ready for review に切り替える:
+
+```bash
+# true のときだけ次の gh pr ready を実行する
+gh pr view <number> --json isDraft -q '.isDraft'
+
+gh pr ready <number>
+```
+
+### Step 11: Summary
 
 完了後、対応結果のサマリーを表示する:
 
@@ -434,6 +445,7 @@ PR: #<number> <title>
 Resolved: <count>件（AIレビュワー・自分名義のスレッド）
 未Resolve: <count>件（他人のスレッド）
 インラインでない返信: <count>件（PR コメント・レビュー本文。resolve 対象外）
+Ready: <draft から切り替えた / 元から ready>
 PR URL: <url>
 ```
 
@@ -449,9 +461,10 @@ Step 5 で止めずに自走した場合は、このサマリーの前に Step 5
 
 ## Rules
 
-- コードを修正したら、Step 7（確認）→ Step 8（commit & push）→ Step 9（返信）まで続けて実行する。
+- コードを修正したら、Step 7（確認）→ Step 8（commit & push）→ Step 9（返信）→ Step 10（ready）まで続けて実行する。
+- 返信と resolve を終えたら、draft の PR は `gh pr ready` で ready for review にする
 - **人間レビュワーのコメントが含まれる場合は、ユーザーの確認なしにコード修正を適用しない / コメントを投稿しない**（Step 5 で止める）
-- **AIレビュワー（Bot）と自分名義のコメントだけの場合は確認を待たずに進める。** 分析結果は Step 10 のサマリーで事後に提示する
+- **AIレビュワー（Bot）と自分名義のコメントだけの場合は確認を待たずに進める。** 分析結果は Step 11 のサマリーで事後に提示する
 - `suggestion` ブロックのコードは正確にそのまま適用する（改変しない）
 - 修正はレビュー指摘の範囲に限定する（関連しない変更を入れない）
 - `git add -A` や `git add .` は使用しない
@@ -488,7 +501,8 @@ Step 5 で止めずに自走した場合は、このサマリーの前に Step 5
 6. src/auth.ts を修正
 7. git add src/auth.ts && git commit && git push
 8. 3件のコメントに返信を投稿
-9. サマリー表示
+9. draft なので gh pr ready で ready に切り替え
+10. サマリー表示
 ```
 
 ### Bot のみのレビューに対して実行
@@ -499,7 +513,7 @@ Step 5 で止めずに自走した場合は、このサマリーの前に Step 5
 1. gh pr view 43 → PR #43
 2. レビューコメント4件を取得 → 全件 copilot-pull-request-reviewer[bot]
 3. 人間レビュワーがいないので確認を挟まず続行
-4. 修正 → commit & push → 返信 → 4スレッドを resolve
+4. 修正 → commit & push → 返信 → 4スレッドを resolve → ready に切り替え
 5. 分析結果（判定内訳）とサマリーをまとめて提示
 ```
 
