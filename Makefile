@@ -3,14 +3,16 @@ SHELL   := /bin/bash
 ROOT          := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 COMMON        := $(ROOT)/bin/common.sh
 
-.PHONY: setup setup-providers setup-skills setup-tokeneconomizer list uninstall help update \
+.PHONY: setup setup-providers setup-skills setup-tokeneconomizer setup-impeccable list uninstall help update \
 	pi-global opencode-global crush-global reasonix-global codewhale-global dsh-global check hooks
 
 # Both halves of the repo: the provider wizard first (it prompts), then the
-# skill symlinks, then TokenEconomizer. SKIP_BANNER keeps it to a single banner.
+# skill symlinks, then TokenEconomizer and Impeccable. SKIP_BANNER keeps it to a
+# single banner.
 setup: setup-providers
 	@SKIP_BANNER=1 "$(ROOT)/bin/skills-setup.sh"
 	@SKIP_BANNER=1 "$(ROOT)/bin/tokeneconomizer.sh"
+	@SKIP_BANNER=1 "$(ROOT)/bin/impeccable.sh"
 
 # Interactive wizard: checkbox provider picker, per-provider API token
 # prompts (Enter keeps the current token), pi package install, one global
@@ -28,6 +30,11 @@ setup-skills:
 # TokenEconomizer (vendor/tokeneconomizer) in Claude Code, pi and OpenCode.
 setup-tokeneconomizer:
 	@"$(ROOT)/bin/tokeneconomizer.sh"
+
+# Impeccable (vendor/impeccable): a plugin in Claude Code, a skill in
+# ~/.agents/skills, and OpenCode's /impeccable command.
+setup-impeccable:
+	@"$(ROOT)/bin/impeccable.sh"
 
 # Validate configs.jsonc, then refuse any provider name outside it.
 check:
@@ -61,6 +68,7 @@ list:
 uninstall:
 	@"$(ROOT)/bin/serve-service.sh" remove
 	@"$(ROOT)/bin/tokeneconomizer.sh" remove
+	@"$(ROOT)/bin/impeccable.sh" remove
 	@. "$(COMMON)"; for out in $$(generated_config_paths); do \
 		if generated_here "$$out"; then \
 			rm -f "$$out" && echo "  Removed $$out"; \

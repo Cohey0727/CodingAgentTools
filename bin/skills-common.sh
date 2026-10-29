@@ -257,3 +257,94 @@ dangling_links() { # <dir>...
   done
   return 0
 }
+
+# A tool kept under vendor/ goes into an agent CLI as a link back here, or, in
+# Claude Code, as a plugin from the folder added as a marketplace of the same
+# name. Claude Code reads a directory marketplace's plugin from the folder
+# itself, so an edit here needs no reinstall. A real file at a link's place, a
+# link somewhere else, and a marketplace of the same name read from anywhere
+# else are someone else's and are left alone.
+
+link_vendored() { # <src> <target>
+  if [ -e "$2" ] && ! linked_to_repo "$2"; then
+    warn "skipped — $(tilde "$2") is not a link into this repo"
+    return 0
+  fi
+  mkdir -p "$(dirname "$2")"
+  ln -sfn "$1" "$2"
+  ok "$(tilde "$2")"
+}
+
+unlink_vendored() { # <target> -> 0 when it removed a link into this repo
+  linked_to_repo "$1" || return 1
+  rm "$1"
+  ok "removed $(tilde "$1")"
+}
+
+claude_marketplace_source() { # <name> -> the folder or repository Claude Code's
+                              # marketplace of that name reads, empty when none
+  claude plugin marketplace list --json 2>/dev/null | "$PYTHON" -c '
+import json, sys
+for m in json.load(sys.stdin):
+    if m.get("name") == sys.argv[1]:
+        print(m.get("path") or m.get("repo") or m.get("url") or "?")
+' "$1"
+}
+
+claude_plugin_state() { # <plugin@marketplace> -> enabled | disabled | absent
+  claude plugin list --json 2>/dev/null | "$PYTHON" -c '
+import json, sys
+found = [p for p in json.load(sys.stdin) if p.get("id") == sys.argv[1]]
+print("absent" if not found else "enabled" if any(p.get("enabled") for p in found) else "disabled")
+' "$1"
+}
+
+claude_vendor_plugin() { # <name> <folder> — the folder as marketplace <name> and
+                         # <name>@<name> installed and enabled; fails when it is not
+  local name=$1 folder=$2 id="$1@$1" source
+  section 'Claude Code'
+  if ! command -v claude >/dev/null 2>&1; then
+    warn "skipped — 'claude' is not on your PATH"
+    return 1
+  fi
+  source=$(claude_marketplace_source "$name")
+  case $source in
+    '')
+      if ! claude plugin marketplace add "$folder" >/dev/null 2>&1; then
+        warn "marketplace add failed — run 'claude plugin marketplace add $folder' by hand"
+        return 1
+      fi
+      ok "marketplace $name -> $(tilde "$folder")"
+      ;;
+    "$folder") ok "marketplace $name already reads $(tilde "$folder")" ;;
+    *)
+      warn "skipped — the $name marketplace reads $(tilde "$source")"
+      return 1
+      ;;
+  esac
+  case $(claude_plugin_state "$id") in
+    absent)
+      if ! claude plugin install "$id" >/dev/null 2>&1; then
+        warn "install failed — run 'claude plugin install $id' by hand"
+        return 1
+      fi
+      ok "plugin $id installed"
+      ;;
+    disabled)
+      if ! claude plugin enable "$id" >/dev/null 2>&1; then
+        warn "enable failed — run 'claude plugin enable $id' by hand"
+        return 1
+      fi
+      ok "plugin $id enabled"
+      ;;
+    enabled) ok "plugin $id already enabled" ;;
+  esac
+}
+
+claude_vendor_plugin_remove() { # <name> <folder> -> 0 when it removed them
+  command -v claude >/dev/null 2>&1 || return 1
+  [ "$(claude_marketplace_source "$1")" = "$2" ] || return 1
+  claude plugin uninstall "$1@$1" >/dev/null 2>&1 || true
+  claude plugin marketplace remove "$1" >/dev/null 2>&1 || return 1
+  ok "removed the Claude Code plugin and marketplace $1"
+}
