@@ -3,13 +3,14 @@ SHELL   := /bin/bash
 ROOT          := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 COMMON        := $(ROOT)/bin/common.sh
 
-.PHONY: setup setup-providers setup-skills list uninstall help update pi-global opencode-global \
-	crush-global reasonix-global codewhale-global dsh-global check hooks
+.PHONY: setup setup-providers setup-skills setup-tokeneconomizer list uninstall help update \
+	pi-global opencode-global crush-global reasonix-global codewhale-global dsh-global check hooks
 
 # Both halves of the repo: the provider wizard first (it prompts), then the
-# skill symlinks. SKIP_BANNER keeps it to a single banner.
+# skill symlinks, then TokenEconomizer. SKIP_BANNER keeps it to a single banner.
 setup: setup-providers
 	@SKIP_BANNER=1 "$(ROOT)/bin/skills-setup.sh"
+	@SKIP_BANNER=1 "$(ROOT)/bin/tokeneconomizer.sh"
 
 # Interactive wizard: checkbox provider picker, per-provider API token
 # prompts (Enter keeps the current token), pi package install, one global
@@ -23,6 +24,10 @@ setup-providers:
 # from claude/mods, named in CLAUDE_CODE_PLUGIN_DIRS in its user settings.
 setup-skills:
 	@"$(ROOT)/bin/skills-setup.sh"
+
+# TokenEconomizer (vendor/tokeneconomizer) in Claude Code, pi and OpenCode.
+setup-tokeneconomizer:
+	@"$(ROOT)/bin/tokeneconomizer.sh"
 
 # Validate configs.jsonc, then refuse any provider name outside it.
 check:
@@ -55,6 +60,7 @@ list:
 
 uninstall:
 	@"$(ROOT)/bin/serve-service.sh" remove
+	@"$(ROOT)/bin/tokeneconomizer.sh" remove
 	@. "$(COMMON)"; for out in $$(generated_config_paths); do \
 		if generated_here "$$out"; then \
 			rm -f "$$out" && echo "  Removed $$out"; \

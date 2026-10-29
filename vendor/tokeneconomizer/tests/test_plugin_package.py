@@ -1,0 +1,508 @@
+"""The installable plugin: manifests, hook files, launchers, and the self-contained bundle.
+
+These pin the packaging facts a host relies on and a refactor could silently break: every hook
+file runs the one launcher that exists and is executable, the Codex file names its host and keeps
+SessionEnd under Codex's three-second cap, the marketplace points at the plugin directory, the
+launcher fails open, and the bundle `scripts/build_plugin.py` writes runs with no checkout beside
+it -- which is what a marketplace install, copying only the plugin directory, actually gets.
+"""
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+import pytest
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PLUGIN = os.path.join(REPO, "plugin")
+EVENTS = {"SessionStart", "UserPromptSubmit", "PostToolUse", "Stop", "SessionEnd"}
+
+
+def _json(*parts):
+    with open(os.path.join(*parts), encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def _commands(hooks_doc):
+    for event, groups in hooks_doc["hooks"].items():
+        for group in groups:
+            for h in group["hooks"]:
+                yield event, group, h
+
+
+def test_manifests_agree_on_identity():
+    claude = _json(PLUGIN, ".claude-plugin", "plugin.json")
+    codex = _json(PLUGIN, ".codex-plugin", "plugin.json")
+    # Copilot reads `.github/plugin/plugin.json` in preference to `.claude-plugin/` (verified on
+    # 1.0.83: only the hooks it names ran), which is how it gets a hook file of its own.
+    copilot = _json(PLUGIN, ".github", "plugin", "plugin.json")
+    assert claude["name"] == codex["name"] == copilot["name"] == "tokeneconomizer"
+    assert claude["version"] == codex["version"] == copilot["version"]
+    assert codex["hooks"] == "./hooks/codex-hooks.json"
+    assert copilot["hooks"] == "hooks/copilot-hooks.json"
+    for m in (codex, copilot):
+        assert os.path.exists(os.path.join(PLUGIN, m["hooks"]))
+    assert "hooks" not in claude              # Claude Code reads hooks/hooks.json by convention
+
+
+@pytest.mark.parametrize("name,host", [("hooks.json", None), ("codex-hooks.json", "codex"),
+                                       ("copilot-hooks.json", "copilot")])
+def test_hook_files_run_the_launcher_on_every_event(name, host):
+    doc = _json(PLUGIN, "hooks", name)
+    # no PreToolUse: the plugin never blocks a call. Claude Code and Copilot report a failed
+    # tool in an event of its own, which the guard must see too.
+    want = EVENTS | ({"PostToolUseFailure"} if host in (None, "copilot") else set())
+    assert set(doc["hooks"]) == want
+    launcher = os.path.join(PLUGIN, "scripts", "te-hook")
+    assert os.access(launcher, os.X_OK)
+    for event, group, h in _commands(doc):
+        assert h["type"] == "command" and "/scripts/te-hook" in h["command"]
+        assert "matcher" not in group                     # PostToolUse watches every tool
+        if host:
+            assert f"--host {host}" in h["command"]
+        if host == "copilot":
+            assert h["command"].startswith('"${PLUGIN_ROOT}/scripts/te-hook"')
+            if event == "SessionEnd" and host == "codex":
+                assert h["timeout"] <= 3                  # Codex's cap for SessionEnd
+
+
+def test_marketplace_lists_the_plugin_directory():
+    m = _json(REPO, ".claude-plugin", "marketplace.json")
+    entry = {p["name"]: p for p in m["plugins"]}["tokeneconomizer"]
+    assert entry["source"] == "./plugin"
+    assert os.path.isdir(os.path.join(REPO, entry["source"], ".claude-plugin"))
+
+
+def test_no_bin_directory():
+    """Files in a plugin's bin/ go on the Bash tool's PATH, and claude.ai will not install a
+    plugin that has one; the launchers live in scripts/."""
+    assert not os.path.exists(os.path.join(PLUGIN, "bin"))
+
+
+def _run_hook(launcher, payload, env):
+    p = subprocess.run([launcher], input=json.dumps(payload), capture_output=True, text=True,
+                       env=env, timeout=60)
+    return p.returncode, p.stdout, p.stderr
+
+
+def _hook_env(tmp_path, **extra):
+    env = {"PATH": os.environ.get("PATH", ""), "TOKENECONOMIZER_HOME": str(tmp_path / "home"),
+           "GIT_CEILING_DIRECTORIES": str(tmp_path), "TE_FOLD_SYNC": "1"}
+    env.update(extra)
+    return env
+
+
+def test_the_launcher_runs_the_dispatcher_from_the_checkout(tmp_path):
+    work = tmp_path / "work"
+    work.mkdir()
+    code, out, _ = _run_hook(os.path.join(PLUGIN, "scripts", "te-hook"),
+                             {"hook_event_name": "SessionStart", "session_id": "s",
+                              "cwd": str(work), "source": "startup"}, _hook_env(tmp_path))
+    assert code == 0 and json.loads(out) == {}
+    assert os.path.isdir(tmp_path / "home" / "repos")      # it ran, and recorded the session
+
+
+def test_the_launcher_fails_open_without_python(tmp_path):
+    code, out, _ = _run_hook(os.path.join(PLUGIN, "scripts", "te-hook"),
+                             {"hook_event_name": "SessionStart"},
+                             {"PATH": "", "TE_PYTHON": "/nonexistent/python"})
+    assert code == 0 and json.loads(out) == {}
+
+
+def test_the_bootstrap_answers_no_change_on_an_old_python(tmp_path, monkeypatch):
+    sys.path.insert(0, os.path.join(PLUGIN, "scripts"))
+    try:
+        import te_bootstrap
+    finally:
+        sys.path.pop(0)
+    monkeypatch.setattr(te_bootstrap, "MIN_VERSION", (99, 0))
+    monkeypatch.setattr(sys, "argv", ["te_bootstrap.py", "hook"])
+    import io
+    monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
+    out = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", out)
+    assert te_bootstrap.main() == 0 and out.getvalue().strip() == "{}"
+
+
+def test_the_bundle_runs_without_a_checkout(tmp_path):
+    out = tmp_path / "market"
+    subprocess.run([sys.executable, os.path.join(REPO, "scripts", "build_plugin.py"),
+                    "--out", str(out)], check=True, capture_output=True)
+    bundle = out / "tokeneconomizer"
+    assert (bundle / "lib" / "tokeneconomizer" / "plugin" / "hook.py").exists()
+    assert not (bundle / "lib" / "te_live").exists()
+    assert (bundle / ".github" / "plugin" / "plugin.json").exists()
+    assert (bundle / "hooks" / "copilot-hooks.json").exists()
+    assert (bundle / "lib" / "tokeneconomizer" / "__init__.py").exists()
+    assert not (bundle / "lib" / "te_harness").exists()
+    assert not (bundle / "lib" / "te_bench").exists()
+    assert not list(bundle.rglob("__pycache__"))
+    m = json.loads((out / ".claude-plugin" / "marketplace.json").read_text())
+    assert m["plugins"][0]["source"] == "./tokeneconomizer"
+    work = tmp_path / "work"
+    work.mkdir()
+    # Run the bundled launcher with the core reachable ONLY through the bundle's lib/.
+    code, stdout, stderr = _run_hook(str(bundle / "scripts" / "te-hook"),
+                                     {"hook_event_name": "SessionStart", "session_id": "s",
+                                      "cwd": str(work), "source": "startup"},
+                                     _hook_env(tmp_path, PYTHONNOUSERSITE="1"))
+    assert code == 0 and json.loads(stdout) == {}, stderr
+    sys.path.insert(0, str(bundle / "scripts"))
+    try:
+        import importlib
+        import te_bootstrap
+        importlib.reload(te_bootstrap)
+        assert te_bootstrap.core_path() == str(bundle / "lib")
+    finally:
+        sys.path.pop(0)
+
+
+# ---- the layering the README promises ------------------------------------------------------
+MECHANISMS = ("microskills", "toolprune", "loopguard", "trace")
+CORE_MODULES = ("config.py", "domain.py", "ledger.py", "pricing.py", "stage.py")
+
+
+def _imports(path):
+    """(module, level) of every import statement in a file."""
+    import ast
+    tree = ast.parse(open(path, encoding="utf-8").read())
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for a in node.names:
+                yield a.name, 0
+        elif isinstance(node, ast.ImportFrom):
+            yield node.module or "", node.level
+            if node.level and not node.module:          # `from .. import plugin`
+                for a in node.names:
+                    yield a.name, node.level
+
+
+def _core_files():
+    pkg = os.path.join(REPO, "tokeneconomizer")
+    for name in CORE_MODULES + ("__init__.py",):
+        yield os.path.join(pkg, name), 0
+    for sub in MECHANISMS:
+        for name in sorted(os.listdir(os.path.join(pkg, sub))):
+            if name.endswith(".py"):
+                yield os.path.join(pkg, sub, name), 1
+
+
+def test_the_mechanisms_never_import_the_plugin_runtime():
+    """The plugin runs the mechanisms; the mechanisms never know it exists. Checked on the source
+    (no import names `plugin`, absolutely or relatively) and on a live import."""
+    for path, depth in _core_files():
+        for mod, level in _imports(path):
+            if level == 0:
+                assert not mod.startswith("tokeneconomizer.plugin"), f"{path} imports {mod}"
+            else:
+                # `from ..plugin import x` inside a subpackage, `from .plugin` at the top level
+                parts = mod.split(".")
+                reaches_top = level == depth + 1
+                assert not (reaches_top and parts[0] == "plugin"), f"{path} imports .{mod}"
+    probe = ("import sys, tokeneconomizer, tokeneconomizer.domain, tokeneconomizer.stage\n"
+             + "".join(f"import tokeneconomizer.{m}\n" for m in MECHANISMS)
+             + "print(sorted(m for m in sys.modules if m.startswith('tokeneconomizer.plugin') "
+               "or m.split('.')[0] in ('te_bench', 'te_harness', 'te_live')))")
+    out = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, cwd=REPO)
+    assert out.stdout.strip() == "[]", out.stdout + out.stderr
+
+
+def test_the_plugin_ships_and_loads_no_benchmark_code():
+    """The benchmark adapters, the facade, the workloads, the baselines and the benchmark-only
+    controllers live with the experiments (`experiments/te_bench/`). The plugin's library is the
+    package alone, and running every part of the plugin loads none of them."""
+    shipped = os.path.join(PLUGIN, "lib", "tokeneconomizer")
+    assert sorted(n for n in os.listdir(shipped)
+                  if os.path.isdir(os.path.join(shipped, n)) and n != "__pycache__") == sorted(
+        MECHANISMS + ("plugin",))
+    for gone in ("adapters", "mechanisms", "vendor", "facade.py", "workloads.py", "runner.py",
+                 "arms.py", "baselines"):
+        assert not os.path.exists(os.path.join(shipped, gone)), gone
+    for gone in ("codex_spiral.py", "spiral_stage.py", "nudge_guard.py"):
+        assert not any(gone in files for _, _, files in os.walk(shipped)), gone
+    mods = ("hook", "controller", "fold", "cli", "denylist", "toolcheck", "repomap",
+            "sidecall", "judge", "probe")
+    probe = ("import sys\n" + "".join(f"import tokeneconomizer.plugin.{m}\n" for m in mods)
+             + "print(sorted({m.split('.')[0] for m in sys.modules} "
+               "& {'te_bench', 'te_harness', 'te_live'}))")
+    out = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, cwd=REPO)
+    assert out.stdout.strip() == "[]", out.stdout + out.stderr
+
+
+def test_the_package_is_stdlib_only_and_never_touches_the_benchmark_harness():
+    pkg = os.path.join(REPO, "tokeneconomizer")
+    for top, _, files in os.walk(pkg):
+        for name in sorted(files):
+            # the repository-map generator runs as a subprocess under a Python that has aider;
+            # nothing imports it
+            if not name.endswith(".py") or name == "repomap_gen.py":
+                continue
+            path = os.path.join(top, name)
+            for mod, level in _imports(path):
+                if level:
+                    continue
+                root = mod.split(".")[0]
+                assert root not in ("te_harness", "te_bench", "te_live", "docker"), \
+                    f"{path} imports {mod}"
+                # tomllib: standard library from 3.11, imported behind an ImportError guard
+                assert root in sys.stdlib_module_names or root in (
+                    "tokeneconomizer", "tomllib"), f"{path} imports non-stdlib {mod}"
+
+
+def test_a_resumed_pi_conversation_keeps_the_section_it_carries():
+    """Pi rebuilds a conversation's system message from its system entries, so a resumed one is
+    given back the facts section it carries, byte for byte: unwrapped from the `<name>` tags Pi
+    stores it in (Pi wraps it again), gone once a patch removed it, and as a compaction restated
+    it. Run through Node, which loads the extension's TypeScript directly."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed")
+    ext = os.path.join(PLUGIN, "pi", "tokeneconomizer.ts")
+    script = """
+const { carriedSection } = await import(process.argv[1]);
+const sys = (sections) => ({ type: "message", message: { role: "system", sections } });
+const compact = (sections) => ({ type: "compaction", systemMessage: { sections } });
+const user = { type: "message", message: { role: "user" } };
+const facts = sys({ tokeneconomizer: "<tokeneconomizer>\\nFacts:\\n- one\\n</tokeneconomizer>" });
+console.log(JSON.stringify([
+  carriedSection([]),
+  carriedSection([facts, user]),
+  carriedSection([facts, sys({ cwd: "<cwd>\\n/x\\n</cwd>" })]),
+  carriedSection([facts, sys({ tokeneconomizer: null })]),
+  carriedSection([facts, compact({ cwd: "c" })]),
+  carriedSection([compact(facts.message.sections)]),
+]));
+"""
+    run = subprocess.run([node, "--experimental-strip-types", "--no-warnings",
+                          "--input-type=module", "-e", script, ext],
+                         capture_output=True, text=True, timeout=60)
+    if run.returncode and "strip-types" in run.stderr:
+        pytest.skip("this node cannot load TypeScript")
+    assert run.returncode == 0, run.stderr
+    facts = "Facts:\n- one"
+    assert json.loads(run.stdout) == ["", facts, facts, "", "", facts]
+
+
+def test_the_plugin_directory_is_also_a_pi_package():
+    """One directory, three agents: Pi loads the extension its `pi` manifest names, and that
+    extension drives the same launchers the Claude Code and Codex hooks run."""
+    pkg = _json(PLUGIN, "package.json")
+    assert "pi-package" in pkg["keywords"]
+    (ext,) = pkg["pi"]["extensions"]
+    src = open(os.path.join(PLUGIN, ext), encoding="utf-8").read()
+    assert 'join(HERE, "..", "scripts")' in src and '"te-hook", ["--host", "pi"]' in src
+    # Exactly the dispatcher's five events. Not `tool_call`, the one Pi event that can block a
+    # call before it runs: the plugin guards nothing, on Pi as on the hook hosts.
+    assert set(re.findall(r'pi\.on\("(\w+)"', src)) == {
+        "session_start", "before_agent_start", "tool_result", "agent_end", "session_shutdown"}
+    # The repository root is the same package for `pi install git:github.com/...`, which clones
+    # the repository and reads the manifest at its root: same package, same extension file.
+    root = _json(os.path.dirname(PLUGIN), "package.json")
+    (root_ext,) = root["pi"]["extensions"]
+    assert os.path.realpath(os.path.join(os.path.dirname(PLUGIN), root_ext)) == \
+        os.path.realpath(os.path.join(PLUGIN, ext))
+    assert {k: v for k, v in root.items() if k != "pi"} == {k: v for k, v in pkg.items()
+                                                           if k != "pi"}
+    # no lockfile: Claude Code installs a plugin's npm dependencies only when one exists,
+    # and this package has none to install (the Pi API is a peer dependency)
+    assert not any(os.path.exists(os.path.join(PLUGIN, f)) for f in
+                   ("package-lock.json", "npm-shrinkwrap.json", "bun.lock", "bun.lockb"))
+
+
+def test_the_plugin_carries_the_core_as_symlinks_an_install_copy_follows(tmp_path):
+    """Claude Code installs a COPY of plugin/ into its cache, even from a local checkout, so the
+    core must be reachable from inside plugin/."""
+    import shutil
+    assert os.listdir(os.path.join(PLUGIN, "lib")) == ["tokeneconomizer"]
+    link = os.path.join(PLUGIN, "lib", "tokeneconomizer")
+    assert os.path.islink(link) and os.readlink(link) == "../../tokeneconomizer"
+    assert os.path.isfile(os.path.join(link, "plugin", "hook.py"))
+    # What an install does: copy the directory, following links. The copy runs on its own.
+    copy = str(tmp_path / "cache" / "tokeneconomizer" / "0.1.0")
+    shutil.copytree(PLUGIN, copy, symlinks=False,
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    out = subprocess.run([os.path.join(copy, "scripts", "te"), "doctor"], capture_output=True,
+                         text=True, env=dict(os.environ, TOKENECONOMIZER_HOME=str(tmp_path / "h")),
+                         timeout=60)
+    assert out.returncode == 0 and "python" in out.stdout, out.stderr[-500:]
+
+
+def test_a_codex_install_copy_finds_the_core_in_the_marketplace_it_came_from(tmp_path):
+    """Codex installs a COPY of plugin/ that drops the `lib` symlink (0.153.1), so the copy
+    finds the core through the marketplace's `source` in Codex's config.toml."""
+    import shutil
+    home = tmp_path / "codex"
+    copy = home / "plugins" / "cache" / "tokeneconomizer" / "tokeneconomizer" / "0.1.0"
+    shutil.copytree(PLUGIN, str(copy), symlinks=True,
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "lib"))
+    (copy / "lib").mkdir()
+
+    def te(source):
+        (home / "config.toml").write_text(
+            'check_for_update_on_startup = false\n\n[marketplaces.tokeneconomizer]\n'
+            f'source_type = "local"\nsource = "{source}"\n')
+        return subprocess.run([str(copy / "scripts" / "te"), "doctor"], capture_output=True,
+                              text=True, timeout=60, cwd=str(tmp_path),
+                              env=dict(os.environ, TOKENECONOMIZER_HOME=str(tmp_path / "h"),
+                                       TE_CORE_PATH="", PYTHONPATH=""))
+    out = te(REPO)
+    assert out.returncode == 0 and "python" in out.stdout, out.stderr[-500:]
+    out = te(str(tmp_path / "nowhere"))
+    assert out.returncode == 1 and "core package was not found" in out.stderr
+    assert "was not found for the plugin at" in (tmp_path / "h" / "errors.log").read_text()
+    # A git marketplace (`codex plugin marketplace add owner/repo`): config.toml names the URL,
+    # and Codex keeps its checkout under .tmp/marketplaces (seen on 0.153.1).
+    (home / ".tmp" / "marketplaces").mkdir(parents=True)
+    os.symlink(REPO, str(home / ".tmp" / "marketplaces" / "tokeneconomizer"))
+    out = te("https://github.com/microsoft/TokenEconomizer.git")
+    assert out.returncode == 0 and "python" in out.stdout, out.stderr[-500:]
+
+
+def test_codex_gets_its_commands_as_plugin_skills_and_no_one_else_does():
+    """Codex has no plugin slash commands; its plugins carry skills. Ours live outside `skills/`,
+    which Claude Code and Copilot would load beside their slash commands. Codex lists a plugin's
+    skills under the plugin's name (0.163.0), so `status` is `$tokeneconomizer:status`, as the
+    slash command is `/tokeneconomizer:status`; each description names TokenEconomizer, which is
+    what a request in plain words, or a Codex that lists the bare name, matches on."""
+    from tokeneconomizer.plugin import cli
+    manifest = _json(PLUGIN, ".codex-plugin", "plugin.json")
+    assert manifest["skills"] == "./codex-skills"
+    assert not os.path.exists(os.path.join(PLUGIN, "skills"))
+    root = os.path.join(PLUGIN, "codex-skills")
+    subcommands = set(cli.build_parser()._subparsers._group_actions[0].choices)
+    names = sorted(os.listdir(root))
+    assert names == ["config", "microskills", "repos", "status", "toolprune"]
+    for name in names:
+        text = open(os.path.join(root, name, "SKILL.md"), encoding="utf-8").read()
+        assert text.startswith(f'---\nname: "{name}"\ndescription: >\n')
+        assert "TokenEconomizer" in text.split("\n")[3]
+        cmd = re.search(r'bin/te" --host codex --cwd "\$\(pwd\)" (\w+)', text)
+        assert cmd and cmd.group(1) in subcommands and cmd.group(1) == name
+
+
+def test_the_commands_keep_their_earlier_names(tmp_path, monkeypatch, capsys):
+    """`te facts` / `te untool` and `/tokeneconomizer:facts` / `:untool` were the names before
+    the mechanisms were renamed; they run exactly what `microskills` / `toolprune` run."""
+    from tokeneconomizer.plugin import cli
+    monkeypatch.setenv("TOKENECONOMIZER_HOME", str(tmp_path / "home"))
+    work = tmp_path / "work"
+    work.mkdir()
+    for new, old in (("microskills", "facts"), ("toolprune", "untool")):
+        outs = []
+        for name in (new, old):
+            assert cli.main(["--cwd", str(work), "--host", "claude", name]) == 0
+            outs.append(capsys.readouterr().out)
+        assert outs[0] == outs[1] and outs[0]
+        body = {}
+        for name in (new, old):
+            text = open(os.path.join(PLUGIN, "slash-commands", f"{name}.md"), encoding="utf-8").read()
+            body[name] = re.search(r'"\$te" --cwd "\$\(pwd\)" (\w+)', text).group(1)
+        assert body[new] == body[old] == new
+
+
+def test_toolprune_note_after_refresh_catalog(tmp_path, monkeypatch, capsys):
+    """Right after `refresh-catalog`, the repository has not folded a session with the catalog
+    yet; the note says so instead of asking for the command just run."""
+    from tokeneconomizer.plugin import cli
+    home = tmp_path / "home"
+    monkeypatch.setenv("TOKENECONOMIZER_HOME", str(home))
+    work = tmp_path / "work"
+    work.mkdir()
+    assert cli.main(["--cwd", str(work), "--host", "claude", "toolprune"]) == 0
+    assert "without `te --host claude toolprune refresh-catalog`" in capsys.readouterr().out
+    (home / "hosts" / "claude").mkdir(parents=True)
+    (home / "hosts" / "claude" / "catalog.json").write_text("{}", encoding="utf-8")
+    assert cli.main(["--cwd", str(work), "--host", "claude", "toolprune"]) == 0
+    out = capsys.readouterr().out
+    assert "joins this repository's evidence from its next session" in out
+    assert "without `te --host" not in out
+
+
+def test_codex_sees_no_claude_format_commands_folder():
+    """Codex turns a plugin's `commands/` folder into skills of its own, which would list every
+    command twice beside `codex-skills/`; Claude Code and Copilot read `slash-commands/` instead."""
+    assert not os.path.exists(os.path.join(PLUGIN, "commands"))
+    for manifest in (".claude-plugin/plugin.json", ".github/plugin/plugin.json"):
+        with open(os.path.join(PLUGIN, manifest), encoding="utf-8") as fh:
+            assert json.load(fh)["commands"] == "./slash-commands/"
+
+
+OPENCODE_DRIVER = """
+const [plugin, env] = [await import(process.argv[1]), JSON.parse(process.argv[2])];
+Object.assign(process.env, env);
+const hooks = {}, said = [], commands = [];
+const ctx = {
+  location: { directory: env.REPO },
+  session: {
+    hook: async (name, cb) => { hooks["session." + name] = cb; },
+    get: async ({ sessionID }) => sessionID === "ses_sub"
+      ? { id: sessionID, parentID: "ses_1" } : { id: sessionID, location: { directory: env.REPO } },
+    context: async () => [{ type: "system" }],
+    synthetic: async (m) => { said.push(m); },
+  },
+  tool: { hook: async (name, cb) => { hooks["tool." + name] = cb; } },
+  command: { transform: async (cb) => cb({ add: (c) => commands.push(c.name) }) },
+  event: { subscribe: () => ({ async *[Symbol.asyncIterator]() {} }) },
+};
+const cleanup = await plugin.default.setup(ctx);
+await hooks["session.prompt"]({ sessionID: "ses_1", prompt: { text: "fix it" } });
+await hooks["session.prompt"]({ sessionID: "ses_sub", prompt: { text: "look around" } });
+for (const sessionID of ["ses_1", "ses_sub"]) {
+  await hooks["tool.execute.after"]({ sessionID, tool: "read", id: "c", input: { path: "a.py" },
+                                      status: "completed", result: { content: "ok" } });
+}
+const request = { sessionID: "ses_1", system: [] };
+hooks["session.context"](request);
+cleanup();
+console.log(JSON.stringify({ id: plugin.default.id, hooks: Object.keys(hooks).sort(), commands,
+                             said, system: request.system }));
+"""
+
+
+def test_the_opencode_plugin_drives_the_dispatcher_with_opencodes_levers(tmp_path):
+    """Loaded as opencode loads it -- a default export `{id, setup}` -- through a link, as it is
+    installed: the prompt opens the session and its turn, a call reaches the guard, the facts go
+    into every request's system prompt, and a subagent's session is left alone. The id is the
+    one a side call switches off. Run through Node, which loads the TypeScript directly."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed")
+    from fixtures import write_opencode_db
+    from tokeneconomizer.plugin import sidecall
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / ".git" / "HEAD").write_text("ref: refs/heads/main\n")
+    home = tmp_path / "home"
+    # A learned fact waiting for the next session, as a fold leaves it.
+    from tokeneconomizer.plugin.paths import repo_identity, repo_state_dir
+    state = repo_state_dir(repo_identity(str(repo)), "opencode", {"TOKENECONOMIZER_HOME": str(home)})
+    os.makedirs(state, exist_ok=True)
+    with open(os.path.join(state, "injection.json"), "w") as fh:
+        json.dump({"rendered": "Facts about this repository:\n- use `python -m pytest`"}, fh)
+    link = tmp_path / "plugins" / "tokeneconomizer.ts"
+    link.parent.mkdir()
+    link.symlink_to(os.path.join(PLUGIN, "opencode", "tokeneconomizer.ts"))
+    env = {"REPO": str(repo), "TOKENECONOMIZER_HOME": str(home), "TE_MICROSKILLS": "envfacts",
+           "OPENCODE_DB": write_opencode_db(str(tmp_path / "opencode.db"), [])}
+    run = subprocess.run([node, "--experimental-strip-types", "--no-warnings", "--input-type=module",
+                          "-e", OPENCODE_DRIVER, str(link), json.dumps(env)],
+                         capture_output=True, text=True, timeout=120)
+    if run.returncode and "strip-types" in run.stderr:
+        pytest.skip("this node cannot load TypeScript")
+    assert run.returncode == 0, run.stderr
+    out = json.loads(run.stdout.strip().splitlines()[-1])
+    assert out["id"] in sidecall.OPENCODE_SIDECALL_CONFIG
+    # No `execute.before`: the plugin blocks no call, on opencode as on the hook hosts.
+    assert out["hooks"] == ["session.context", "session.prompt", "tool.execute.after"]
+    assert out["commands"] == ["te"]
+    assert out["system"] == [{"type": "text",
+                              "text": "Facts about this repository:\n- use `python -m pytest`"}]
+    (notice,) = out["said"]
+    assert notice["sessionID"] == "ses_1" and notice["resume"] is False
+    assert "learned fact" in notice["text"] and "/te microskills" in notice["text"]
+    sessions = sorted(os.listdir(os.path.join(state, "sessions")))
+    assert sessions == ["ses_1.json"]                    # not the subagent's
+    rec = json.load(open(os.path.join(state, "sessions", "ses_1.json")))
+    assert rec["turn"]["turn_key"] == "ses_1:1" and rec["cwd"] == str(repo)

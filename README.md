@@ -34,6 +34,7 @@ opencode/plugin/<name>.js        # an OpenCode plugin, linked into ~/.config/ope
 pi/extensions/<name>.ts          # a pi extension, linked into ~/.pi/agent/extensions
 pi/agents/<name>.md              # a pi subagent definition, linked into ~/.pi/agent/agents
 claude/mods/<name>/              # a Claude Code mod (function hooks), loaded through CLAUDE_CODE_PLUGIN_DIRS in ~/.claude/settings.json
+vendor/tokeneconomizer/          # TokenEconomizer, with its OpenCode plugin, turned on in Claude Code, pi and OpenCode
 configs.jsonc                    # every provider by heading: endpoint, API, models, tags, ${VAR} references (in git)
 .env                             # the values those references point at (gitignored, chmod 600)
 .env.example                     # the same variables, empty (in git)
@@ -64,10 +65,11 @@ bin/skills-setup.sh              # links them there (`make setup-skills`)
 bin/removed-skills.txt           # skills no longer shipped; setup deletes their old links
 bin/skills-list.sh               # their install status (part of `make list`)
 bin/skills-uninstall.sh          # removes only the symlinks pointing back here and the claude/mods entry (part of `make uninstall`)
+bin/tokeneconomizer.sh           # turns TokenEconomizer on in Claude Code, pi and OpenCode (`make setup-tokeneconomizer`), or off (`make uninstall`)
 bin/list.sh                      # everything this repo manages (`make list`)
 bin/help.sh                      # target overview (`make help`)
 docs/migrations/                 # upgrade notes for existing checkouts
-Makefile                         # setup / setup-providers / setup-skills / list / uninstall / <agent>-global / help
+Makefile                         # setup / setup-providers / setup-skills / setup-tokeneconomizer / list / uninstall / <agent>-global / help
 ```
 
 Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; adding a skill is a new `skills/<name>/SKILL.md` and a `make setup-skills`. An OpenCode slash command is a new `opencode/command/<name>.md`, and a plugin a new `opencode/plugin/<name>.js` default-exporting `{ id, setup }` — same `make setup-skills`. So is a pi extension, a new `pi/extensions/<name>.ts`, and a pi subagent, a new `pi/agents/<name>.md`.
@@ -125,8 +127,9 @@ One interactive wizard does everything:
 6. [`dsh web` and OpenCode's Web UI](#dsh-web-and-opencode-through-a-cloudflare-tunnel) are (re)started in the background as a service of your user's, while dsh is set up or `SERVE_HOST` or `SERVE_OPENCODE_HOST` is set — and the service is removed once none of them is
 7. You get a warning if any of the CLIs those configs are for is missing from your PATH
 8. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/loop`](#loops-in-opencode) and [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode`, and pi gets its [dashboard](#pi-dashboard) in `~/.pi/agent/extensions` ([details below](#skills-and-global-instructions))
+9. [TokenEconomizer](#tokeneconomizer) is turned on in Claude Code, pi and OpenCode
 
-To rotate a token, pick up new settings or add a provider later, just re-run `make setup`. `make setup-providers` and `make setup-skills` each run one half on its own; only the provider half prompts.
+To rotate a token, pick up new settings or add a provider later, just re-run `make setup`. `make setup-providers`, `make setup-skills` and `make setup-tokeneconomizer` each run one part on its own; only the provider half prompts.
 
 Coming from an older checkout? `docs/migrations/` has the per-variable
 mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/migrations/2026-08-15-shared-env-settings.md),
@@ -151,9 +154,10 @@ and [2026-10-03 — pi 1.0](docs/migrations/2026-10-03-pi-1.0.md).
 
 | Target | What it does |
 |--------|--------------|
-| `make setup` | Both halves: the provider wizard, then the skill, `AGENTS.md`, OpenCode extension, pi extension and Claude Code mod install |
+| `make setup` | Both halves: the provider wizard, then the skill, `AGENTS.md`, OpenCode extension, pi extension and Claude Code mod install, then TokenEconomizer |
 | `make setup-providers` | The wizard above only: tokens, `.env` upkeep, pi packages, DeepSeek Harness, Command Code, OpenCode plugins, and every global config |
 | `make setup-skills` | The shared assets only: `skills/`, `agents/`, `AGENTS.md`, `opencode/` and `pi/` into every agent CLI, and `claude/mods/` into Claude Code's `CLAUDE_CODE_PLUGIN_DIRS` |
+| `make setup-tokeneconomizer` | [TokenEconomizer](#tokeneconomizer) only: turn it on in Claude Code, pi and OpenCode |
 | `make check` | Validate `configs.jsonc`, then refuse any concrete name outside it (see `CLAUDE.md`). What the pre-commit hook runs |
 | `make hooks` | Install the lefthook pre-commit hook that runs `make check` |
 | `make list` | Every provider with its heading, endpoint and models with their tags, then every skill, subagent, OpenCode extension and pi extension with its install status |
@@ -164,7 +168,7 @@ and [2026-10-03 — pi 1.0](docs/migrations/2026-10-03-pi-1.0.md).
 | `make reasonix-global` | Re-generate Reasonix's global `~/.reasonix/config.toml`, and the keys it reads from `~/.reasonix/.env` |
 | `make codewhale-global` | Re-generate Codewhale's global `~/.codewhale/config.toml`, keys included, written at 600 |
 | `make dsh-global` | Re-generate DeepSeek Harness's home patch `~/.dsh/cordis.patch.yml`, and the keys it reads from `~/.dsh/.env` |
-| `make uninstall` | Remove the [background service](#dsh-web-and-opencode-through-a-cloudflare-tunnel) running `dsh web` and OpenCode, the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, the `claude/mods` entry in Claude Code's `CLAUDE_CODE_PLUGIN_DIRS`, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
+| `make uninstall` | Remove the [background service](#dsh-web-and-opencode-through-a-cloudflare-tunnel) running `dsh web` and OpenCode, [TokenEconomizer](#tokeneconomizer), the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, the `claude/mods` entry in Claude Code's `CLAUDE_CODE_PLUGIN_DIRS`, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
 | `make help` | The target list above, on the terminal |
 
 ## Usage
@@ -518,6 +522,33 @@ renamed. It loads like the dashboard, through `claude/mods`.
 
 `claude plugin validate claude/mods/pr-title` and
 `claude plugin test claude/mods/pr-title` check it.
+
+### TokenEconomizer
+
+[TokenEconomizer](https://github.com/microsoft/TokenEconomizer) cuts what a
+session spends: it learns short facts about each repository from finished
+sessions and adds them at the start of the next one (micro-skills), leaves out
+tools a repository's sessions never use (tool pruning, Claude Code only), and
+redirects a turn stuck repeating the same failure. It needs Python 3.10+ on the
+`PATH` and no key of its own. `vendor/tokeneconomizer/` is upstream's tree
+without `experiments/` and `docs/assets/`, plus an OpenCode 2.x plugin
+upstream does not have (`plugin/opencode/tokeneconomizer.ts`, read through
+`tokeneconomizer/trace/opencode.py`).
+
+`make setup` (or `make setup-tokeneconomizer` alone) turns it on:
+
+| Agent | How | Commands |
+|-------|-----|----------|
+| Claude Code | `vendor/tokeneconomizer` added as the `tokeneconomizer` marketplace and its plugin installed; Claude Code reads it from the folder, so edits here need no reinstall. Every run records the tool catalog again (`toolprune refresh-catalog`) | `/tokeneconomizer:status` and the rest |
+| pi | `vendor/tokeneconomizer` as a local package in `~/.pi/agent/settings.json` | `/te status` |
+| OpenCode | `~/.config/opencode/plugin/tokeneconomizer.ts`, a symlink to its plugin. The background service loads it on its next start: `opencode service restart` | `/te status` |
+
+In OpenCode the plugin's notices arrive as messages in the session, which the
+model reads too, and tool pruning does not apply. State lives in
+`~/.tokeneconomizer`; `make uninstall` turns the plugin off and leaves it.
+
+The tests run from `vendor/tokeneconomizer`:
+`uv run --no-project --with pytest python -m pytest tests`.
 
 ### Loops in OpenCode
 
