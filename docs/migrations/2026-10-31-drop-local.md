@@ -13,6 +13,9 @@ DeepSeek Harness のモデル選択から `Local` が消える。
 - 生成物から `local` が消える。pi の `models.json`、OpenCode の `opencode.json`
   （と `~/.config/opencode/claude-compatibles/local.token`）、DeepSeek Harness の
   `cordis.patch.yml`。
+- provider の `picker`（`false` で `make setup` のチェックボックス一覧から外す）を
+  削除した。使っていたのが `local` だけで、もう誰も書かない。`picker` を書いた
+  provider は `make check` が未知のキーとして弾く。
 
 ## 手順
 

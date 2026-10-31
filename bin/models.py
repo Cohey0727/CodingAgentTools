@@ -52,7 +52,7 @@ PI_APIS = {"anthropic": ("anthropic-messages", ""), "openai": ("openai-completio
 AGENTS = ("pi", "opencode", "dsh")
 
 MODEL_KEYS = {"id", "api", "tags", "context_window", "max_tokens", "reasoning", "input"}
-PROVIDER_KEYS = {"label", "API_KEY", "BASE_URL", "REQUEST_HEADERS", "api", "catalog", "primary", "picker", "agents", "defaults", "opencode", "models"}
+PROVIDER_KEYS = {"label", "API_KEY", "BASE_URL", "REQUEST_HEADERS", "api", "catalog", "primary", "agents", "defaults", "opencode", "models"}
 OPENCODE_KEYS = {"lean", "context_window", "max_tokens"}
 AGENT_ROOT_KEYS = {"overrides"}
 
@@ -246,10 +246,6 @@ def load(name):
     if not isinstance(label, str):
         raise ConfigError(f"{where}: label must be a string")
 
-    picker = raw.get("picker", True)
-    if not isinstance(picker, bool):
-        raise ConfigError(f"{where}: picker must be a boolean")
-
     agents = raw.get("agents", list(AGENTS))
     if (
         not isinstance(agents, list)
@@ -344,7 +340,6 @@ def load(name):
         "name": name,
         "section": heading,
         "label": label,
-        "picker": picker,
         "agents": agents,
         "api_key": expand(api_key),
         "api_key_var": api_key_var,
@@ -477,7 +472,6 @@ def shell(config, api=""):
         "M_SMALL_MODEL": config["small_model"]["id"],
         "M_SMALL_API": config["small_model"]["api"],
         "M_OPENCODE_LEAN": "true" if config["lean"] else "false",
-        "M_PICKER": "true" if config["picker"] else "false",
         "M_AGENTS": " ".join(config["agents"]),
         "M_OPENCODE_MODELS_JSON": opencode_models_json(config, models),
         "M_PI_ID": pi_id(config),
