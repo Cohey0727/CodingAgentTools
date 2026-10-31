@@ -6,10 +6,10 @@ One repo that generates the global config of three CLIs covering every provider 
 
 | Heading | Provider | Endpoint | API | Flagship model |
 |---------|----------|----------|-----|----------------|
-| Subscriptions | DeepSeek | `https://api.deepseek.com/anthropic` | anthropic | `deepseek-v4-pro` |
-| Subscriptions | Local (llama.cpp) | `http://127.0.0.1:11301` | anthropic | `default` |
-| Subscriptions | gtr (llama.cpp behind Cloudflare) | `https://gtr-halogen.spaghetti-monster.com` | openai | `default` |
-| Subscriptions | Claude API | `https://api.anthropic.com` | anthropic | `claude-sonnet-5-5` |
+| API Key | DeepSeek | `https://api.deepseek.com/anthropic` | anthropic | `deepseek-v4-pro` |
+| API Key | Local (llama.cpp) | `http://127.0.0.1:11301` | anthropic | `default` |
+| API Key | gtr (llama.cpp behind Cloudflare) | `https://gtr-halogen.spaghetti-monster.com` | openai | `default` |
+| API Key | Claude API | `https://api.anthropic.com` | anthropic | `claude-sonnet-5-5` |
 | Command Code | Command Code | `https://api.commandcode.ai/provider` | openai, and anthropic for Claude | `deepseek/deepseek-v4.1-flash` |
 
 `make setup` writes every provider into each CLI's global config, so a bare `opencode` gets them all under `/models`, a bare `pi` under `/model`, and so does `dsh web` — `dsh` has no default profile, so a bare `dsh` only answers `--profile <name> is required`.
@@ -135,7 +135,8 @@ mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/mig
 [2026-09-18 — pi の provider id を label に揃える](docs/migrations/2026-09-18-pi-provider-labels.md),
 [2026-09-27 — OpenCode v2 移行](docs/migrations/2026-09-27-opencode-v2.md),
 [2026-10-03 — pi 1.0](docs/migrations/2026-10-03-pi-1.0.md),
-and [2026-10-31 — Crush・Reasonix・Codewhale の対応を削除](docs/migrations/2026-10-31-drop-crush-reasonix-codewhale.md).
+[2026-10-31 — Crush・Reasonix・Codewhale の対応を削除](docs/migrations/2026-10-31-drop-crush-reasonix-codewhale.md),
+and [2026-10-31 — OpenCode の見出しを Subscriptions から API Key に変更](docs/migrations/2026-10-31-api-key-heading.md).
 
 ### Make targets
 
@@ -652,7 +653,7 @@ providers sit under in [OpenCode's model dialog](#opencodes-model-dialog):
 ```json
 {
   "providers": {
-    "Subscriptions": {
+    "API Key": {
       "deepseek": {
         "label": "DeepSeek",
         "API_KEY": "${DEEPSEEK_API_KEY}",
@@ -805,13 +806,13 @@ display name leads with its provider's `label` when it has one:
 
 ```
 OpenCode Zen          OpenCode's own, from /connect
+API Key               providers."API Key"
+  DeepSeek deepseek-v4-pro
+  Local default
 Command Code          providers."Command Code"
   claude-opus-5
   deepseek/deepseek-v4.1-flash
 OpenCode Go           OpenCode's own, from /connect
-Subscriptions         providers.Subscriptions
-  DeepSeek deepseek-v4-pro
-  Local default
 ```
 
 Nothing under those headings comes from OpenCode's own catalog (models.dev).

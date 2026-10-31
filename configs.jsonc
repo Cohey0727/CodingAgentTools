@@ -67,7 +67,7 @@
   // model.
   "providers": {
 
-    "Subscriptions": {
+    "API Key": {
 
       "deepseek": {
         "label": "DeepSeek",
