@@ -316,8 +316,9 @@ provider_env_vars() { # -> "<provider><tab><var><tab><what>" per reference
   "$PYTHON" "$MODELS_PY" env-vars
 }
 
-configured_provider() { # <provider> — valid, and its API_KEY resolves to something?
-  ( models_resolve "$1" && [ -n "$M_API_KEY" ] )
+configured_provider() { # <provider> <agent> — valid, offered to that agent, and
+                        # its API_KEY resolves to something?
+  ( models_resolve "$1" && [ -n "$M_API_KEY" ] && [[ " $M_AGENTS " == *" $2 "* ]] )
 }
 
 model_rows() { # -> one "id US context US max_tokens US reasoning US input" line

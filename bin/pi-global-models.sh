@@ -53,7 +53,7 @@ providers=()
 entries=()
 while IFS= read -r provider; do
   [ -n "$provider" ] || continue
-  configured_provider "$provider" || continue
+  configured_provider "$provider" pi || continue
   providers+=("$provider")
   # Each provider is resolved in a subshell so none leaks into the next.
   entries+=("$(

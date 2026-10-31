@@ -109,7 +109,7 @@ blocks=()
 skipped=()
 while IFS= read -r provider; do
   [ -n "$provider" ] || continue
-  configured_provider "$provider" || continue
+  configured_provider "$provider" dsh || continue
   if ! ( models_resolve "$provider" && [ -n "$M_API_KEY_VAR" ] ); then
     skipped+=("$provider: its API_KEY is written out in configs.jsonc, not referenced")
     continue

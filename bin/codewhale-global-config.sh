@@ -84,7 +84,7 @@ providers=()
 blocks=()
 while IFS= read -r provider; do
   [ -n "$provider" ] || continue
-  configured_provider "$provider" || continue
+  configured_provider "$provider" codewhale || continue
   providers+=("$provider")
   for api in $(models_resolve "$provider"; printf '%s' "$M_APIS"); do
     blocks+=("$(

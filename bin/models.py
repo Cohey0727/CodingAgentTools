@@ -47,8 +47,12 @@ APIS = ("anthropic", "openai")
 # appends /v1/messages itself, its OpenAI one only /chat/completions.
 PI_APIS = {"anthropic": ("anthropic-messages", ""), "openai": ("openai-completions", "/v1")}
 
+# The agent CLIs a provider can be registered in: the prefix of each generator's
+# name in GLOBAL_GENERATORS (bin/common.sh).
+AGENTS = ("pi", "opencode", "crush", "reasonix", "codewhale", "dsh")
+
 MODEL_KEYS = {"id", "api", "tags", "context_window", "max_tokens", "reasoning", "input"}
-PROVIDER_KEYS = {"label", "API_KEY", "BASE_URL", "REQUEST_HEADERS", "api", "catalog", "primary", "picker", "defaults", "opencode", "models"}
+PROVIDER_KEYS = {"label", "API_KEY", "BASE_URL", "REQUEST_HEADERS", "api", "catalog", "primary", "picker", "agents", "defaults", "opencode", "models"}
 OPENCODE_KEYS = {"lean", "context_window", "max_tokens"}
 AGENT_ROOT_KEYS = {"overrides"}
 
@@ -246,6 +250,14 @@ def load(name):
     if not isinstance(picker, bool):
         raise ConfigError(f"{where}: picker must be a boolean")
 
+    agents = raw.get("agents", list(AGENTS))
+    if (
+        not isinstance(agents, list)
+        or not agents
+        or not all(agent in AGENTS for agent in agents)
+    ):
+        raise ConfigError(f"{where}: agents must be a non-empty array of {', '.join(AGENTS)}")
+
     base_url = expand(raw.get("BASE_URL") or "").rstrip("/")
     if not base_url:
         raise ConfigError(f"{where}: BASE_URL is required")
@@ -333,6 +345,7 @@ def load(name):
         "section": heading,
         "label": label,
         "picker": picker,
+        "agents": agents,
         "api_key": expand(api_key),
         "api_key_var": api_key_var,
         "api_key_fallback": api_key_fallback,
@@ -465,6 +478,7 @@ def shell(config, api=""):
         "M_SMALL_API": config["small_model"]["api"],
         "M_OPENCODE_LEAN": "true" if config["lean"] else "false",
         "M_PICKER": "true" if config["picker"] else "false",
+        "M_AGENTS": " ".join(config["agents"]),
         "M_OPENCODE_MODELS_JSON": opencode_models_json(config, models),
         "M_PI_ID": pi_id(config),
         "M_PI_MODELS_JSON": pi_models_json(config, models),

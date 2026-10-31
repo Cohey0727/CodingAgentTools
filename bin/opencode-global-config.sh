@@ -41,7 +41,7 @@ fi
 providers=()
 while IFS= read -r provider; do
   [ -n "$provider" ] || continue
-  if configured_provider "$provider"; then providers+=("$provider"); fi
+  if configured_provider "$provider" opencode; then providers+=("$provider"); fi
 done < <(provider_names)
 
 if [ "${#providers[@]}" -eq 0 ]; then

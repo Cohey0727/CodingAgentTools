@@ -83,7 +83,7 @@ providers=()
 blocks=()
 while IFS= read -r provider; do
   [ -n "$provider" ] || continue
-  configured_provider "$provider" || continue
+  configured_provider "$provider" crush || continue
   providers+=("$provider")
   for api in $(models_resolve "$provider"; printf '%s' "$M_APIS"); do
     blocks+=("$(models_resolve "$provider" "$api"; provider_crushrc)")

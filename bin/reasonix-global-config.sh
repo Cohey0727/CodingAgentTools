@@ -102,7 +102,7 @@ blocks=()
 skipped=()
 while IFS= read -r provider; do
   [ -n "$provider" ] || continue
-  configured_provider "$provider" || continue
+  configured_provider "$provider" reasonix || continue
   # A key Reasonix can only be handed through a variable it reads itself, and a
   # header it would carry in the clear, are the two things this config cannot
   # express. Both are reported rather than written around.

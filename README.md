@@ -9,6 +9,7 @@ One repo that generates the global config of six CLIs covering every provider �
 | Subscriptions | DeepSeek | `https://api.deepseek.com/anthropic` | anthropic | `deepseek-v4-pro` |
 | Subscriptions | Local (llama.cpp) | `http://127.0.0.1:11301` | anthropic | `default` |
 | Subscriptions | gtr (llama.cpp behind Cloudflare) | `https://gtr-halogen.spaghetti-monster.com` | openai | `default` |
+| Subscriptions | Claude API | `https://api.anthropic.com` | anthropic | `claude-sonnet-5-5` |
 | Command Code | Command Code | `https://api.commandcode.ai/provider` | openai, and anthropic for Claude | `deepseek/deepseek-v4.1-flash` |
 
 `make setup` writes every provider into each CLI's global config, so a bare `opencode` gets them all under `/models`, a bare `pi` under `/model`, `crush`, `reasonix` and `codewhale` each start with the whole set, and so does `dsh web` — `dsh` has no default profile, so a bare `dsh` only answers `--profile <name> is required`.
@@ -18,6 +19,8 @@ There is no proxy or translation layer: each CLI talks to each endpoint in the A
 > **Note:** Local is not a hosted service — it points at a `llama-server` on your own machine, which serves the Anthropic shape on `/v1/messages`. Here that server is LlamaGate (`~/Workspace/LlamaGate`): `just start` brings it up on `127.0.0.1:11301`, `just profiles` lists the models it can load and `just start <profile>` swaps to one. There is no account and no key, so its `API_KEY` is a placeholder the CLIs merely require to be non-empty. Both llama.cpp providers use the fixed model id `default`: llama-server answers with whatever it has loaded and ignores the requested name, so swapping the model on the server needs no edit here. Keep `context_window` at or below the server's `--ctx-size`.
 
 > **Note:** gtr is a `llama-server` on another machine, published through a Cloudflare tunnel and gated by Cloudflare Access. Requests without Access credentials get a 302 to the login page, so its `REQUEST_HEADERS` carry an Access service token (`CF-Access-Client-Id` / `CF-Access-Client-Secret`), whose values come from `.env`. Like Local, its `API_KEY` is only a placeholder unless `llama-server` runs with `--api-key`. It answers the OpenAI shape; `GTR9_API` in `.env` switches the CLIs to the Anthropic one if it is ever put behind such a route.
+
+> **Note:** Claude API (`claude-api`) is Anthropic's pay-as-you-go API, read from `ANTHROPIC_API_KEY` in `.env` — not a Claude subscription. It is registered in OpenCode, pi and DeepSeek Harness only, through its `agents` field, and only once that key is set.
 
 > **Note:** Command Code's [Provider API](https://commandcode.ai/docs/provider) serves Claude only on `/v1/messages` and every other model only on `/v1/chat/completions`, answering 400 on the wrong one — so its Claude models carry `"api": "anthropic"` and the rest follow the provider's `"api": "openai"`. It needs a paid plan: the Go plan has no API access. Its model list is not maintained by hand: the provider declares `catalog` and `make update` rewrites it from the Provider API's own list.
 
@@ -783,6 +786,7 @@ models speak, as the route `<name>-<api>`; `make list` prints the name.
 | `REQUEST_HEADERS` | Extra request headers as a `{ "Name": "value" }` object, sent by every CLI — e.g. a Cloudflare Access service token in front of a self-hosted server. A value is a literal or one `${VAR}` reference standing alone, and a reference is carried wherever the CLI's format can express one |
 | `primary` | `true` on at most one provider — the one every generated config starts on |
 | `picker` | `false` keeps the provider out of the checkbox list `make setup` starts from — configure it by naming it directly (`bin/setup.sh <name>`). A key that resolves still registers it like any other provider |
+| `agents` | The CLIs that register the provider, from `pi`, `opencode`, `crush`, `reasonix`, `codewhale` and `dsh`. Omit it for all of them. A provider still needs a key that resolves to be registered anywhere |
 | `opencode.lean` | `true` gives the provider [a lean agent of its own](#lean-agents) |
 | `opencode.context_window`, `opencode.max_tokens` | Cap every model's limits for OpenCode. These are the window a session may grow into before it is compacted, so a backend too slow to prefill its full context sets them lower — `gtr` does |
 
