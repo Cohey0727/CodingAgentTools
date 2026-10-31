@@ -88,29 +88,6 @@
         ]
       },
 
-      "local": {
-        "label": "Local",
-        "picker": false,
-        // llama-server takes no auth, but the CLIs require a non-empty value.
-        "API_KEY": "${LOCAL_API_KEY:-local}",
-        "BASE_URL": "${LOCAL_BASE_URL:-http://127.0.0.1:11301}",
-        "api": "anthropic",
-
-        "models": [
-          // llama-server answers with whatever it has loaded and ignores the id,
-          // so a fixed one survives swapping the model. context_window must stay
-          // at or below the server's --ctx-size.
-          {
-            "id": "default",
-            "tags": ["default", "small"],
-            "context_window": 262144,
-            "max_tokens": 32768,
-            "reasoning": true,
-            "input": ["text"]
-          }
-        ]
-      },
-
       "gtr": {
         "label": "GTR9",
         // llama-server takes no auth unless started with --api-key, but the CLIs
@@ -137,8 +114,9 @@
         },
 
         "models": [
-          // As with "local", the id is a label and context_window must stay at or
-          // below the server's --ctx-size.
+          // llama-server answers with whatever it has loaded and ignores the id,
+          // so a fixed one survives swapping the model. context_window must stay
+          // at or below the server's --ctx-size.
           {
             "id": "default",
             "tags": ["default", "small"],

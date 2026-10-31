@@ -7,7 +7,6 @@ One repo that generates the global config of three CLIs covering every provider 
 | Heading | Provider | Endpoint | API | Flagship model |
 |---------|----------|----------|-----|----------------|
 | API Key | DeepSeek | `https://api.deepseek.com/anthropic` | anthropic | `deepseek-v4-pro` |
-| API Key | Local (llama.cpp) | `http://127.0.0.1:11301` | anthropic | `default` |
 | API Key | gtr (llama.cpp behind Cloudflare) | `https://gtr-halogen.spaghetti-monster.com` | openai | `default` |
 | API Key | Claude API | `https://api.anthropic.com` | anthropic | `claude-sonnet-5-5` |
 | Command Code | Command Code | `https://api.commandcode.ai/provider` | openai, and anthropic for Claude | `deepseek/deepseek-v4.1-flash` |
@@ -16,9 +15,7 @@ One repo that generates the global config of three CLIs covering every provider 
 
 There is no proxy or translation layer: each CLI talks to each endpoint in the API it already speaks — Anthropic Messages (`/v1/messages`) or OpenAI Chat Completions (`/v1/chat/completions`), chosen per model. Every model any of them can reach is declared in one place: `configs.jsonc` at the repo root, in git, grouped by the [heading](#opencodes-model-dialog) it sits under in OpenCode's model dialog, with [tags](#tags) naming the model each CLI starts on. It holds no secret — an API key is written there as `${DEEPSEEK_API_KEY}` and read from the single gitignored `.env` beside it.
 
-> **Note:** Local is not a hosted service — it points at a `llama-server` on your own machine, which serves the Anthropic shape on `/v1/messages`. Here that server is LlamaGate (`~/Workspace/LlamaGate`): `just start` brings it up on `127.0.0.1:11301`, `just profiles` lists the models it can load and `just start <profile>` swaps to one. There is no account and no key, so its `API_KEY` is a placeholder the CLIs merely require to be non-empty. Both llama.cpp providers use the fixed model id `default`: llama-server answers with whatever it has loaded and ignores the requested name, so swapping the model on the server needs no edit here. Keep `context_window` at or below the server's `--ctx-size`.
-
-> **Note:** gtr is a `llama-server` on another machine, published through a Cloudflare tunnel and gated by Cloudflare Access. Requests without Access credentials get a 302 to the login page, so its `REQUEST_HEADERS` carry an Access service token (`CF-Access-Client-Id` / `CF-Access-Client-Secret`), whose values come from `.env`. Like Local, its `API_KEY` is only a placeholder unless `llama-server` runs with `--api-key`. It answers the OpenAI shape; `GTR9_API` in `.env` switches the CLIs to the Anthropic one if it is ever put behind such a route.
+> **Note:** gtr is a `llama-server` on another machine, published through a Cloudflare tunnel and gated by Cloudflare Access. Requests without Access credentials get a 302 to the login page, so its `REQUEST_HEADERS` carry an Access service token (`CF-Access-Client-Id` / `CF-Access-Client-Secret`), whose values come from `.env`. Its `API_KEY` is only a placeholder unless `llama-server` runs with `--api-key`. It answers the OpenAI shape; `GTR9_API` in `.env` switches the CLIs to the Anthropic one if it is ever put behind such a route. Its model id is the fixed `default`: llama-server answers with whatever it has loaded and ignores the requested name, so swapping the model on the server needs no edit here. Keep `context_window` at or below the server's `--ctx-size`.
 
 > **Note:** Claude API (`claude-api`) is Anthropic's pay-as-you-go API, read from `ANTHROPIC_API_KEY` in `.env` — not a Claude subscription. It is registered in OpenCode, pi and DeepSeek Harness only, through its `agents` field, and only once that key is set.
 
@@ -136,7 +133,8 @@ mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/mig
 [2026-09-27 — OpenCode v2 移行](docs/migrations/2026-09-27-opencode-v2.md),
 [2026-10-03 — pi 1.0](docs/migrations/2026-10-03-pi-1.0.md),
 [2026-10-31 — Crush・Reasonix・Codewhale の対応を削除](docs/migrations/2026-10-31-drop-crush-reasonix-codewhale.md),
-and [2026-10-31 — OpenCode の見出しを Subscriptions から API Key に変更](docs/migrations/2026-10-31-api-key-heading.md).
+[2026-10-31 — OpenCode の見出しを Subscriptions から API Key に変更](docs/migrations/2026-10-31-api-key-heading.md),
+and [2026-10-31 — Local provider を削除](docs/migrations/2026-10-31-drop-local.md).
 
 ### Make targets
 
@@ -808,7 +806,7 @@ display name leads with its provider's `label` when it has one:
 OpenCode Zen          OpenCode's own, from /connect
 API Key               providers."API Key"
   DeepSeek deepseek-v4-pro
-  Local default
+  GTR9 default
 Command Code          providers."Command Code"
   claude-opus-5
   deepseek/deepseek-v4.1-flash
@@ -875,7 +873,7 @@ way, one file per header, and referenced from `options.headers`. OpenCode merges
 `opencode.json` and `opencode.jsonc` from its config directory (later wins)
 and then your project `opencode.json`, so hand-written settings still override
 the generated ones — and a file this repo did not generate is never touched
-(first-line marker). The `local` provider shows up whenever its placeholder
+(first-line marker). The `gtr` provider shows up whenever its placeholder
 token is set; picking it while `llama-server` is down fails that one request
 and nothing else.
 
@@ -1115,7 +1113,7 @@ Where each provider's key comes from:
 |----------|---------|
 | DeepSeek | https://platform.deepseek.com/ |
 | Command Code | https://commandcode.ai/studio/ (not on the Go plan) |
-| Local / gtr | No account and no key; `API_KEY` is a placeholder the CLIs only require to be non-empty |
+| gtr | No account and no key; `API_KEY` is a placeholder the CLIs only require to be non-empty |
 
 - [DeepSeek: Claude Code Integration Guide](https://api-docs.deepseek.com/guides/agent_integrations/claude_code) — where its Anthropic endpoint is documented
 - [Command Code: Provider API](https://commandcode.ai/docs/provider)
