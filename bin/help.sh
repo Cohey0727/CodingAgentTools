@@ -23,9 +23,6 @@ target 'make list' 'every provider, skill, subagent and OpenCode extension, with
 target 'make update' 'fetch every live model catalog, rewrite configs.jsonc from it, and regenerate every global config'
 target 'make pi-global' "re-generate pi's global models.json from configs.jsonc"
 target 'make opencode-global' "re-generate OpenCode's global config from configs.jsonc"
-target 'make crush-global' "re-generate Crush's global config from configs.jsonc"
-target 'make reasonix-global' "re-generate Reasonix's global config from configs.jsonc"
-target 'make codewhale-global' "re-generate Codewhale's global config from configs.jsonc"
 target 'make dsh-global' "re-generate DeepSeek Harness's home patch from configs.jsonc"
 target 'make uninstall' 'remove the background service, TokenEconomizer, Impeccable, generated configs, symlinks and Claude Code mods entry this repo installed'
 target 'make help' 'this screen'
@@ -34,8 +31,8 @@ section 'notes'
 note 'configs.jsonc holds every provider: endpoint, models and the tags naming each slot'
 note '.env holds the values configs.jsonc refers to as ${NAME}, and the dsh web / opencode web hostnames'
 note 'skills and AGENTS.md are installed as symlinks — edits here take effect immediately'
-note '~/.claude/skills is read by Claude Code, Crush, opencode and Reasonix'
-note '~/.agents/skills is read by Codex, Command Code, Crush, DeepSeek Harness, opencode, pi and Reasonix'
+note '~/.claude/skills is read by Claude Code and opencode'
+note '~/.agents/skills is read by Codex, Command Code, DeepSeek Harness, opencode and pi'
 note 'opencode/ adds OpenCode-only extensions: /loop repeats one prompt until done, /goal keeps one objective going'
 note 'pi/ adds pi-only extensions and subagents: a dashboard footer (tok/s, context, topic, todo), /panel, and an Explore on your model'
 note 'AGENTS.md is the single global instruction file — Claude Code reads it as ~/.claude/CLAUDE.md'

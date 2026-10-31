@@ -49,7 +49,7 @@ PI_APIS = {"anthropic": ("anthropic-messages", ""), "openai": ("openai-completio
 
 # The agent CLIs a provider can be registered in: the prefix of each generator's
 # name in GLOBAL_GENERATORS (bin/common.sh).
-AGENTS = ("pi", "opencode", "crush", "reasonix", "codewhale", "dsh")
+AGENTS = ("pi", "opencode", "dsh")
 
 MODEL_KEYS = {"id", "api", "tags", "context_window", "max_tokens", "reasoning", "input"}
 PROVIDER_KEYS = {"label", "API_KEY", "BASE_URL", "REQUEST_HEADERS", "api", "catalog", "primary", "picker", "agents", "defaults", "opencode", "models"}

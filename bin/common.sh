@@ -33,9 +33,6 @@ generated_marker() { # <target> [<comment prefix>] -> the first line of a config
 
 PI_GLOBAL_MARKER=$(generated_marker pi-global)
 OPENCODE_GLOBAL_MARKER=$(generated_marker opencode-global)
-CRUSH_GLOBAL_MARKER=$(generated_marker crush-global "$GENERATED_MARKER_HASH")
-REASONIX_GLOBAL_MARKER=$(generated_marker reasonix-global "$GENERATED_MARKER_HASH")
-CODEWHALE_GLOBAL_MARKER=$(generated_marker codewhale-global "$GENERATED_MARKER_HASH")
 DSH_GLOBAL_MARKER=$(generated_marker dsh-global "$GENERATED_MARKER_HASH")
 OPENCODE_PLUGIN_MARKER="$GENERATED_MARKER — the plugin itself lives in this repo"
 
@@ -73,18 +70,12 @@ opencode_tokens_dir() { # -> per-provider secret files the generated config refe
 # runs them in this order; every one is also a make target of its own.
 GLOBAL_GENERATORS="pi-global-models
 opencode-global-config
-crush-global-config
-reasonix-global-config
-codewhale-global-config
 dsh-global-config"
 
 # The path each of those owns, in the same order. Named here rather than in the
 # Makefile so uninstall removes them all without spelling any of them out.
 GENERATED_CONFIG_PATHS="pi_global_models_path
 opencode_global_config_path
-crush_global_config_path
-reasonix_global_config_path
-codewhale_global_config_path
 dsh_global_config_path"
 
 generated_config_paths() { # -> one generated config path per line
@@ -93,26 +84,6 @@ generated_config_paths() { # -> one generated config path per line
     [ -n "$path" ] || continue
     printf '%s\n' "$("$path")"
   done <<<"$GENERATED_CONFIG_PATHS"
-}
-
-reasonix_home() { # -> Reasonix's own directory: its config and its .env
-  printf '%s' "${REASONIX_HOME:-$HOME/.reasonix}"
-}
-
-reasonix_global_config_path() { # -> the config.toml `make reasonix-global` writes
-  printf '%s/config.toml' "$(reasonix_home)"
-}
-
-reasonix_env_path() { # -> the only file Reasonix reads provider keys from
-  printf '%s/.env' "$(reasonix_home)"
-}
-
-codewhale_home() { # -> Codewhale's own directory: its config and its .env
-  printf '%s' "${CODEWHALE_HOME:-$HOME/.codewhale}"
-}
-
-codewhale_global_config_path() { # -> the config.toml `make codewhale-global` writes
-  printf '%s/config.toml' "$(codewhale_home)"
 }
 
 dsh_home() { # -> DeepSeek Harness's own directory: its patch, .env and AGENTS.md
@@ -136,14 +107,6 @@ dsh_set_up() { # — dsh on the PATH, with the home patch `make dsh-global` writ
 dsh_env_path() { # -> the .env dsh resolves an apiKeyEnv from after the process
                  # environment, its credentials file and the working directory's
   printf '%s/.env' "$(dsh_home)"
-}
-
-crush_config_dir() { # -> Crush's global config directory
-  printf '%s/crush' "${XDG_CONFIG_HOME:-$HOME/.config}"
-}
-
-crush_global_config_path() { # -> the crushrc `make crush-global` writes
-  printf '%s/crushrc' "$(crush_config_dir)"
 }
 
 default_provider() { # <configured provider>... -> the one to start on. The name
@@ -425,14 +388,6 @@ pi_secret_ref() { # <variable name> [<fallback>] -> the same command, in the for
   local command
   command=$(secret_command "$1" "${2:-}") || return 1
   printf '!%s' "$command"
-}
-
-crush_secret_ref() { # <variable name> [<fallback>] -> the substitution Crush runs
-                     # when it reads its config. crushrc is bash, so the command
-                     # goes in as one.
-  local command
-  command=$(secret_command "$1" "${2:-}") || return 1
-  printf '$(%s)' "$command"
 }
 
 route_id() { # [<api>] -> the id every generated config files the route of that

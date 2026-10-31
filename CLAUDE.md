@@ -29,8 +29,8 @@
   隠れた設定ではない
 - agent 名で引くテーブル（`bin/skills-common.sh`）、agent ごとの make ターゲット
 
-generator は CLI ごとに 1 本ずつある（pi / OpenCode / Crush / Reasonix /
-Codewhale / DeepSeek Harness）。そこを抽象化しても読みにくくなるだけで、
+generator は CLI ごとに 1 本ずつある（pi / OpenCode / DeepSeek Harness）。
+そこを抽象化しても読みにくくなるだけで、
 `configs.jsonc` が単一の真実である性質は変わらない。
 
 ### provider の値をどう取るか

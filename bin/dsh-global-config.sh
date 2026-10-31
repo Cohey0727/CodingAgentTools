@@ -15,8 +15,7 @@
 # .env in dsh's home. The value is copied into that last one at 600, so a rotated
 # key needs a re-run. A header takes a value, but a `!!js` expression in a patch
 # is evaluated when the patch loads, so a header configs.jsonc references is read
-# back out of this repo's .env by the command pi and Crush run, and nothing is
-# copied.
+# back out of this repo's .env by the command pi runs, and nothing is copied.
 
 set -euo pipefail
 

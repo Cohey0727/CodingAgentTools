@@ -4,7 +4,7 @@ ROOT          := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 COMMON        := $(ROOT)/bin/common.sh
 
 .PHONY: setup setup-providers setup-skills setup-tokeneconomizer setup-impeccable list uninstall help update \
-	pi-global opencode-global crush-global reasonix-global codewhale-global dsh-global check hooks
+	pi-global opencode-global dsh-global check hooks
 
 # Both halves of the repo: the provider wizard first (it prompts), then the
 # skill symlinks, then TokenEconomizer and Impeccable. SKIP_BANNER keeps it to a
@@ -91,23 +91,13 @@ uninstall:
 	@"$(ROOT)/bin/skills-uninstall.sh"
 
 # One target per agent CLI: each writes that CLI's own global config from
-# configs.jsonc, so a bare `pi`, `opencode`, `crush`,
-# `reasonix` or `codewhale`, and every `dsh --profile`, lists every provider.
-# `make setup` runs them all.
+# configs.jsonc, so a bare `pi` or `opencode`, and every `dsh --profile`, lists
+# every provider. `make setup` runs them all.
 pi-global:
 	@"$(ROOT)/bin/pi-global-models.sh"
 
 opencode-global:
 	@"$(ROOT)/bin/opencode-global-config.sh"
-
-crush-global:
-	@"$(ROOT)/bin/crush-global-config.sh"
-
-reasonix-global:
-	@"$(ROOT)/bin/reasonix-global-config.sh"
-
-codewhale-global:
-	@"$(ROOT)/bin/codewhale-global-config.sh"
 
 dsh-global:
 	@"$(ROOT)/bin/dsh-global-config.sh"

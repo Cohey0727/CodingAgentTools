@@ -1,8 +1,8 @@
 # CodingAgentTools
 
-> Run OpenCode, pi, Crush, Reasonix, Codewhale and DeepSeek Harness on the LLM backends you pay for (DeepSeek · Command Code · your own llama.cpp) — one repo, one `make setup`, one `configs.jsonc` driving all six CLIs, and the skills and global instruction file they share.
+> Run OpenCode, pi and DeepSeek Harness on the LLM backends you pay for (DeepSeek · Command Code · your own llama.cpp) — one repo, one `make setup`, one `configs.jsonc` driving all three CLIs, and the skills and global instruction file they share.
 
-One repo that generates the global config of six CLIs covering every provider — [OpenCode](https://opencode.ai), the [pi coding agent](https://pi.dev), [Crush](https://github.com/charmbracelet/crush), [Reasonix](https://github.com/esengine/DeepSeek-Reasonix), [Codewhale](https://codewhale.net) and [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness):
+One repo that generates the global config of three CLIs covering every provider — [OpenCode](https://opencode.ai), the [pi coding agent](https://pi.dev) and [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness):
 
 | Heading | Provider | Endpoint | API | Flagship model |
 |---------|----------|----------|-----|----------------|
@@ -12,7 +12,7 @@ One repo that generates the global config of six CLIs covering every provider �
 | Subscriptions | Claude API | `https://api.anthropic.com` | anthropic | `claude-sonnet-5-5` |
 | Command Code | Command Code | `https://api.commandcode.ai/provider` | openai, and anthropic for Claude | `deepseek/deepseek-v4.1-flash` |
 
-`make setup` writes every provider into each CLI's global config, so a bare `opencode` gets them all under `/models`, a bare `pi` under `/model`, `crush`, `reasonix` and `codewhale` each start with the whole set, and so does `dsh web` — `dsh` has no default profile, so a bare `dsh` only answers `--profile <name> is required`.
+`make setup` writes every provider into each CLI's global config, so a bare `opencode` gets them all under `/models`, a bare `pi` under `/model`, and so does `dsh web` — `dsh` has no default profile, so a bare `dsh` only answers `--profile <name> is required`.
 
 There is no proxy or translation layer: each CLI talks to each endpoint in the API it already speaks — Anthropic Messages (`/v1/messages`) or OpenAI Chat Completions (`/v1/chat/completions`), chosen per model. Every model any of them can reach is declared in one place: `configs.jsonc` at the repo root, in git, grouped by the [heading](#opencodes-model-dialog) it sits under in OpenCode's model dialog, with [tags](#tags) naming the model each CLI starts on. It holds no secret — an API key is written there as `${DEEPSEEK_API_KEY}` and read from the single gitignored `.env` beside it.
 
@@ -52,9 +52,6 @@ bin/models-update.py             # rewrites that provider's models in configs.js
 bin/setup.sh                     # provider wizard: pick providers, paste tokens, install (`make setup-providers`)
 bin/pi-global-models.sh          # registers every provider in pi's global models.json (`make pi-global`)
 bin/opencode-global-config.sh    # registers every provider in OpenCode's global config (`make opencode-global`)
-bin/crush-global-config.sh       # registers every provider in Crush's global crushrc (`make crush-global`)
-bin/reasonix-global-config.sh    # registers every provider in Reasonix's global config.toml (`make reasonix-global`)
-bin/codewhale-global-config.sh   # registers every provider in Codewhale's global config.toml (`make codewhale-global`)
 bin/dsh-global-config.sh         # registers every provider in DeepSeek Harness's home patch (`make dsh-global`)
 bin/serve.sh                     # runs dsh web and OpenCode behind nginx for their hostnames
 bin/serve-service.sh             # keeps it running as a launchd agent or systemd user unit (`make setup`, `make uninstall`)
@@ -91,22 +88,6 @@ Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; addi
   curl -fsSL https://pi.dev/install.sh | sh
   ```
   (the older `@mariozechner/pi-coding-agent` package is deprecated and resolves environment references differently)
-- [Crush](https://github.com/charmbracelet/crush) (`crush` on your PATH) — optional, and like the two above it gets a generated config:
-  ```bash
-  brew install charmbracelet/tap/crush   # macOS (Homebrew)
-  # or
-  npm install -g @charmland/crush
-  ```
-- [Reasonix](https://github.com/esengine/DeepSeek-Reasonix) (`reasonix` on your PATH) — optional:
-  ```bash
-  npm install -g reasonix
-  # or
-  brew install esengine/reasonix/reasonix
-  ```
-- [Codewhale](https://codewhale.net) (`codewhale` on your PATH) — optional:
-  ```bash
-  curl -fsSL https://codewhale.net/install.sh | sh
-  ```
 - [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) — one of the two CLIs `make setup` installs itself, with `bun install -g @deepseek-ai/dsh@next`, upgrading a `dsh` already on your PATH. That needs `bun` and Node.js `^22.19.0 || >=24.0.0`. It is a developer preview: read its [safety notice](https://github.com/deepseek-ai/deepseek-harness/blob/main/SAFETY.md) first
 - [Command Code](https://commandcode.ai) (`cmd`) — the other one, installed with `npm install -g command-code@latest`, upgrading a `cmd` already there. That needs `npm` and Node.js `>=22`. It gets no generated config, only the [skills and `AGENTS.md`](#skills-and-global-instructions), and it updates itself in the background (`cmd update` does it on demand)
 - [nginx](https://nginx.org) (`nginx`) — only for [`dsh web` and OpenCode through a Cloudflare Tunnel](#dsh-web-and-opencode-through-a-cloudflare-tunnel), and `make setup` installs or upgrades it with `brew install nginx` — or `sudo apt-get install nginx` where there is no Homebrew — once `SERVE_HOST` or `SERVE_OPENCODE_HOST` is set. `bin/serve.sh` installs it the same way when it is missing
@@ -153,7 +134,8 @@ mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/mig
 [2026-09-18 — pi の MCP・サブエージェントと起動モデル](docs/migrations/2026-09-18-pi-mcp-subagents.md),
 [2026-09-18 — pi の provider id を label に揃える](docs/migrations/2026-09-18-pi-provider-labels.md),
 [2026-09-27 — OpenCode v2 移行](docs/migrations/2026-09-27-opencode-v2.md),
-and [2026-10-03 — pi 1.0](docs/migrations/2026-10-03-pi-1.0.md).
+[2026-10-03 — pi 1.0](docs/migrations/2026-10-03-pi-1.0.md),
+and [2026-10-31 — Crush・Reasonix・Codewhale の対応を削除](docs/migrations/2026-10-31-drop-crush-reasonix-codewhale.md).
 
 ### Make targets
 
@@ -170,9 +152,6 @@ and [2026-10-03 — pi 1.0](docs/migrations/2026-10-03-pi-1.0.md).
 | `make update` | Fetch the live model catalog (`catalog`) of every provider that names one and rewrite its models in `configs.jsonc` — ids, context windows and per-model API follow the catalog, tags stay hand-written — then regenerate every global config. One command brings everything up to date |
 | `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from `configs.jsonc`, set the startup model in `~/.pi/agent/settings.json`, and link the keys OpenCode's `/connect` holds into `~/.pi/agent/auth.json` — run it after changing a model or endpoint, or connecting a provider in OpenCode |
 | `make opencode-global` | Re-generate OpenCode's global config from `configs.jsonc` — run it after editing it |
-| `make crush-global` | Re-generate Crush's global `~/.config/crush/crushrc` from `configs.jsonc` |
-| `make reasonix-global` | Re-generate Reasonix's global `~/.reasonix/config.toml`, and the keys it reads from `~/.reasonix/.env` |
-| `make codewhale-global` | Re-generate Codewhale's global `~/.codewhale/config.toml`, keys included, written at 600 |
 | `make dsh-global` | Re-generate DeepSeek Harness's home patch `~/.dsh/cordis.patch.yml`, and the keys it reads from `~/.dsh/.env` |
 | `make uninstall` | Remove the [background service](#dsh-web-and-opencode-through-a-cloudflare-tunnel) running `dsh web` and OpenCode, [TokenEconomizer](#tokeneconomizer), [Impeccable](#impeccable), the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, the `claude/mods` entry in Claude Code's `CLAUDE_CODE_PLUGIN_DIRS`, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
 | `make help` | The target list above, on the terminal |
@@ -182,9 +161,6 @@ and [2026-10-03 — pi 1.0](docs/migrations/2026-10-03-pi-1.0.md).
 ```bash
 opencode          # OpenCode — every configured provider is in /models
 pi                # pi — every configured provider is in /model
-crush             # Crush — every configured provider is in its model picker
-reasonix          # Reasonix — every configured provider is in /model
-codewhale         # Codewhale — every configured provider is in its model picker
 dsh web           # DeepSeek Harness — every configured provider is in the Web UI's model picker
 ```
 
@@ -215,13 +191,9 @@ opencode --model commandcode-openai/deepseek/deepseek-v4.1-flash
 
 Note `small_model` — the model OpenCode names a session with, and its only use for one — stays at the one `opencode.overrides` sets even after you switch the main model via `/models`.
 
-Crush, Reasonix, Codewhale and DeepSeek Harness work the same way — one
-generated global config each:
+DeepSeek Harness works the same way — one generated global config:
 
 ```bash
-crush                                      # starts on the large slot: the default provider's model
-reasonix                                   # starts on default_model in ~/.reasonix/config.toml
-codewhale                                  # starts on default_text_model in ~/.codewhale/config.toml
 dsh web                                    # starts on agent-default-model in ~/.dsh/cordis.patch.yml
 dsh --profile headless "run the tests"     # the same providers, one task, no browser
 ```
@@ -232,13 +204,6 @@ A model picked or a provider edited in the Web UI is saved to
 `~/.dsh/settings.yaml`, which dsh merges over the generated patch — so it
 survives `make dsh-global`, and once a model is saved there a re-run no longer
 changes the one dsh starts on.
-
-Crush has two model slots rather than a free choice per session — `large` is
-what the interactive agent runs on, `small` what it delegates cheap work to —
-and the generated `crushrc` points them at the default provider's `default` and
-`small` models. Naming a model it does not know is not an error there: Crush
-silently falls back to a model of its own choosing and writes that correction
-back to disk, so a hand-edit that misspells one is easy to miss.
 
 ### dsh web and OpenCode through a Cloudflare Tunnel
 
@@ -747,8 +712,8 @@ leaks into the resolution of another's.
 
 | Tag | The model… |
 |-----|------------|
-| `default` | every generated config starts on, Crush's `large` slot |
-| `small` | OpenCode titles sessions with, Crush's `small` slot. Falls back to `default` |
+| `default` | every generated config starts on |
+| `small` | OpenCode titles sessions with. Falls back to `default` |
 
 Every CLI gets **every** model in the file — they pick between them in the
 session (`/models`, `/model`) — so a tag only decides where one starts, and for
@@ -786,7 +751,7 @@ models speak, as the route `<name>-<api>`; `make list` prints the name.
 | `REQUEST_HEADERS` | Extra request headers as a `{ "Name": "value" }` object, sent by every CLI — e.g. a Cloudflare Access service token in front of a self-hosted server. A value is a literal or one `${VAR}` reference standing alone, and a reference is carried wherever the CLI's format can express one |
 | `primary` | `true` on at most one provider — the one every generated config starts on |
 | `picker` | `false` keeps the provider out of the checkbox list `make setup` starts from — configure it by naming it directly (`bin/setup.sh <name>`). A key that resolves still registers it like any other provider |
-| `agents` | The CLIs that register the provider, from `pi`, `opencode`, `crush`, `reasonix`, `codewhale` and `dsh`. Omit it for all of them. A provider still needs a key that resolves to be registered anywhere |
+| `agents` | The CLIs that register the provider, from `pi`, `opencode` and `dsh`. Omit it for all of them. A provider still needs a key that resolves to be registered anywhere |
 | `opencode.lean` | `true` gives the provider [a lean agent of its own](#lean-agents) |
 | `opencode.context_window`, `opencode.max_tokens` | Cap every model's limits for OpenCode. These are the window a session may grow into before it is compacted, so a backend too slow to prefill its full context sets them lower — `gtr` does |
 
@@ -804,9 +769,6 @@ leaking into another's. `make setup` runs every one of them.
 |-----|-----------|----------------|
 | pi | `bin/pi-global-models.sh` | `~/.pi/agent/models.json`, and `defaultProvider` / `defaultModel` in `settings.json` |
 | OpenCode | `bin/opencode-global-config.sh` | `~/.config/opencode/opencode.json` with `opencode.overrides` merged in last, and one key file per provider under `claude-compatibles/` |
-| Crush | `bin/crush-global-config.sh` | `~/.config/crush/crushrc` |
-| Reasonix | `bin/reasonix-global-config.sh` | `~/.reasonix/config.toml`, and the keys it names in `~/.reasonix/.env` |
-| Codewhale | `bin/codewhale-global-config.sh` | `~/.codewhale/config.toml`, at 600 — it is the one that holds the keys |
 | DeepSeek Harness | `bin/dsh-global-config.sh` | `~/.dsh/cordis.patch.yml`, and the keys it names in `~/.dsh/.env` |
 
 Every one of those files opens with a line naming the target that rewrites it.
@@ -816,32 +778,21 @@ stops, so a config written by hand survives.
 **How a key reaches each of them.** `configs.jsonc` holds a reference, never a
 key, and each generator carries that as far as its CLI's format allows:
 
-- **a command run when the value is needed** — pi and Crush. `!bash -c '…'` in
-  pi's `models.json`, `$(bash -c '…')` in a `crushrc`, both reading the `.env`
-  through `bin/common.sh`. Nothing is copied, so a rotated key needs no re-run.
+- **a command run when the value is needed** — pi. `!bash -c '…'` in
+  pi's `models.json`, reading the `.env` through `bin/common.sh`. Nothing is
+  copied, so a rotated key needs no re-run.
 - **a reference to a file this repo writes at 600** — OpenCode's
   `{file:…}`, under `~/.config/opencode/claude-compatibles/`.
-- **the name of a variable the CLI resolves itself** — Reasonix, whose config
-  takes an `api_key_env` and reads the value only from the `.env` in its own
-  directory, and DeepSeek Harness, whose `apiKeyEnv` falls back to the `.env`
-  in `~/.dsh` after the process environment, its own credentials file and the
-  working directory's `.env`. The config still holds no key; the value is copied
-  into that `.env` at 600, and a rotated key does need a re-run.
-- **the key itself, in a file at 600** — Codewhale, and only because it offers
-  nothing else: its `api_key_env` is resolved from the process environment
-  alone, so a reference there works only for someone who has already exported
-  the variable, and every provider would otherwise be unusable. Its
-  `config.toml` is created at 600 before a byte is written to it.
+- **the name of a variable the CLI resolves itself** — DeepSeek Harness, whose
+  `apiKeyEnv` falls back to the `.env` in `~/.dsh` after the process
+  environment, its own credentials file and the working directory's `.env`. The
+  config still holds no key; the value is copied into that `.env` at 600, and a
+  rotated key does need a re-run.
 
-Request headers follow the same order: Codewhale, whose `config.toml` already
-holds the keys at 600, gets their values there too. Reasonix's config can only
-take a header value as it stands, so a provider whose headers carry a secret is
-left out of it rather than have the secret written in — the generator names
-which and why. That is why `gtr`, whose Cloudflare Access token travels in a header, reaches every
-CLI here except Reasonix. DeepSeek Harness takes header values only as they
-stand, but a `!!js` expression in a patch is evaluated when the patch loads, so
-each header there runs the same `.env` command pi and Crush run — once per
-launch (and per live reload of the patch under `dsh web`) rather than per
+Request headers are carried the same way. DeepSeek Harness takes header values
+only as they stand, but a `!!js` expression in a patch is evaluated when the
+patch loads, so each header there runs the same `.env` command pi runs — once
+per launch (and per live reload of the patch under `dsh web`) rather than per
 request.
 
 ### OpenCode's model dialog
@@ -868,9 +819,8 @@ Each route is declared in full — `@ai-sdk/anthropic` for an `anthropic` one,
 `@ai-sdk/openai-compatible` for an `openai` one — with exactly the models listed
 in `configs.jsonc`. It is filed under `<name>-<api>`, and the suffix is also what
 keeps it apart from a provider of the same name in that catalog, whose
-definition OpenCode would otherwise merge into it. pi, Crush, Codewhale and
-DeepSeek Harness ship catalogs that merge the same way, so every generator uses
-the same id.
+definition OpenCode would otherwise merge into it. pi and DeepSeek Harness ship
+catalogs that merge the same way, so every generator uses the same id.
 
 OpenCode Zen and OpenCode Go are OpenCode's own services: `/connect` stores their
 key in OpenCode's `auth.json`, and nothing here generates them. They serve some
@@ -892,11 +842,10 @@ is sourced by bash, so a value can be computed at use time:
 GTR_CF_ACCESS_CLIENT_SECRET="$(cat ~/.secrets/gtr-cf-access-client-secret)"
 ```
 
-pi and Crush evaluate it on every request, and DeepSeek Harness each time it
-loads its patch — but only for header values.
-OpenCode, Reasonix and Codewhale read a copy taken when their generator last
-ran, and so does DeepSeek Harness for its keys, so a rotated key needs
-`make setup` again for those four.
+pi evaluates it on every request, and DeepSeek Harness each time it loads its
+patch — but only for header values. OpenCode reads a copy taken when its
+generator last ran, and so does DeepSeek Harness for its keys, so a rotated key
+needs `make setup` again for those two.
 
 ## How it works
 
@@ -929,50 +878,20 @@ the generated ones — and a file this repo did not generate is never touched
 token is set; picking it while `llama-server` is down fails that one request
 and nothing else.
 
-The other generators write the whole of their CLI's config from the same
-resolved values:
-
-- **Crush** — `~/.config/crush/crushrc`, which is bash: one `provider add` per
-  route — `--type anthropic` with `BASE_URL` as it stands (Crush's Anthropic
-  client appends `v1/messages` itself), or `--type openai-compat` with
-  `<BASE_URL>/v1` (its OpenAI client appends only `chat/completions`) — one
-  `model add` per model carrying its window, output cap and both capability
-  flags, then `model large` / `model small` pointing at the default provider's
-  two. The key and every header value go in as
-  `$(bash -c '…')`, run by Crush when it reads the file. Naming a model no
-  `model add` declared is not an error there — Crush substitutes one of its own
-  and writes the correction back — so the generator emits every `model add`
-  before the two selections.
-- **Reasonix** — `~/.reasonix/config.toml`: a `[[providers]]` entry per route
-  with `kind = "anthropic"` and `BASE_URL` as it stands, or `kind = "openai"`
-  and `<BASE_URL>/v1`, the model list, and `model_overrides` giving each model
-  the window and output cap `configs.jsonc` gives it. The entry names an
-  `api_key_env` rather than a key, and Reasonix resolves that name from the
-  `.env` in its own directory and nowhere else — not this repo's, not the
-  surrounding shell — so the generator writes the value there at 600.
-- **Codewhale** — `~/.codewhale/config.toml`, at 600: one
-  `[providers.<name>-<api>]` table per route declaring
-  `kind = "openai-compatible"` alongside `wire = "anthropic-messages"` or
-  `wire = "chat"` — the first says the entry is none of its own catalog's, the
-  second which protocol the endpoint actually speaks; Codewhale adds the `/v1`
-  itself —
-  and one `[[custom_models]]` entry per model, whose `base_url` has to match its
-  provider's. It is the one config here that carries the keys, for the reason
-  under [Generated configs](#generated-configs).
-- **DeepSeek Harness** — `~/.dsh/cordis.patch.yml`, the home patch every profile
-  (`web`, `headless`, …) applies and dsh itself never writes: one
-  `<name>-<api>` route under the `llm-pi-ai` row with
-  `api: anthropic-messages` and `baseURL` set to `BASE_URL` as it stands (the
-  Anthropic SDK underneath appends `/v1/messages`), or
-  `api: openai-completions` and `<BASE_URL>/v1`, the provider's `label` (or its
-  heading) as its `displayName`, and every model with its window, output cap and
-  input kinds; then the `agent-default-model` row naming the default provider's
-  `default` model. A model dsh does not find in its own catalog neither reasons
-  nor takes images unless declared, so a model with `reasoning` offers the
-  `low` / `medium` / `high` efforts. The key goes in as `apiKeyEnv` with its
-  value copied into `~/.dsh/.env` at 600, and each header as a `!!js` expression
-  that runs the `.env` command when the patch loads. `settings.yaml`, which the
-  Web UI writes, is merged over the patch and is never touched.
+**DeepSeek Harness** — `~/.dsh/cordis.patch.yml`, the home patch every profile
+(`web`, `headless`, …) applies and dsh itself never writes: one
+`<name>-<api>` route under the `llm-pi-ai` row with
+`api: anthropic-messages` and `baseURL` set to `BASE_URL` as it stands (the
+Anthropic SDK underneath appends `/v1/messages`), or
+`api: openai-completions` and `<BASE_URL>/v1`, the provider's `label` (or its
+heading) as its `displayName`, and every model with its window, output cap and
+input kinds; then the `agent-default-model` row naming the default provider's
+`default` model. A model dsh does not find in its own catalog neither reasons
+nor takes images unless declared, so a model with `reasoning` offers the
+`low` / `medium` / `high` efforts. The key goes in as `apiKeyEnv` with its
+value copied into `~/.dsh/.env` at 600, and each header as a `!!js` expression
+that runs the `.env` command when the patch loads. `settings.yaml`, which the
+Web UI writes, is merged over the patch and is never touched.
 
 ### Lean agents
 
@@ -1037,7 +956,6 @@ One file is the source of truth; each CLI gets it under the name it expects:
 | `~/.claude/CLAUDE.md` | Claude Code — it does not read `AGENTS.md` itself |
 | `~/.pi/agent/AGENTS.md` | pi |
 | `~/.codex/AGENTS.md` | Codex |
-| `~/.config/crush/CRUSH.md` | Crush |
 | `~/.dsh/AGENTS.md` | DeepSeek Harness |
 | `~/.commandcode/AGENTS.md` | Command Code |
 
@@ -1046,13 +964,6 @@ Per-project files need no such trick: pi reads a directory's `AGENTS.md` or its
 `instructions` array in `~/.config/opencode/opencode.jsonc` instead — point it
 at this repo's `AGENTS.md` if you want them there too.
 
-Reasonix gets no link. It reads `~/.reasonix/AGENTS.md`, but opens it through a
-root confined to `~/.reasonix` and drops any symlink resolving outside it — a
-link would be ignored without a word. Copy the file there if you want it, and
-remember it is then a copy. Codewhale is left out for the same kind of reason:
-where it takes global instructions from is its `instructions` setting, not a
-path this repo can link into.
-
 ### Skills and subagents
 
 Every directory under `skills/` and every `agents/<name>.md` is linked into both
@@ -1060,13 +971,13 @@ roots:
 
 | Target | Read by |
 |--------|---------|
-| `~/.claude/skills/` | Claude Code, Crush, opencode, Reasonix |
+| `~/.claude/skills/` | Claude Code, opencode |
 | `~/.claude/agents/` | Claude Code |
-| `~/.agents/skills/` | Codex, Command Code, Crush, DeepSeek Harness, opencode, pi, Reasonix |
+| `~/.agents/skills/` | Codex, Command Code, DeepSeek Harness, opencode, pi |
 | `~/.agents/agents/` | nothing yet — kept as a mirror |
 
 `~/.agents` is the vendor-neutral root: pi reads it alongside
-`~/.pi/agent/skills`, opencode, Crush and Reasonix alongside `~/.claude/skills`, DeepSeek Harness
+`~/.pi/agent/skills`, opencode alongside `~/.claude/skills`, DeepSeek Harness
 alongside `~/.dsh/skills`, Command Code alongside `~/.commandcode/skills`, and
 Codex uses it as its skills root. Subagents have no such convention — every CLI keeps its own
 place (`~/.codex/agents/*.toml`, `~/.config/opencode/agent/*.md`, pi's subagent
@@ -1151,46 +1062,12 @@ live. Run `make pi-global` (or `make setup`) and check `/model`. A
 `~/.pi/agent/models.json` this repo did not write is left alone (first-line
 marker): merge it by hand or move it aside.
 
-**`'crush' / 'reasonix' / 'codewhale' is not on your PATH`** — each of those
-configs is only read by its own CLI, and this repo installs none of them. See
-[Requirements](#requirements). The config is written either way, so installing
-the CLI later needs no re-run.
-
 **`dsh` or `cmd` is not on your PATH after `make setup`** — its install step
 says why: no `npm`, the install failed, or npm's global `bin` directory is not
 on your PATH. Under asdf the setup regenerates the shim itself; with another
 version manager, open a new shell or reshim. `installed, but '<command>
 --version' failed` means the active Node.js is too old: dsh needs
 `^22.19.0 || >=24.0.0`, Command Code `>=22`.
-
-**Crush starts on a model you did not pick** — Crush does not fail on a
-`model large` / `model small` naming something it cannot find; it substitutes a
-model of its own and writes that back into its config. Re-run
-`make crush-global` to put the choice back, and check `configs.jsonc` still tags
-a `default` and a `small`.
-
-**Reasonix says a provider has no key** — its keys do not come from this repo's
-`.env`. The generated `config.toml` names a variable, and Reasonix reads that
-name only from `~/.reasonix/.env`, which `make reasonix-global` writes at 600. A
-key rotated here needs that re-run.
-
-**A provider is missing from `~/.reasonix/config.toml`** — a provider whose
-`REQUEST_HEADERS` carry a secret is left out on purpose: Reasonix sends header
-values exactly as written, so registering `gtr` would mean writing its
-Cloudflare Access token into a config file. The generator names the provider and
-the reason on stderr. Add it by hand if you want it.
-
-**Global instructions do not reach Reasonix** — `~/.reasonix/AGENTS.md` cannot
-be a symlink to this repo: Reasonix opens it through a root confined to
-`~/.reasonix` and silently ignores anything resolving outside. Copy `AGENTS.md`
-there, and re-copy it when it changes. Skills are not affected — Reasonix
-follows those symlinks and reads `~/.agents/skills` like the others.
-
-**`~/.codewhale/config.toml` contains the API keys** — deliberately, and the
-file is created at 600 before anything is written to it. Codewhale resolves an
-`api_key_env` from the process environment alone, so the alternative is a config
-that works only in a shell that already exported every provider's variable. See
-[Generated configs](#generated-configs).
 
 **`dsh` starts on a model you did not pick, or ignores a change to `configs.jsonc`** —
 the Web UI saves its own choices to `~/.dsh/settings.yaml`, which dsh merges
@@ -1243,8 +1120,5 @@ Where each provider's key comes from:
 - [Command Code: Provider API](https://commandcode.ai/docs/provider)
 - [OpenCode: Config](https://opencode.ai/docs/config/) / [Providers](https://opencode.ai/docs/providers/)
 - [pi: Custom models](https://pi.dev/docs/latest/models) / [Providers](https://pi.dev/docs/latest/providers) / [DeepSeek's pi integration guide](https://api-docs.deepseek.com/quick_start/agent_integrations/pi_mono/)
-- [Crush: Configuration](https://github.com/charmbracelet/crush/blob/main/docs/config/README.md) — the `crushrc` builtins and the legacy JSON form
-- [Reasonix: config paths](https://github.com/esengine/DeepSeek-Reasonix/blob/main-v2/docs/CONFIG_PATHS.md) / [reasonix.example.toml](https://github.com/esengine/DeepSeek-Reasonix/blob/main-v2/reasonix.example.toml)
-- [Codewhale: Configuration](https://github.com/Hmbown/Codewhale/blob/main/docs/CONFIGURATION.md) / [Providers](https://github.com/Hmbown/Codewhale/blob/main/docs/PROVIDERS.md)
 - [DeepSeek Harness: Documentation](https://deepseek-harness.github.io/deepseek-harness/) / [Safety notice](https://github.com/deepseek-ai/deepseek-harness/blob/main/SAFETY.md)
 - [Command Code: Documentation](https://commandcode.ai/docs)

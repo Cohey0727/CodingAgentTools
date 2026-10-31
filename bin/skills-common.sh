@@ -40,14 +40,12 @@ MODS_SRC="$ROOT/claude/mods"
 CLAUDE_SETTINGS="$HOME/.claude/settings.json"
 
 # One global instruction file, linked to wherever each CLI looks for it. Claude
-# Code does not read AGENTS.md itself, so it gets the CLAUDE.md name, and Crush
-# reads CRUSH.md beside its own config.
+# Code does not read AGENTS.md itself, so it gets the CLAUDE.md name.
 CONTEXT_SRC="$ROOT/AGENTS.md"
 CONTEXT_TARGETS=(
   "$HOME/.claude/CLAUDE.md"
   "$HOME/.pi/agent/AGENTS.md"
   "$HOME/.codex/AGENTS.md"
-  "$(crush_config_dir)/CRUSH.md"
   "$(dsh_home)/AGENTS.md"
   "$(command_code_home)/AGENTS.md"
 )
@@ -57,21 +55,19 @@ context_reader() { # <target> -> the CLI that reads it
     "$HOME/.claude/CLAUDE.md") echo claude ;;
     "$HOME/.pi/agent/AGENTS.md") echo pi ;;
     "$HOME/.codex/AGENTS.md") echo codex ;;
-    "$(crush_config_dir)/CRUSH.md") echo crush ;;
     "$(dsh_home)/AGENTS.md") echo dsh ;;
     "$(command_code_home)/AGENTS.md") echo cmd ;;
   esac
 }
 
 skill_readers() { # <root> -> CLIs that discover skills there
-  # opencode, crush and reasonix read both roots; pi reads ~/.pi/agent/skills
-  # and ~/.agents/skills; codex uses .agents/skills as its skills root; dsh and
+  # opencode reads both roots; pi reads ~/.pi/agent/skills and
+  # ~/.agents/skills; codex uses .agents/skills as its skills root; dsh and
   # Command Code (cmd) read their own home and ~/.agents/skills. All of them
-  # follow a symlink out to this repo — except Reasonix's *instruction* loader,
-  # which is why AGENTS.md has no target under ~/.reasonix.
+  # follow a symlink out to this repo.
   case $1 in
-    "$HOME/.claude") echo 'claude crush opencode reasonix' ;;
-    "$HOME/.agents") echo 'cmd codex crush dsh opencode pi reasonix' ;;
+    "$HOME/.claude") echo 'claude opencode' ;;
+    "$HOME/.agents") echo 'cmd codex dsh opencode pi' ;;
   esac
 }
 
