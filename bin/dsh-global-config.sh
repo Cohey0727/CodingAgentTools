@@ -58,13 +58,20 @@ models_yaml() { # -> one `models` entry per model, after models_resolve. dsh
                 # treats a model missing from its catalog as text-only and not
                 # reasoning unless the entry says otherwise. The effort names are
                 # Anthropic's; an endpoint on budget-based thinking reads only
-                # which levels are offered.
+                # which levels are offered. Claude 5 models reject the
+                # `thinking: disabled` that pi-ai sends for "off", so they
+                # offer no "off".
   local id context max reasoning input kinds efforts
   while IFS=$'\x1f' read -r id context max reasoning input; do
     [ -n "$id" ] || continue
     kinds=$(printf '%s' "$input" | sed "s/[^,][^,]*/'&'/g; s/,/, /g")
     case $reasoning in
-      true) efforts="{ 'off': null, 'low': 'low', 'medium': 'medium', 'high': 'high' }" ;;
+      true)
+        if [ "$M_API" = anthropic ] && [[ $id =~ ^claude-[a-z]+-5(-[0-9]+)?$ ]]; then
+          efforts="{ 'low': 'low', 'medium': 'medium', 'high': 'high' }"
+        else
+          efforts="{ 'off': null, 'low': 'low', 'medium': 'medium', 'high': 'high' }"
+        fi ;;
       *) efforts=false ;;
     esac
     cat <<EOF

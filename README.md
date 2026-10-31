@@ -886,7 +886,8 @@ heading) as its `displayName`, and every model with its window, output cap and
 input kinds; then the `agent-default-model` row naming the default provider's
 `default` model. A model dsh does not find in its own catalog neither reasons
 nor takes images unless declared, so a model with `reasoning` offers the
-`low` / `medium` / `high` efforts. The key goes in as `apiKeyEnv` with its
+`low` / `medium` / `high` efforts, plus `off` — except a Claude 5 model on an
+Anthropic API route, which rejects the way `off` is sent and so has no `off`. The key goes in as `apiKeyEnv` with its
 value copied into `~/.dsh/.env` at 600, and each header as a `!!js` expression
 that runs the `.env` command when the patch loads. `settings.yaml`, which the
 Web UI writes, is merged over the patch and is never touched.
