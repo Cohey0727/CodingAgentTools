@@ -730,6 +730,7 @@ an error rather than a label — `make setup` refuses to install until it is fix
 | `tags` | Which slots this model fills; see [Tags](#tags) |
 | `context_window`, `max_tokens` | **Required.** Every generated config carries them — pi otherwise assumes 128k / 16k, and OpenCode never compacts a session on a model without a context limit |
 | `reasoning`, `input` | Whether the model supports extended thinking (`true` or `false`, default `true`) and what it accepts (`["text"]` or `["text", "image"]`) |
+| `compat` | pi's per-model `compat` object, written to its `models.json` as-is. `{"forceAdaptiveThinking": true}` makes pi send `thinking.type: "adaptive"` with `output_config.effort`, which Claude 4.6 and later require |
 
 `defaults` at the top level supplies any of these but `id`, `api` and `tags` to
 every model that does not set it itself.

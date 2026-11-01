@@ -51,7 +51,7 @@ PI_APIS = {"anthropic": ("anthropic-messages", ""), "openai": ("openai-completio
 # name in GLOBAL_GENERATORS (bin/common.sh).
 AGENTS = ("pi", "opencode", "dsh")
 
-MODEL_KEYS = {"id", "api", "tags", "context_window", "max_tokens", "reasoning", "input"}
+MODEL_KEYS = {"id", "api", "tags", "context_window", "max_tokens", "reasoning", "input", "compat"}
 PROVIDER_KEYS = {"label", "API_KEY", "BASE_URL", "REQUEST_HEADERS", "api", "catalog", "primary", "agents", "defaults", "opencode", "models"}
 OPENCODE_KEYS = {"lean", "context_window", "max_tokens"}
 AGENT_ROOT_KEYS = {"overrides"}
@@ -312,6 +312,9 @@ def load(name):
         input_kinds = merged.get("input", ["text"])
         if not isinstance(input_kinds, list) or not all(k in ("text", "image") for k in input_kinds):
             raise ConfigError(f"{at}: input must be an array of \"text\" / \"image\"")
+        compat = merged.get("compat", {})
+        if not isinstance(compat, dict):
+            raise ConfigError(f"{at}: compat must be an object")
         model = {
             "id": model_id,
             "api": _api(at, merged.get("api", api)),
@@ -320,6 +323,7 @@ def load(name):
             "max_tokens": _int(at, merged.get("max_tokens"), "max_tokens"),
             "reasoning": reasoning,
             "input": input_kinds,
+            "compat": compat,
         }
         for tag in tags:
             if tag not in ROLE_TAGS:
@@ -398,7 +402,13 @@ def pi_models_json(config, models):
         f'          "reasoning": {"true" if model["reasoning"] else "false"},\n'
         f'          "input": {json.dumps(model["input"])},\n'
         f'          "contextWindow": {model["context_window"]},\n'
-        f'          "maxTokens": {model["max_tokens"]}\n'
+        f'          "maxTokens": {model["max_tokens"]}'
+        + (
+            f',\n          "compat": {json.dumps(model["compat"], ensure_ascii=False)}'
+            if model["compat"]
+            else ""
+        )
+        + "\n"
         "        }"
         for model in models
     )

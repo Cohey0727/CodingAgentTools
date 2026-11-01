@@ -141,7 +141,10 @@
           "context_window": 1000000,
           "max_tokens": 32000,
           "reasoning": true,
-          "input": ["text", "image"]
+          "input": ["text", "image"],
+          // Claude 4.6 and later reject budget-based thinking; they take
+          // thinking.type "adaptive" with an output_config effort level.
+          "compat": { "forceAdaptiveThinking": true }
         },
 
         "models": [
@@ -174,16 +177,16 @@
         },
 
         "models": [
-          { "id": "claude-sonnet-5-5", "api": "anthropic", "context_window": 1000000 },
-          { "id": "claude-sonnet-5", "api": "anthropic", "context_window": 1000000 },
-          { "id": "claude-sonnet-4-6", "api": "anthropic", "context_window": 1000000 },
-          { "id": "claude-fable-5-1", "api": "anthropic", "context_window": 1000000 },
-          { "id": "claude-fable-5", "api": "anthropic", "context_window": 1000000 },
-          { "id": "claude-opus-5-5", "api": "anthropic", "context_window": 1000000 },
-          { "id": "claude-opus-5", "api": "anthropic", "context_window": 1000000 },
-          { "id": "claude-opus-4-8", "api": "anthropic", "context_window": 1000000 },
-          { "id": "claude-opus-4-7", "api": "anthropic", "context_window": 1000000 },
-          { "id": "claude-haiku-5-5", "api": "anthropic", "context_window": 1000000 },
+          { "id": "claude-sonnet-5-5", "api": "anthropic", "context_window": 1000000, "compat": { "forceAdaptiveThinking": true } },
+          { "id": "claude-sonnet-5", "api": "anthropic", "context_window": 1000000, "compat": { "forceAdaptiveThinking": true } },
+          { "id": "claude-sonnet-4-6", "api": "anthropic", "context_window": 1000000, "compat": { "forceAdaptiveThinking": true } },
+          { "id": "claude-fable-5-1", "api": "anthropic", "context_window": 1000000, "compat": { "forceAdaptiveThinking": true } },
+          { "id": "claude-fable-5", "api": "anthropic", "context_window": 1000000, "compat": { "forceAdaptiveThinking": true } },
+          { "id": "claude-opus-5-5", "api": "anthropic", "context_window": 1000000, "compat": { "forceAdaptiveThinking": true } },
+          { "id": "claude-opus-5", "api": "anthropic", "context_window": 1000000, "compat": { "forceAdaptiveThinking": true } },
+          { "id": "claude-opus-4-8", "api": "anthropic", "context_window": 1000000, "compat": { "forceAdaptiveThinking": true } },
+          { "id": "claude-opus-4-7", "api": "anthropic", "context_window": 1000000, "compat": { "forceAdaptiveThinking": true } },
+          { "id": "claude-haiku-5-5", "api": "anthropic", "context_window": 1000000, "compat": { "forceAdaptiveThinking": true } },
           { "id": "claude-haiku-4-5-20251001", "api": "anthropic", "context_window": 200000 },
           { "id": "gpt-6-astra", "context_window": 1050000 },
           { "id": "gpt-6.1-sol", "context_window": 1050000 },
