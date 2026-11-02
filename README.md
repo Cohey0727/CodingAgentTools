@@ -65,10 +65,11 @@ bin/skills-list.sh               # their install status (part of `make list`)
 bin/skills-uninstall.sh          # removes only the symlinks pointing back here and the claude/mods entry (part of `make uninstall`)
 bin/tokeneconomizer.sh           # turns TokenEconomizer on in Claude Code, pi and OpenCode (`make setup-tokeneconomizer`), or off (`make uninstall`)
 bin/impeccable.sh                # turns Impeccable on in every agent CLI (`make setup-impeccable`), or off (`make uninstall`)
+bin/egm.sh                       # installs the Elephant-Goldfish Model plugin in Claude Code (`make setup-egm`), or removes it (`make uninstall`)
 bin/list.sh                      # everything this repo manages (`make list`)
 bin/help.sh                      # target overview (`make help`)
 docs/migrations/                 # upgrade notes for existing checkouts
-Makefile                         # setup / setup-providers / setup-skills / setup-tokeneconomizer / setup-impeccable / list / uninstall / <agent>-global / help
+Makefile                         # setup / setup-providers / setup-skills / setup-tokeneconomizer / setup-impeccable / setup-egm / list / uninstall / <agent>-global / help
 ```
 
 Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; adding a skill is a new `skills/<name>/SKILL.md` and a `make setup-skills`. An OpenCode slash command is a new `opencode/command/<name>.md`, and a plugin a new `opencode/plugin/<name>.js` default-exporting `{ id, setup }` — same `make setup-skills`. So is a pi extension, a new `pi/extensions/<name>.ts`, and a pi subagent, a new `pi/agents/<name>.md`.
@@ -110,9 +111,9 @@ One interactive wizard does everything:
 6. [`dsh web` and OpenCode's Web UI](#dsh-web-and-opencode-through-a-cloudflare-tunnel) are (re)started in the background as a service of your user's, while dsh is set up or `SERVE_HOST` or `SERVE_OPENCODE_HOST` is set — and the service is removed once none of them is
 7. You get a warning if any of the CLIs those configs are for is missing from your PATH
 8. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/loop`](#loops-in-opencode) and [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode`, and pi gets its [dashboard](#pi-dashboard) in `~/.pi/agent/extensions` ([details below](#skills-and-global-instructions))
-9. [TokenEconomizer](#tokeneconomizer) is turned on in Claude Code, pi and OpenCode, and [Impeccable](#impeccable) in every agent CLI
+9. [TokenEconomizer](#tokeneconomizer) is turned on in Claude Code, pi and OpenCode, [Impeccable](#impeccable) in every agent CLI, and the [Elephant-Goldfish Model](#elephant-goldfish-model) in Claude Code
 
-To rotate a token, pick up new settings or add a provider later, just re-run `make setup`. `make setup-providers`, `make setup-skills`, `make setup-tokeneconomizer` and `make setup-impeccable` each run one part on its own; only the provider half prompts.
+To rotate a token, pick up new settings or add a provider later, just re-run `make setup`. `make setup-providers`, `make setup-skills`, `make setup-tokeneconomizer`, `make setup-impeccable` and `make setup-egm` each run one part on its own; only the provider half prompts.
 
 Coming from an older checkout? `docs/migrations/` has the per-variable
 mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/migrations/2026-08-15-shared-env-settings.md),
@@ -140,11 +141,12 @@ and [2026-10-31 — Local provider を削除](docs/migrations/2026-10-31-drop-lo
 
 | Target | What it does |
 |--------|--------------|
-| `make setup` | Both halves: the provider wizard, then the skill, `AGENTS.md`, OpenCode extension, pi extension and Claude Code mod install, then TokenEconomizer and Impeccable |
+| `make setup` | Both halves: the provider wizard, then the skill, `AGENTS.md`, OpenCode extension, pi extension and Claude Code mod install, then TokenEconomizer, Impeccable and the Elephant-Goldfish Model |
 | `make setup-providers` | The wizard above only: tokens, `.env` upkeep, pi packages, DeepSeek Harness, Command Code, OpenCode plugins, and every global config |
 | `make setup-skills` | The shared assets only: `skills/`, `agents/`, `AGENTS.md`, `opencode/` and `pi/` into every agent CLI, and `claude/mods/` into Claude Code's `CLAUDE_CODE_PLUGIN_DIRS` |
 | `make setup-tokeneconomizer` | [TokenEconomizer](#tokeneconomizer) only: turn it on in Claude Code, pi and OpenCode |
 | `make setup-impeccable` | [Impeccable](#impeccable) only: turn it on in every agent CLI |
+| `make setup-egm` | [Elephant-Goldfish Model](#elephant-goldfish-model) only: install the plugin in Claude Code |
 | `make check` | Validate `configs.jsonc`, then refuse any concrete name outside it (see `CLAUDE.md`). What the pre-commit hook runs |
 | `make hooks` | Install the lefthook pre-commit hook that runs `make check` |
 | `make list` | Every provider with its heading, endpoint and models with their tags, then every skill, subagent, OpenCode extension and pi extension with its install status |
@@ -152,7 +154,7 @@ and [2026-10-31 — Local provider を削除](docs/migrations/2026-10-31-drop-lo
 | `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from `configs.jsonc`, set the startup model in `~/.pi/agent/settings.json`, and link the keys OpenCode's `/connect` holds into `~/.pi/agent/auth.json` — run it after changing a model or endpoint, or connecting a provider in OpenCode |
 | `make opencode-global` | Re-generate OpenCode's global config from `configs.jsonc` — run it after editing it |
 | `make dsh-global` | Re-generate DeepSeek Harness's home patch `~/.dsh/cordis.patch.yml`, and the keys it reads from `~/.dsh/.env` |
-| `make uninstall` | Remove the [background service](#dsh-web-and-opencode-through-a-cloudflare-tunnel) running `dsh web` and OpenCode, [TokenEconomizer](#tokeneconomizer), [Impeccable](#impeccable), the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, the `claude/mods` entry in Claude Code's `CLAUDE_CODE_PLUGIN_DIRS`, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
+| `make uninstall` | Remove the [background service](#dsh-web-and-opencode-through-a-cloudflare-tunnel) running `dsh web` and OpenCode, [TokenEconomizer](#tokeneconomizer), [Impeccable](#impeccable), the [Elephant-Goldfish Model](#elephant-goldfish-model), the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, the `claude/mods` entry in Claude Code's `CLAUDE_CODE_PLUGIN_DIRS`, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
 | `make help` | The target list above, on the terminal |
 
 ## Usage
@@ -544,6 +546,18 @@ in it; `vendor/impeccable/` keeps three of the builds, and `make setup` (or
 The design hook runs the detector after every edit of a UI file and once more
 when the turn ends, and hands its findings to the model, in every project.
 `/impeccable hooks off` turns it off for one project.
+
+### Elephant-Goldfish Model
+
+[Elephant-Goldfish Model](https://github.com/google/elephant-goldfish-model)
+(`egm`) drafts a design with an agent that holds the project's context, then has
+reviewers with no context of the conversation stress-test it before any code is
+written. `make setup` (or `make setup-egm` alone) has Claude Code add
+`google/elephant-goldfish-model` as the `egm` marketplace and install its `egm`
+plugin; unlike Impeccable and TokenEconomizer it is cloned from upstream, not
+kept under `vendor/`. Start a new session, then run `/egm:egm-brainstorm`,
+`/egm:egm-draft` and `/egm:egm-review`. The reviews need an agent that can start
+fresh subagents.
 
 ### Loops in OpenCode
 
