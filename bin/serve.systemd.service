@@ -1,10 +1,10 @@
 # The systemd user unit bin/serve-service.sh fills in to keep bin/serve.sh
-# running. It exits 0 when there is nothing to serve and non-zero when one of
-# its apps exits, so only the latter starts it again; on SIGTERM it exits 130.
+# running. It exits 0 when there is nothing to serve and non-zero when dsh web
+# or nginx exits, so only the latter starts it again; on SIGTERM it exits 130.
 # Its output, dsh web's token URL among it, goes to the user journal.
 
 [Unit]
-Description=dsh web and OpenCode behind a Cloudflare Tunnel
+Description=dsh web behind a Cloudflare Tunnel
 
 [Service]
 ExecStart="@SERVE@"

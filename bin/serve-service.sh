@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # Keep bin/serve.sh running in the background as a service of this user's — a
 # launchd agent on macOS, a systemd user unit elsewhere — started at login and
-# again whenever it exits with an error, which it does when one of its apps
+# again whenever it exits with an error, which it does when dsh web or nginx
 # exits.
 #
 #   bin/serve-service.sh          (re)start it while there is something to serve,
 #                                 remove it once there is not (`make setup`)
 #   bin/serve-service.sh remove   remove it (`make uninstall`)
 #
-# There is something to serve once SERVE_HOST or SERVE_OPENCODE_HOST is set in
-# .env, or dsh is set up. The service gets this shell's PATH, where every app it
-# starts was found, and each start of it reads .env afresh.
+# There is something to serve once SERVE_HOST is set in .env, or dsh is set up.
+# The service gets this shell's PATH, where dsh was found, and each start of it
+# reads .env afresh.
 
 set -euo pipefail
 
@@ -89,11 +89,7 @@ if [ "${1:-}" = remove ]; then
   exit 0
 fi
 
-apps=()
-if [ -n "$(env_value SERVE_HOST)" ] || dsh_set_up; then apps+=('dsh web'); fi
-if [ -n "$(env_value SERVE_OPENCODE_HOST)" ]; then apps+=('opencode web'); fi
-
-if [ "${#apps[@]}" -eq 0 ]; then
+if [ -z "$(env_value SERVE_HOST)" ] && ! dsh_set_up; then
   [ -f "$service_file" ] || exit 0
   section 'serving in the background'
   remove
@@ -101,7 +97,7 @@ if [ "${#apps[@]}" -eq 0 ]; then
   exit 0
 fi
 
-section "serving ${apps[0]}${apps[1]:+ and ${apps[1]}} in the background"
+section 'serving dsh web in the background'
 if [ "$kind" = systemd ] && ! systemctl --user show-environment >/dev/null 2>&1; then
   warn "skipped — no systemd user manager to run it. Run bin/serve.sh yourself."
   exit 1

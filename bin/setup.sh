@@ -7,9 +7,9 @@
 # configs.jsonc lists every provider and refers to its secrets as "${NAME}";
 # the .env beside it holds those values and is the only file with a key in it.
 # At a prompt, pressing Enter with no input keeps whatever is already set.
-# The checkbox also has "dsh web" and "opencode web" rows, which set the
-# hostnames bin/serve.sh serves those under; once one is set, the nginx it runs
-# is installed too, with Homebrew or apt-get.
+# The checkbox also has a "dsh web" row, which sets the hostname bin/serve.sh
+# serves it under; once that is set, the nginx it runs is installed too, with
+# Homebrew or apt-get.
 # Keys still sitting in the old providers/<name>/.env files are carried over
 # first. Then pi is updated, the pi packages in $PI_PACKAGES are installed into
 # pi's user settings and pi's model catalogs are refreshed, DeepSeek Harness is
@@ -48,20 +48,18 @@ current_token() { # <provider> -> its resolved key, maybe ""
   ( models_resolve "$1" 2>/dev/null && printf '%s' "$M_API_KEY" )
 }
 
-SERVE_ITEMS=('dsh web' 'opencode web') # the checkbox rows after the providers
+SERVE_ITEMS=('dsh web') # the checkbox row after the providers
 
 serve_var() { # <checkbox row> -> the .env variable holding its bin/serve.sh
               # hostname, or nothing for a provider
   case $1 in
     'dsh web') printf 'SERVE_HOST' ;;
-    'opencode web') printf 'SERVE_OPENCODE_HOST' ;;
   esac
 }
 
 item_section() { # <checkbox row> -> the heading shown beside it
   case $1 in
     'dsh web') printf 'DeepSeek Harness' ;;
-    'opencode web') printf 'OpenCode' ;;
     *) provider_section "$1" ;;
   esac
 }
@@ -531,10 +529,10 @@ install_dsh_cli() {
   fi
 }
 
-# bin/serve.sh puts nginx in front of the apps it serves, so it is installed
-# once a hostname says that is in use.
+# bin/serve.sh puts nginx in front of dsh web, so it is installed once SERVE_HOST
+# says that is in use.
 install_serve_nginx() {
-  [ -n "$(env_value SERVE_HOST)$(env_value SERVE_OPENCODE_HOST)" ] || return 0
+  [ -n "$(env_value SERVE_HOST)" ] || return 0
   "$ROOT/bin/nginx-install.sh" || true
 }
 

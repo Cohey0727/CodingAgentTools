@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Install or upgrade the nginx bin/serve.sh puts in front of the apps it serves:
-# with Homebrew where there is one, otherwise with apt-get through sudo.
-# `make setup` runs this once a hostname says nginx is in use, and bin/serve.sh
-# whenever nginx is missing. Exits non-zero when nginx is still not on the PATH.
+# Install or upgrade the nginx bin/serve.sh puts in front of dsh web: with
+# Homebrew where there is one, otherwise with apt-get through sudo. `make setup`
+# runs this once SERVE_HOST says nginx is in use, and bin/serve.sh whenever nginx
+# is missing. Exits non-zero when nginx is still not on the PATH.
 
 set -euo pipefail
 
@@ -18,7 +18,7 @@ nginx_version() { nginx -v 2>&1 | sed 's|.*/||'; }
 before=
 if command -v nginx >/dev/null 2>&1; then before=$(nginx_version); fi
 
-section 'installing nginx for dsh web and opencode web'
+section 'installing nginx for dsh web'
 if command -v brew >/dev/null 2>&1; then
   hint='brew install nginx'
   install() { brew install nginx; }

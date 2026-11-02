@@ -50,14 +50,13 @@ bin/setup.sh                     # provider wizard: pick providers, paste tokens
 bin/pi-global-models.sh          # registers every provider in pi's global models.json (`make pi-global`)
 bin/opencode-global-config.sh    # registers every provider in OpenCode's global config (`make opencode-global`)
 bin/dsh-global-config.sh         # registers every provider in DeepSeek Harness's home patch (`make dsh-global`)
-bin/serve.sh                     # runs dsh web and OpenCode behind nginx for their hostnames
+bin/serve.sh                     # runs dsh web behind nginx for its hostname
 bin/serve-service.sh             # keeps it running as a launchd agent or systemd user unit (`make setup`, `make uninstall`)
 bin/serve.launchd.plist          # that launchd agent, filled in by serve-service.sh
 bin/serve.systemd.service        # that systemd user unit, filled in by serve-service.sh
 bin/nginx-install.sh             # installs or upgrades its nginx with Homebrew or apt-get (`make setup`, and serve.sh when it is missing)
 bin/serve.nginx.conf             # that nginx's config; each start fills it in for the run
 bin/serve.dsh.nginx.conf         # its server for dsh web, handing out dsh's startup token
-bin/serve.opencode.nginx.conf    # its server for OpenCode, sending OpenCode's server password
 bin/skills-common.sh             # where skills, subagents, AGENTS.md and the OpenCode and pi extensions are installed
 bin/skills-setup.sh              # links them there (`make setup-skills`)
 bin/removed-skills.txt           # skills no longer shipped; setup deletes their old links
@@ -88,7 +87,7 @@ Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; addi
   (the older `@mariozechner/pi-coding-agent` package is deprecated and resolves environment references differently)
 - [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) — one of the two CLIs `make setup` installs itself, with `bun install -g @deepseek-ai/dsh@next`, upgrading a `dsh` already on your PATH. That needs `bun` and Node.js `^22.19.0 || >=24.0.0`. It is a developer preview: read its [safety notice](https://github.com/deepseek-ai/deepseek-harness/blob/main/SAFETY.md) first
 - [Command Code](https://commandcode.ai) (`cmd`) — the other one, installed with `npm install -g command-code@latest`, upgrading a `cmd` already there. That needs `npm` and Node.js `>=22`. It gets no generated config, only the [skills and `AGENTS.md`](#skills-and-global-instructions), and it updates itself in the background (`cmd update` does it on demand)
-- [nginx](https://nginx.org) (`nginx`) — only for [`dsh web` and OpenCode through a Cloudflare Tunnel](#dsh-web-and-opencode-through-a-cloudflare-tunnel), and `make setup` installs or upgrades it with `brew install nginx` — or `sudo apt-get install nginx` where there is no Homebrew — once `SERVE_HOST` or `SERVE_OPENCODE_HOST` is set. `bin/serve.sh` installs it the same way when it is missing
+- [nginx](https://nginx.org) (`nginx`) — only for [`dsh web` through a Cloudflare Tunnel](#dsh-web-through-a-cloudflare-tunnel), and `make setup` installs or upgrades it with `brew install nginx` — or `sudo apt-get install nginx` where there is no Homebrew — once `SERVE_HOST` is set. `bin/serve.sh` installs it the same way when it is missing
 
 Every one of these is optional. A generator writes its config whether or not the
 CLI is installed, and `make setup` says which of them it could not find on your
@@ -103,12 +102,12 @@ make setup
 
 One interactive wizard does everything:
 
-1. Check the providers whose token you want to set or change (arrows + Space, Enter to confirm). Providers that already have a token show ✅ and start unchecked, so Enter alone leaves every token as it is. The last two rows, `dsh web` and `opencode web`, are not providers: checking one asks for the hostname [`bin/serve.sh`](#dsh-web-and-opencode-through-a-cloudflare-tunnel) serves it under
+1. Check the providers whose token you want to set or change (arrows + Space, Enter to confirm). Providers that already have a token show ✅ and start unchecked, so Enter alone leaves every token as it is. The last row, `dsh web`, is not a provider: checking it asks for the hostname [`bin/serve.sh`](#dsh-web-through-a-cloudflare-tunnel) serves it under
 2. Paste the API token of each checked provider — an empty answer keeps the existing token
 3. `configs.jsonc` is validated before anything is written; `.env` is created from `.env.example` if missing (`chmod 600`), gets any variables added to `.env.example` since, and picks up keys still sitting in the old `providers/<name>/.env` files
-4. pi itself is updated, the [pi packages](#pi-packages) that add `/loop`, `/goal`, MCP and subagents are installed into pi's user settings (`~/.pi/agent/settings.json`), and pi's model catalogs are refreshed, and DeepSeek Harness is installed with `bun install -g <package>@next` and Command Code with `npm install -g <package>@latest` — and nginx with `brew install nginx`, or `sudo apt-get install nginx` without Homebrew, once `SERVE_HOST` or `SERVE_OPENCODE_HOST` is set, for [`bin/serve.sh`](#dsh-web-and-opencode-through-a-cloudflare-tunnel). Anything of these already installed is upgraded to the newest release, so re-running `make setup` is also how you update them
+4. pi itself is updated, the [pi packages](#pi-packages) that add `/loop`, `/goal`, MCP and subagents are installed into pi's user settings (`~/.pi/agent/settings.json`), and pi's model catalogs are refreshed, and DeepSeek Harness is installed with `bun install -g <package>@next` and Command Code with `npm install -g <package>@latest` — and nginx with `brew install nginx`, or `sudo apt-get install nginx` without Homebrew, once `SERVE_HOST` is set, for [`bin/serve.sh`](#dsh-web-through-a-cloudflare-tunnel). Anything of these already installed is upgraded to the newest release, so re-running `make setup` is also how you update them
 5. Every provider whose key resolves is registered in the global config of every CLI — [one generator each](#generated-configs) — with every model in `configs.jsonc`, not just the tagged ones, and all of them starting on [the default provider](#default-provider). pi also gets the keys OpenCode's `/connect` holds, for [Zen and Go](#usage). OpenCode itself is installed or upgraded with its v2 installer, and the [OpenCode plugins](#opencode-plugins-from-npm) with `opencode plugin add`
-6. [`dsh web` and OpenCode's Web UI](#dsh-web-and-opencode-through-a-cloudflare-tunnel) are (re)started in the background as a service of your user's, while dsh is set up or `SERVE_HOST` or `SERVE_OPENCODE_HOST` is set — and the service is removed once none of them is
+6. [`dsh web`](#dsh-web-through-a-cloudflare-tunnel) is (re)started in the background as a service of your user's, while dsh is set up or `SERVE_HOST` is set — and the service is removed once neither is
 7. You get a warning if any of the CLIs those configs are for is missing from your PATH
 8. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/loop`](#loops-in-opencode) and [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode`, and pi gets its [dashboard](#pi-dashboard) in `~/.pi/agent/extensions` ([details below](#skills-and-global-instructions))
 9. [TokenEconomizer](#tokeneconomizer) is turned on in Claude Code, pi and OpenCode, [Impeccable](#impeccable) in every agent CLI, and the [Elephant-Goldfish Model](#elephant-goldfish-model) in Claude Code
@@ -135,7 +134,8 @@ mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/mig
 [2026-10-03 — pi 1.0](docs/migrations/2026-10-03-pi-1.0.md),
 [2026-10-31 — Crush・Reasonix・Codewhale の対応を削除](docs/migrations/2026-10-31-drop-crush-reasonix-codewhale.md),
 [2026-10-31 — OpenCode の見出しを Subscriptions から API Key に変更](docs/migrations/2026-10-31-api-key-heading.md),
-and [2026-10-31 — Local provider を削除](docs/migrations/2026-10-31-drop-local.md).
+[2026-10-31 — Local provider を削除](docs/migrations/2026-10-31-drop-local.md),
+and [2026-11-02 — opencode web を削除](docs/migrations/2026-11-02-drop-opencode-web.md).
 
 ### Make targets
 
@@ -154,7 +154,7 @@ and [2026-10-31 — Local provider を削除](docs/migrations/2026-10-31-drop-lo
 | `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from `configs.jsonc`, set the startup model in `~/.pi/agent/settings.json`, and link the keys OpenCode's `/connect` holds into `~/.pi/agent/auth.json` — run it after changing a model or endpoint, or connecting a provider in OpenCode |
 | `make opencode-global` | Re-generate OpenCode's global config from `configs.jsonc` — run it after editing it |
 | `make dsh-global` | Re-generate DeepSeek Harness's home patch `~/.dsh/cordis.patch.yml`, and the keys it reads from `~/.dsh/.env` |
-| `make uninstall` | Remove the [background service](#dsh-web-and-opencode-through-a-cloudflare-tunnel) running `dsh web` and OpenCode, [TokenEconomizer](#tokeneconomizer), [Impeccable](#impeccable), the [Elephant-Goldfish Model](#elephant-goldfish-model), the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, the `claude/mods` entry in Claude Code's `CLAUDE_CODE_PLUGIN_DIRS`, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
+| `make uninstall` | Remove the [background service](#dsh-web-through-a-cloudflare-tunnel) running `dsh web`, [TokenEconomizer](#tokeneconomizer), [Impeccable](#impeccable), the [Elephant-Goldfish Model](#elephant-goldfish-model), the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, the `claude/mods` entry in Claude Code's `CLAUDE_CODE_PLUGIN_DIRS`, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
 | `make help` | The target list above, on the terminal |
 
 ## Usage
@@ -206,21 +206,19 @@ A model picked or a provider edited in the Web UI is saved to
 survives `make dsh-global`, and once a model is saved there a re-run no longer
 changes the one dsh starts on.
 
-### dsh web and OpenCode through a Cloudflare Tunnel
+### dsh web through a Cloudflare Tunnel
 
-`make setup` keeps `dsh web` and OpenCode's Web UI running in the background
-for a browser elsewhere, reached through a Cloudflare Tunnel and signed in to by
-Cloudflare Access alone — no dsh token, no OpenCode password. `SERVE_HOST` and
-`SERVE_OPENCODE_HOST` name the tunnel's public hostnames — set them by checking
-`dsh web` and `opencode web` in `make setup`, or in `.env`. Each app starts
-only when its hostname is set, except `dsh web`: once `make setup` has
+`make setup` keeps `dsh web` running in the background for a browser elsewhere,
+reached through a Cloudflare Tunnel and signed in to by Cloudflare Access alone
+— no dsh token. `SERVE_HOST` names the tunnel's public hostname — set it by
+checking `dsh web` in `make setup`, or in `.env`. Once `make setup` has
 installed and configured dsh, it starts without `SERVE_HOST` too, on this
-machine alone and behind its own token URL. With nothing set, nothing starts.
+machine alone and behind its own token URL. With neither, nothing starts.
 
-`bin/serve.sh` runs them, as a service of your user's that `make setup`
+`bin/serve.sh` runs it, as a service of your user's that `make setup`
 (re)starts at the end of every run — a launchd agent on macOS, a systemd user
-unit elsewhere — so they come up at login and again whenever one of them exits.
-Each start reads `.env`, so re-run `make setup` after editing it; the apps are
+unit elsewhere — so it comes up at login and again whenever it exits.
+Each start reads `.env`, so re-run `make setup` after editing it; dsh is
 found on the `PATH` `make setup` last ran with. When nothing is left to serve, `make setup` removes
 the service, and `make uninstall` always does. A systemd user unit stops at
 logout unless lingering is on, so `make setup` turns it on with
@@ -231,41 +229,31 @@ tail -f ~/Library/Logs/codingagenttools-serve.log    # macOS
 journalctl --user -u codingagenttools-serve -f       # systemd
 # dsh web: http://127.0.0.1:3080/?token=…    ← on this machine
 # dsh web: https://dsh.example.com/ — through the tunnel, no token needed
-# opencode: https://oc.example.com/ — through the tunnel, no password needed
 ```
 
 | Listens on | What |
 |---|---|
-| `127.0.0.1:3081` | nginx — every route of the tunnel points here; it tells the apps apart by Host |
+| `127.0.0.1:3081` | nginx — the tunnel's route points here |
 | `127.0.0.1:3080` | `dsh web`, which also accepts `SERVE_HOST` besides loopback as the Host and Origin of a request (`--trusted-host`) |
-| `127.0.0.1:3082` | `opencode serve`, a server of its own beside OpenCode's background service, started from `$HOME` |
 
-The routes must not override the HTTP Host header: both apps check Origin
-against it. Each hostname needs a subdomain of its own, since OpenCode's Web UI
-asks for `/api` at the root.
+The route must not override the HTTP Host header: dsh checks Origin against it.
 
-Neither app lets its login be turned off, so nginx signs you in:
-
-- dsh mints a new startup token every start and answers a browser without its
-  cookie with 401. nginx turns that 401, on a page for `SERVE_HOST`, into a
-  redirect to the token URL, which dsh trades for a 30-day cookie.
-- OpenCode asks every API request for its server password. `bin/serve.sh`
-  makes one up for each start and nginx sends it with every request for
-  `SERVE_OPENCODE_HOST`. OpenCode then takes whatever reaches it as signed in,
-  so nginx refuses a request whose Origin is another site.
+dsh's login cannot be turned off, so nginx signs you in. dsh mints a new startup
+token every start and answers a browser without its cookie with 401. nginx turns
+that 401, on a page for `SERVE_HOST`, into a redirect to the token URL, which dsh
+trades for a 30-day cookie.
 
 So `bin/serve.sh` writes nginx a config for each start, in a directory only you
-can read, removed when it stops. `make setup` installs nginx once either
-hostname is set — with Homebrew, or with apt-get where there is none, disabling
+can read, removed when it stops. `make setup` installs nginx once `SERVE_HOST`
+is set — with Homebrew, or with apt-get where there is none, disabling
 again the system service Debian's package starts on port 80 — and `bin/serve.sh`
 installs it the same way when it is missing.
 
-That makes Cloudflare Access the only lock on both hostnames, and whoever gets
-past it can run any command and read any file on this machine — OpenCode opens
-any directory as a project and has a terminal. Admit only yourself, and turn on
-each route's Access protection in the tunnel too, so a request that skipped
-Access is refused before it reaches nginx. Anyone with an account on this
-machine can also reach `127.0.0.1:3081` directly.
+That makes Cloudflare Access the only lock on the hostname, and whoever gets
+past it can run any command and read any file on this machine. Admit only
+yourself, and turn on the route's Access protection in the tunnel too, so a
+request that skipped Access is refused before it reaches nginx. Anyone with an
+account on this machine can also reach `127.0.0.1:3081` directly.
 
 ### Default provider
 
@@ -846,9 +834,9 @@ heading — `deepseek/deepseek-v4.1-flash Command Code` against `DeepSeek V4.1 F
 One variable per line, named by whatever `configs.jsonc` references.
 `.env.example` lists them all with the URL to get each key from, and
 `make setup` prompts for the keys. The variables that already have a default in
-`configs.jsonc` ship commented out there — uncomment one to override it. Two
-variables are not a provider's: `SERVE_HOST` and `SERVE_OPENCODE_HOST`, the
-hostnames [`bin/serve.sh`](#dsh-web-and-opencode-through-a-cloudflare-tunnel) serves under. The file
+`configs.jsonc` ship commented out there — uncomment one to override it. One
+variable is not a provider's: `SERVE_HOST`, the
+hostname [`bin/serve.sh`](#dsh-web-through-a-cloudflare-tunnel) serves under. The file
 is sourced by bash, so a value can be computed at use time:
 
 ```bash
