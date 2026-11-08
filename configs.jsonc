@@ -217,6 +217,7 @@
           { "id": "zai-org/GLM-5.2-Fast", "context_window": 1000000 },
           { "id": "zai-org/GLM-5.1", "context_window": 200000 },
           { "id": "zai-org/GLM-5", "context_window": 200000 },
+          { "id": "minimax/minimax-m3.1-flash", "context_window": 1000000 },
           { "id": "MiniMaxAI/MiniMax-M3", "context_window": 1000000 },
           { "id": "MiniMaxAI/MiniMax-M2.7", "context_window": 200000 },
           { "id": "MiniMaxAI/MiniMax-M2.5", "context_window": 200000 },

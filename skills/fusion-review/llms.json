@@ -62,9 +62,17 @@
     {
       "name": "deepseek-commandcode",
       "label": "DeepSeek V4.1 Flash (Command Code)",
-      "enabled": true,
+      "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model commandcode-openai/deepseek/deepseek-v4.1-flash --agent plan",
+      "notes": "--agent plan で read-only"
+    },
+    {
+      "name": "minimax-m3.1-flash-commandcode",
+      "label": "MiniMax M3.1 Flash (Command Code)",
+      "enabled": true,
+      "schema": "stdin",
+      "command": "opencode run --model commandcode-openai/minimax/minimax-m3.1-flash --agent plan",
       "notes": "--agent plan で read-only"
     },
     {
