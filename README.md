@@ -66,10 +66,11 @@ bin/tokeneconomizer.sh           # turns TokenEconomizer on in Claude Code, pi a
 bin/impeccable.sh                # turns Impeccable on in every agent CLI (`make setup-impeccable`), or off (`make uninstall`)
 bin/egm.sh                       # installs the Elephant-Goldfish Model plugin in Claude Code (`make setup-egm`), or removes it (`make uninstall`)
 bin/ocr.sh                       # installs Open Code Review's `ocr` CLI and review skills (`make setup-ocr`), or removes the skills (`make uninstall`)
+bin/superpowers.sh               # installs the Superpowers plugin in Claude Code and Codex (`make setup-superpowers`), or removes it (`make uninstall`)
 bin/list.sh                      # everything this repo manages (`make list`)
 bin/help.sh                      # target overview (`make help`)
 docs/migrations/                 # upgrade notes for existing checkouts
-Makefile                         # setup / setup-providers / setup-skills / setup-tokeneconomizer / setup-impeccable / setup-egm / setup-ocr / list / uninstall / <agent>-global / help
+Makefile                         # setup / setup-providers / setup-skills / setup-tokeneconomizer / setup-impeccable / setup-egm / setup-ocr / setup-superpowers / list / uninstall / <agent>-global / help
 ```
 
 Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; adding a skill is a new `skills/<name>/SKILL.md` and a `make setup-skills`. An OpenCode slash command is a new `opencode/command/<name>.md`, and a plugin a new `opencode/plugin/<name>.js` default-exporting `{ id, setup }` — same `make setup-skills`. So is a pi extension, a new `pi/extensions/<name>.ts`, and a pi subagent, a new `pi/agents/<name>.md`.
@@ -111,9 +112,9 @@ One interactive wizard does everything:
 6. [`dsh web`](#dsh-web-through-a-cloudflare-tunnel) is (re)started in the background as a service of your user's, while dsh is set up or `SERVE_HOST` is set — and the service is removed once neither is
 7. You get a warning if any of the CLIs those configs are for is missing from your PATH
 8. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/loop`](#loops-in-opencode) and [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode`, and pi gets its [dashboard](#pi-dashboard) in `~/.pi/agent/extensions` ([details below](#skills-and-global-instructions))
-9. [TokenEconomizer](#tokeneconomizer) is turned on in Claude Code, pi and OpenCode, [Impeccable](#impeccable) in every agent CLI, and the [Elephant-Goldfish Model](#elephant-goldfish-model) in Claude Code, and [Open Code Review](#open-code-review)'s CLI and skills are installed
+9. [TokenEconomizer](#tokeneconomizer) is turned on in Claude Code, pi and OpenCode, [Impeccable](#impeccable) in every agent CLI, and the [Elephant-Goldfish Model](#elephant-goldfish-model) in Claude Code, and [Open Code Review](#open-code-review)'s CLI and skills are installed, and [Superpowers](#superpowers) is installed in Claude Code and Codex
 
-To rotate a token, pick up new settings or add a provider later, just re-run `make setup`. `make setup-providers`, `make setup-skills`, `make setup-tokeneconomizer`, `make setup-impeccable`, `make setup-egm` and `make setup-ocr` each run one part on its own; only the provider half prompts.
+To rotate a token, pick up new settings or add a provider later, just re-run `make setup`. `make setup-providers`, `make setup-skills`, `make setup-tokeneconomizer`, `make setup-impeccable`, `make setup-egm`, `make setup-ocr` and `make setup-superpowers` each run one part on its own; only the provider half prompts.
 
 Coming from an older checkout? `docs/migrations/` has the per-variable
 mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/migrations/2026-08-15-shared-env-settings.md),
@@ -142,13 +143,14 @@ and [2026-11-02 — opencode web を削除](docs/migrations/2026-11-02-drop-open
 
 | Target | What it does |
 |--------|--------------|
-| `make setup` | Both halves: the provider wizard, then the skill, `AGENTS.md`, OpenCode extension, pi extension and Claude Code mod install, then TokenEconomizer, Impeccable, the Elephant-Goldfish Model and Open Code Review |
+| `make setup` | Both halves: the provider wizard, then the skill, `AGENTS.md`, OpenCode extension, pi extension and Claude Code mod install, then TokenEconomizer, Impeccable, the Elephant-Goldfish Model, Open Code Review and Superpowers |
 | `make setup-providers` | The wizard above only: tokens, `.env` upkeep, pi packages, DeepSeek Harness, Command Code, OpenCode plugins, and every global config |
 | `make setup-skills` | The shared assets only: `skills/`, `agents/`, `AGENTS.md`, `opencode/` and `pi/` into every agent CLI, and `claude/mods/` into Claude Code's `CLAUDE_CODE_PLUGIN_DIRS` |
 | `make setup-tokeneconomizer` | [TokenEconomizer](#tokeneconomizer) only: turn it on in Claude Code, pi and OpenCode |
 | `make setup-impeccable` | [Impeccable](#impeccable) only: turn it on in every agent CLI |
 | `make setup-egm` | [Elephant-Goldfish Model](#elephant-goldfish-model) only: install the plugin in Claude Code |
 | `make setup-ocr` | [Open Code Review](#open-code-review) only: install or upgrade the `ocr` CLI and its review skills |
+| `make setup-superpowers` | [Superpowers](#superpowers) only: install the plugin in Claude Code and Codex |
 | `make check` | Validate `configs.jsonc`, then refuse any concrete name outside it (see `CLAUDE.md`). What the pre-commit hook runs |
 | `make hooks` | Install the lefthook pre-commit hook that runs `make check` |
 | `make list` | Every provider with its heading, endpoint and models with their tags, then every skill, subagent, OpenCode extension and pi extension with its install status |
@@ -156,7 +158,7 @@ and [2026-11-02 — opencode web を削除](docs/migrations/2026-11-02-drop-open
 | `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from `configs.jsonc`, set the startup model in `~/.pi/agent/settings.json`, and link the keys OpenCode's `/connect` holds into `~/.pi/agent/auth.json` — run it after changing a model or endpoint, or connecting a provider in OpenCode |
 | `make opencode-global` | Re-generate OpenCode's global config from `configs.jsonc` — run it after editing it |
 | `make dsh-global` | Re-generate DeepSeek Harness's home patch `~/.dsh/cordis.patch.yml`, and the keys it reads from `~/.dsh/.env` |
-| `make uninstall` | Remove the [background service](#dsh-web-through-a-cloudflare-tunnel) running `dsh web`, [TokenEconomizer](#tokeneconomizer), [Impeccable](#impeccable), the [Elephant-Goldfish Model](#elephant-goldfish-model), the [Open Code Review](#open-code-review) skills, the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, the `claude/mods` entry in Claude Code's `CLAUDE_CODE_PLUGIN_DIRS`, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
+| `make uninstall` | Remove the [background service](#dsh-web-through-a-cloudflare-tunnel) running `dsh web`, [TokenEconomizer](#tokeneconomizer), [Impeccable](#impeccable), the [Elephant-Goldfish Model](#elephant-goldfish-model), the [Open Code Review](#open-code-review) skills, [Superpowers](#superpowers), the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, the `claude/mods` entry in Claude Code's `CLAUDE_CODE_PLUGIN_DIRS`, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
 | `make help` | The target list above, on the terminal |
 
 ## Usage
@@ -314,12 +316,13 @@ OpenCode's TUI settings are not in `opencode.json` but in `~/.config/opencode/cl
 
 ### OpenCode plugins from npm
 
-`make setup` installs two community plugins into OpenCode:
+`make setup` installs three community plugins into OpenCode:
 
 | Plugin | Adds |
 |--------|------|
 | [`oc-tps`](https://github.com/Tarquinen/oc-tps) | Live tokens per second and time to first token in the session prompt |
 | [`@tarquinen/opencode-dcp`](https://github.com/Opencode-DCP/opencode-dynamic-context-pruning) | A `compress` tool the model uses to summarize finished parts of a session, and pruning of repeated or failed tool calls. Its settings are in `~/.config/opencode/dcp.jsonc`, written on first run |
+| [`superpowers`](#superpowers) | The Superpowers skills, installed from its git repository |
 
 A plugin has a server half, listed under `plugins` in `opencode.json`, and a TUI half, listed under `plugins` in `~/.config/opencode/cli.json`. The server halves are in `opencode.overrides.plugins` in `configs.jsonc`, so `make opencode-global` keeps them. `make setup` then runs `opencode plugin add` for every plugin in `OPENCODE_PLUGINS` in `bin/setup.sh`, and `opencode plugin update` brings each to its latest. A new plugin with a server half goes in both lists.
 
@@ -331,7 +334,7 @@ v2-format plugins — see `docs/migrations/2026-09-27-opencode-v2.md`.
 pi keeps its core small and ships no loop of its own, nor subagents. Its
 built-in MCP cannot read OpenCode's servers, so MCP comes from a package too.
 Everything of that kind lives in [pi packages](https://pi.dev/packages), so
-`make setup` installs four of them:
+`make setup` installs five of them:
 
 | Package | Adds | What it does |
 |---------|------|--------------|
@@ -339,6 +342,7 @@ Everything of that kind lives in [pi packages](https://pi.dev/packages), so
 | `npm:pi-goal` | `/goal` | A persistent objective the agent keeps working on across turns until it is complete, paused, or out of budget |
 | [`npm:pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter) | `/mcp` | MCP servers behind one `mcp` tool, started when first used |
 | [`npm:@tintinweb/pi-subagents`](https://github.com/tintinweb/pi-subagents) | `/agents` | Claude Code's `Agent` tool with `general-purpose`, `Explore` and `Plan`, run in the foreground or background, plus Claude Code's `Workflow` scripts as `SubagentWorkflow` |
+| [`git:github.com/obra/superpowers`](#superpowers) | skills | The Superpowers skills and the bootstrap that has the agent use them; no slash command |
 
 ```
 /loop "make the tests pass" --until-stable 2 --max 20
@@ -370,7 +374,7 @@ built-in: on its first start it adds `"-builtin:mcp"` to `extensions` in pi's
 `mcp.json` if nothing else is left in it.
 
 **Subagents.** The skills written for Claude Code's `Agent` tool, such as
-`deep-review` and `fanout`, run in pi unchanged. The
+`fanout`, run in pi unchanged. The
 package's built-in `Explore` runs on Claude Haiku, which this setup reaches only
 through paid providers, so `pi/agents/Explore.md` replaces it with the same
 prompt and no `model:`. It then runs on the parent session's model.
@@ -564,6 +568,30 @@ leaves the CLI.
 |---|---|---|
 | `open-code-review` | `ocr review`, on the model `ocr` is configured with | `ocr config provider` and `ocr config model` once |
 | `open-code-review-delegate` | the agent running the skill; `ocr` only picks the files and the rules for each | nothing beyond the CLI |
+
+### Superpowers
+
+[Superpowers](https://github.com/obra/superpowers) is a set of skills that has
+the agent settle the design before it writes code, then plan, work test-first
+and review: `brainstorming`, `writing-plans`, `test-driven-development`,
+`requesting-code-review`, `finishing-a-development-branch` and the rest. They
+start on their own; nothing is typed to call them. Each CLI takes it its own
+way, so `make setup` installs it four times:
+
+| CLI | How |
+|---|---|
+| Claude Code | `claude plugin install superpowers@claude-plugins-official` |
+| Codex | `codex plugin add superpowers@openai-curated` |
+| pi | `git:github.com/obra/superpowers` in `PI_PACKAGES` |
+| OpenCode | `superpowers@git+https://github.com/obra/superpowers.git` in `opencode.overrides.plugins` and `OPENCODE_PLUGINS` |
+
+`make setup-superpowers` runs the first two on its own; pi and OpenCode take it
+with their other packages in `make setup-providers`. DeepSeek Harness and
+Command Code are not covered: upstream documents no install for either.
+`make uninstall` removes it from all four. Its brainstorming skill's optional
+visual companion loads a logo from the vendor's site, which tells it the
+Superpowers version in use and nothing else; set `SUPERPOWERS_DISABLE_TELEMETRY`
+to any true value to stop that.
 
 ### Loops in OpenCode
 

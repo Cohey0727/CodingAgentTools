@@ -7,7 +7,7 @@ description: Spec-driven review that reports in six fixed sections (仕様チェ
 
 Spec-driven code review that always reports in **six fixed sections** — 仕様チェック (spec compliance), docsチェック (docs & conventions), コード品質 (code quality), パフォーマンス (performance), セキュリティ (security), 技術選定 (selection of newly adopted libraries / technologies) — and delivers the result as a temp file, a file in a user-specified folder, or inline comments posted directly on the PR lines.
 
-Unlike `/deep-review` (5 parallel subagents for adversarial depth), this runs a single review context focused on judging the diff **against the spec**. Lighter and faster; use it when you have a spec and want a structured verdict, not an exhaustive sweep.
+This runs a single review context focused on judging the diff **against the spec**. Lighter and faster; use it when you have a spec and want a structured verdict, not an exhaustive sweep.
 
 ## Workflow
 
@@ -228,7 +228,6 @@ Findings whose line is inside the PR diff become inline comments at that exact l
 
 | Goal | Use |
 |---|---|
-| Deep, adversarial 5-perspective sweep | `/deep-review` |
 | Cross-model consensus on the same review request | `/fusion-review` |
 | Address review comments received on a PR | `/resolve-reviews` |
 | Write tests (source of the prohibited-test patterns) | `/test-generation` |

@@ -545,7 +545,7 @@ install_serve_nginx() {
 # the generators. quota and handoff stay out until they ship v2-format plugins.
 # cli.json is OpenCode's own file, so opencode-cli.overrides is merged into it
 # in place once the adds have written it.
-OPENCODE_PLUGINS='oc-tps @tarquinen/opencode-dcp'
+OPENCODE_PLUGINS='oc-tps @tarquinen/opencode-dcp superpowers@git+https://github.com/obra/superpowers.git'
 
 install_opencode_plugins() {
   local module cli merged

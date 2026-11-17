@@ -12,13 +12,14 @@ target() { printf '  %s%-26s%s %s\n' "$B" "$1" "$RST" "$2"; }
 banner
 
 section 'targets'
-target 'make setup' 'both halves: the provider wizard, then the skill symlinks, then TokenEconomizer, Impeccable, the Elephant-Goldfish Model and Open Code Review'
+target 'make setup' 'both halves: the provider wizard, then the skill symlinks, then TokenEconomizer, Impeccable, the Elephant-Goldfish Model, Open Code Review and Superpowers'
 target 'make setup-providers' 'pick providers, paste tokens, install dsh, Command Code and every global config'
 target 'make setup-skills' 'link skills/, agents/, AGENTS.md, opencode/ and pi/ into every agent CLI, and claude/mods/ into Claude Code'
 target 'make setup-tokeneconomizer' 'turn TokenEconomizer on in Claude Code, pi and OpenCode'
 target 'make setup-impeccable' 'turn Impeccable on in every agent CLI'
 target 'make setup-egm' 'install the Elephant-Goldfish Model plugin in Claude Code'
 target 'make setup-ocr' "install Open Code Review's ocr CLI and its review skills"
+target 'make setup-superpowers' 'install the Superpowers plugin in Claude Code and Codex'
 target 'make check' 'validate configs.jsonc, then refuse any name only it may hold outside it'
 target 'make hooks' 'install the lefthook pre-commit hook that runs make check'
 target 'make list' 'every provider, skill, subagent and OpenCode extension, with its install status'
@@ -26,7 +27,7 @@ target 'make update' 'fetch every live model catalog, rewrite configs.jsonc from
 target 'make pi-global' "re-generate pi's global models.json from configs.jsonc"
 target 'make opencode-global' "re-generate OpenCode's global config from configs.jsonc"
 target 'make dsh-global' "re-generate DeepSeek Harness's home patch from configs.jsonc"
-target 'make uninstall' 'remove the background service, TokenEconomizer, Impeccable, the Elephant-Goldfish Model, the Open Code Review skills, generated configs, symlinks and Claude Code mods entry this repo installed'
+target 'make uninstall' 'remove the background service, TokenEconomizer, Impeccable, the Elephant-Goldfish Model, the Open Code Review skills, Superpowers, generated configs, symlinks and Claude Code mods entry this repo installed'
 target 'make help' 'this screen'
 
 section 'notes'

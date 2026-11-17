@@ -17,7 +17,7 @@
       // plugin from npm at every start; `make setup` registers the TUI half in
       // cli.json with `opencode plugin add`. quota and handoff stay out until
       // they ship v2-format plugins — see docs/migrations/2026-09-27-opencode-v2.md.
-      "plugins": ["@tarquinen/opencode-dcp"],
+      "plugins": ["@tarquinen/opencode-dcp", "superpowers@git+https://github.com/obra/superpowers.git"],
 
       "mcp": {
         // The persistent profile keeps logins across restarts. Chrome locks a

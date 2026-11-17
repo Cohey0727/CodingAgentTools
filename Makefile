@@ -3,18 +3,19 @@ SHELL   := /bin/bash
 ROOT          := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 COMMON        := $(ROOT)/bin/common.sh
 
-.PHONY: setup setup-providers setup-skills setup-tokeneconomizer setup-impeccable setup-egm setup-ocr list uninstall help update \
+.PHONY: setup setup-providers setup-skills setup-tokeneconomizer setup-impeccable setup-egm setup-ocr setup-superpowers list uninstall help update \
 	pi-global opencode-global dsh-global check hooks
 
 # Both halves of the repo: the provider wizard first (it prompts), then the
-# skill symlinks, then TokenEconomizer, Impeccable, the Elephant-Goldfish Model and
-# Open Code Review. SKIP_BANNER keeps it to a single banner.
+# skill symlinks, then TokenEconomizer, Impeccable, the Elephant-Goldfish Model,
+# Open Code Review and Superpowers. SKIP_BANNER keeps it to a single banner.
 setup: setup-providers
 	@SKIP_BANNER=1 "$(ROOT)/bin/skills-setup.sh"
 	@SKIP_BANNER=1 "$(ROOT)/bin/tokeneconomizer.sh"
 	@SKIP_BANNER=1 "$(ROOT)/bin/impeccable.sh"
 	@SKIP_BANNER=1 "$(ROOT)/bin/egm.sh"
 	@SKIP_BANNER=1 "$(ROOT)/bin/ocr.sh"
+	@SKIP_BANNER=1 "$(ROOT)/bin/superpowers.sh"
 
 # Interactive wizard: checkbox provider picker, per-provider API token
 # prompts (Enter keeps the current token), pi package install, one global
@@ -47,6 +48,11 @@ setup-egm:
 # two review skills into ~/.agents/skills and ~/.claude/skills.
 setup-ocr:
 	@"$(ROOT)/bin/ocr.sh"
+
+# Superpowers (obra/superpowers): a plugin in Claude Code and Codex. pi and
+# OpenCode install it with their other packages, in `make setup-providers`.
+setup-superpowers:
+	@"$(ROOT)/bin/superpowers.sh"
 
 # Validate configs.jsonc, then refuse any provider name outside it.
 check:
@@ -83,6 +89,7 @@ uninstall:
 	@"$(ROOT)/bin/impeccable.sh" remove
 	@"$(ROOT)/bin/egm.sh" remove
 	@"$(ROOT)/bin/ocr.sh" remove
+	@"$(ROOT)/bin/superpowers.sh" remove
 	@. "$(COMMON)"; for out in $$(generated_config_paths); do \
 		if generated_here "$$out"; then \
 			rm -f "$$out" && echo "  Removed $$out"; \

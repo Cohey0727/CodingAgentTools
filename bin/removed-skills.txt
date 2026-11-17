@@ -4,6 +4,9 @@
 # Add the old name whenever a skill is removed or renamed.
 ask-mmx
 codex
+commit
+create-pr
+deep-review
 dev-hotl
 dev-issue-create
 dev-issue-implement
