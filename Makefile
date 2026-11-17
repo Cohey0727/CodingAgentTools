@@ -3,17 +3,18 @@ SHELL   := /bin/bash
 ROOT          := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 COMMON        := $(ROOT)/bin/common.sh
 
-.PHONY: setup setup-providers setup-skills setup-tokeneconomizer setup-impeccable setup-egm list uninstall help update \
+.PHONY: setup setup-providers setup-skills setup-tokeneconomizer setup-impeccable setup-egm setup-ocr list uninstall help update \
 	pi-global opencode-global dsh-global check hooks
 
 # Both halves of the repo: the provider wizard first (it prompts), then the
-# skill symlinks, then TokenEconomizer, Impeccable and the Elephant-Goldfish Model. SKIP_BANNER keeps it to a
-# single banner.
+# skill symlinks, then TokenEconomizer, Impeccable, the Elephant-Goldfish Model and
+# Open Code Review. SKIP_BANNER keeps it to a single banner.
 setup: setup-providers
 	@SKIP_BANNER=1 "$(ROOT)/bin/skills-setup.sh"
 	@SKIP_BANNER=1 "$(ROOT)/bin/tokeneconomizer.sh"
 	@SKIP_BANNER=1 "$(ROOT)/bin/impeccable.sh"
 	@SKIP_BANNER=1 "$(ROOT)/bin/egm.sh"
+	@SKIP_BANNER=1 "$(ROOT)/bin/ocr.sh"
 
 # Interactive wizard: checkbox provider picker, per-provider API token
 # prompts (Enter keeps the current token), pi package install, one global
@@ -41,6 +42,11 @@ setup-impeccable:
 # installed from its upstream repository.
 setup-egm:
 	@"$(ROOT)/bin/egm.sh"
+
+# Open Code Review (alibaba/open-code-review): the `ocr` CLI with bun, and its
+# two review skills into ~/.agents/skills and ~/.claude/skills.
+setup-ocr:
+	@"$(ROOT)/bin/ocr.sh"
 
 # Validate configs.jsonc, then refuse any provider name outside it.
 check:
@@ -76,6 +82,7 @@ uninstall:
 	@"$(ROOT)/bin/tokeneconomizer.sh" remove
 	@"$(ROOT)/bin/impeccable.sh" remove
 	@"$(ROOT)/bin/egm.sh" remove
+	@"$(ROOT)/bin/ocr.sh" remove
 	@. "$(COMMON)"; for out in $$(generated_config_paths); do \
 		if generated_here "$$out"; then \
 			rm -f "$$out" && echo "  Removed $$out"; \

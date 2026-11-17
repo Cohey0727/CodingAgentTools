@@ -65,10 +65,11 @@ bin/skills-uninstall.sh          # removes only the symlinks pointing back here 
 bin/tokeneconomizer.sh           # turns TokenEconomizer on in Claude Code, pi and OpenCode (`make setup-tokeneconomizer`), or off (`make uninstall`)
 bin/impeccable.sh                # turns Impeccable on in every agent CLI (`make setup-impeccable`), or off (`make uninstall`)
 bin/egm.sh                       # installs the Elephant-Goldfish Model plugin in Claude Code (`make setup-egm`), or removes it (`make uninstall`)
+bin/ocr.sh                       # installs Open Code Review's `ocr` CLI and review skills (`make setup-ocr`), or removes the skills (`make uninstall`)
 bin/list.sh                      # everything this repo manages (`make list`)
 bin/help.sh                      # target overview (`make help`)
 docs/migrations/                 # upgrade notes for existing checkouts
-Makefile                         # setup / setup-providers / setup-skills / setup-tokeneconomizer / setup-impeccable / setup-egm / list / uninstall / <agent>-global / help
+Makefile                         # setup / setup-providers / setup-skills / setup-tokeneconomizer / setup-impeccable / setup-egm / setup-ocr / list / uninstall / <agent>-global / help
 ```
 
 Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; adding a skill is a new `skills/<name>/SKILL.md` and a `make setup-skills`. An OpenCode slash command is a new `opencode/command/<name>.md`, and a plugin a new `opencode/plugin/<name>.js` default-exporting `{ id, setup }` — same `make setup-skills`. So is a pi extension, a new `pi/extensions/<name>.ts`, and a pi subagent, a new `pi/agents/<name>.md`.
@@ -110,9 +111,9 @@ One interactive wizard does everything:
 6. [`dsh web`](#dsh-web-through-a-cloudflare-tunnel) is (re)started in the background as a service of your user's, while dsh is set up or `SERVE_HOST` is set — and the service is removed once neither is
 7. You get a warning if any of the CLIs those configs are for is missing from your PATH
 8. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/loop`](#loops-in-opencode) and [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode`, and pi gets its [dashboard](#pi-dashboard) in `~/.pi/agent/extensions` ([details below](#skills-and-global-instructions))
-9. [TokenEconomizer](#tokeneconomizer) is turned on in Claude Code, pi and OpenCode, [Impeccable](#impeccable) in every agent CLI, and the [Elephant-Goldfish Model](#elephant-goldfish-model) in Claude Code
+9. [TokenEconomizer](#tokeneconomizer) is turned on in Claude Code, pi and OpenCode, [Impeccable](#impeccable) in every agent CLI, and the [Elephant-Goldfish Model](#elephant-goldfish-model) in Claude Code, and [Open Code Review](#open-code-review)'s CLI and skills are installed
 
-To rotate a token, pick up new settings or add a provider later, just re-run `make setup`. `make setup-providers`, `make setup-skills`, `make setup-tokeneconomizer`, `make setup-impeccable` and `make setup-egm` each run one part on its own; only the provider half prompts.
+To rotate a token, pick up new settings or add a provider later, just re-run `make setup`. `make setup-providers`, `make setup-skills`, `make setup-tokeneconomizer`, `make setup-impeccable`, `make setup-egm` and `make setup-ocr` each run one part on its own; only the provider half prompts.
 
 Coming from an older checkout? `docs/migrations/` has the per-variable
 mapping — see [2026-08-15 — pi 対応と `.env` の共通設定化](docs/migrations/2026-08-15-shared-env-settings.md),
@@ -141,12 +142,13 @@ and [2026-11-02 — opencode web を削除](docs/migrations/2026-11-02-drop-open
 
 | Target | What it does |
 |--------|--------------|
-| `make setup` | Both halves: the provider wizard, then the skill, `AGENTS.md`, OpenCode extension, pi extension and Claude Code mod install, then TokenEconomizer, Impeccable and the Elephant-Goldfish Model |
+| `make setup` | Both halves: the provider wizard, then the skill, `AGENTS.md`, OpenCode extension, pi extension and Claude Code mod install, then TokenEconomizer, Impeccable, the Elephant-Goldfish Model and Open Code Review |
 | `make setup-providers` | The wizard above only: tokens, `.env` upkeep, pi packages, DeepSeek Harness, Command Code, OpenCode plugins, and every global config |
 | `make setup-skills` | The shared assets only: `skills/`, `agents/`, `AGENTS.md`, `opencode/` and `pi/` into every agent CLI, and `claude/mods/` into Claude Code's `CLAUDE_CODE_PLUGIN_DIRS` |
 | `make setup-tokeneconomizer` | [TokenEconomizer](#tokeneconomizer) only: turn it on in Claude Code, pi and OpenCode |
 | `make setup-impeccable` | [Impeccable](#impeccable) only: turn it on in every agent CLI |
 | `make setup-egm` | [Elephant-Goldfish Model](#elephant-goldfish-model) only: install the plugin in Claude Code |
+| `make setup-ocr` | [Open Code Review](#open-code-review) only: install or upgrade the `ocr` CLI and its review skills |
 | `make check` | Validate `configs.jsonc`, then refuse any concrete name outside it (see `CLAUDE.md`). What the pre-commit hook runs |
 | `make hooks` | Install the lefthook pre-commit hook that runs `make check` |
 | `make list` | Every provider with its heading, endpoint and models with their tags, then every skill, subagent, OpenCode extension and pi extension with its install status |
@@ -154,7 +156,7 @@ and [2026-11-02 — opencode web を削除](docs/migrations/2026-11-02-drop-open
 | `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from `configs.jsonc`, set the startup model in `~/.pi/agent/settings.json`, and link the keys OpenCode's `/connect` holds into `~/.pi/agent/auth.json` — run it after changing a model or endpoint, or connecting a provider in OpenCode |
 | `make opencode-global` | Re-generate OpenCode's global config from `configs.jsonc` — run it after editing it |
 | `make dsh-global` | Re-generate DeepSeek Harness's home patch `~/.dsh/cordis.patch.yml`, and the keys it reads from `~/.dsh/.env` |
-| `make uninstall` | Remove the [background service](#dsh-web-through-a-cloudflare-tunnel) running `dsh web`, [TokenEconomizer](#tokeneconomizer), [Impeccable](#impeccable), the [Elephant-Goldfish Model](#elephant-goldfish-model), the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, the `claude/mods` entry in Claude Code's `CLAUDE_CODE_PLUGIN_DIRS`, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
+| `make uninstall` | Remove the [background service](#dsh-web-through-a-cloudflare-tunnel) running `dsh web`, [TokenEconomizer](#tokeneconomizer), [Impeccable](#impeccable), the [Elephant-Goldfish Model](#elephant-goldfish-model), the [Open Code Review](#open-code-review) skills, the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, the `claude/mods` entry in Claude Code's `CLAUDE_CODE_PLUGIN_DIRS`, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
 | `make help` | The target list above, on the terminal |
 
 ## Usage
@@ -546,6 +548,22 @@ plugin; unlike Impeccable and TokenEconomizer it is cloned from upstream, not
 kept under `vendor/`. Start a new session, then run `/egm:egm-brainstorm`,
 `/egm:egm-draft` and `/egm:egm-review`. The reviews need an agent that can start
 fresh subagents.
+
+### Open Code Review
+
+[Open Code Review](https://github.com/alibaba/open-code-review) reviews a diff
+with its `ocr` CLI. `make setup` (or `make setup-ocr` alone) installs or
+upgrades the CLI with `bun add -g @alibaba-group/open-code-review@latest`, then
+runs `npx skills add alibaba/open-code-review -g` for its two skills — a copy
+in `~/.agents/skills` and a symlink in `~/.claude/skills`, re-fetched from
+upstream on every run. The CLI comes first because the skills install a
+missing `ocr` with npm themselves. `make uninstall` removes the skills and
+leaves the CLI.
+
+| Skill | Who reviews | Needs |
+|---|---|---|
+| `open-code-review` | `ocr review`, on the model `ocr` is configured with | `ocr config provider` and `ocr config model` once |
+| `open-code-review-delegate` | the agent running the skill; `ocr` only picks the files and the rules for each | nothing beyond the CLI |
 
 ### Loops in OpenCode
 
