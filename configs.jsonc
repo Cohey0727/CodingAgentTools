@@ -34,6 +34,14 @@
           "type": "remote",
           "url": "https://search.parallel.ai/mcp",
           "enabled": true
+        },
+
+        // Drives tabs of the user's own Chrome through the browse extension, so
+        // the agent works with the browser's signed-in sessions.
+        "browse": {
+          "type": "local",
+          "command": ["browse", "mcp"],
+          "enabled": true
         }
       }
     }
