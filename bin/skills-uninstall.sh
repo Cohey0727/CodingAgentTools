@@ -73,6 +73,13 @@ for target in "${CONTEXT_TARGETS[@]}"; do
 done
 [ "$N_REMOVED" -gt "$before" ] || note 'nothing linked from this repo'
 
+section "$(tilde "$ANTIGRAVITY_SKILLS_MANIFEST")"
+status=$(antigravity_skills_manifest remove) || status=invalid
+case $status in
+  removed) ok "removed $(tilde "$SHARED_SKILLS_DIR") from the manifest" ;;
+  absent) note 'nothing listed from this repo' ;;
+esac
+
 section "$(tilde "$CLAUDE_SETTINGS")"
 status=$(claude_plugin_dirs remove) || status=invalid
 case $status in

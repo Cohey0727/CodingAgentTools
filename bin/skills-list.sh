@@ -83,7 +83,7 @@ list_context() {
 }
 
 list_targets() {
-  local root name skills agents
+  local root name skills agents mark
 
   section 'skill targets'
   for root in "${TARGET_ROOTS[@]}"; do
@@ -98,6 +98,14 @@ list_targets() {
     printf '  %s%-12s%s %s%s skills · %s subagents linked%s\n' \
       "$B" "$(tilde "$root")" "$RST" "$DIM" "$skills" "$agents" "$RST"
   done
+
+  if [ "$(antigravity_skills_manifest status 2>/dev/null)" = present ]; then
+    mark="${GRN}✔${RST}"
+  else
+    mark="${YLW}⚠${RST}"
+  fi
+  printf '  %s %s%s%s %s->%s %s\n' "$mark" "$B" "$(tilde "$SHARED_SKILLS_DIR")" "$RST" \
+    "$DIM" "$RST" "$(tilde "$ANTIGRAVITY_SKILLS_MANIFEST")"
 }
 
 banner

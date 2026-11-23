@@ -95,6 +95,11 @@ command_code_home() { # -> Command Code's own directory: its AGENTS.md. The CLI
   printf '%s/.commandcode' "$HOME" # style-check: allow
 }
 
+antigravity_home() { # -> Antigravity's own directory: its AGENTS.md, and config/
+                     # beside it, which holds the skills manifest
+  printf '%s/.gemini' "$HOME"
+}
+
 dsh_global_config_path() { # -> the home patch `make dsh-global` writes. Every
                            # profile applies it, and dsh itself never writes it.
   printf '%s/cordis.patch.yml' "$(dsh_home)"

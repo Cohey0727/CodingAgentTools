@@ -23,6 +23,10 @@
 # Claude Code's mods under claude/mods/ are not linked: the folder is added to
 # CLAUDE_CODE_PLUGIN_DIRS in ~/.claude/settings.json, so a new mod needs no
 # re-run, only a new Claude Code session.
+#
+# Antigravity gets AGENTS.md as a link, and ~/.agents/skills as an entry in its
+# personal skills manifest (~/.gemini/config/skills.json), so every skill there
+# — the ones linked above and the ones other tools installed — is active in it.
 
 set -euo pipefail
 
@@ -154,6 +158,27 @@ install_mods() { # Claude Code's mods: their folder in CLAUDE_CODE_PLUGIN_DIRS
   esac
 }
 
+install_antigravity() { # Antigravity's skills manifest: the shared skills folder
+  local label status
+  label=$(tilde "$SHARED_SKILLS_DIR")
+
+  section "$(tilde "$ANTIGRAVITY_SKILLS_MANIFEST")"
+  if ! status=$(antigravity_skills_manifest add); then
+    N_SKIPPED=$((N_SKIPPED + 1))
+    printf '  %s⚠%s %-30s %sskipped — not valid JSON%s\n' \
+      "$YLW" "$RST" "$label" "$YLW" "$RST"
+    return 0
+  fi
+  case $status in
+    added)
+      printf '  %s✔%s %-30s %s%sadded%s\n' "$GRN" "$RST" "$label" "$B" "$GRN" "$RST"
+      ;;
+    present)
+      printf '  %s✔%s %-30s %salready listed%s\n' "$GRN" "$RST" "$label" "$DIM" "$RST"
+      ;;
+  esac
+}
+
 install_context() { # the shared AGENTS.md, under whatever name each CLI expects
   local target
   [ -f "$CONTEXT_SRC" ] || return 0
@@ -217,6 +242,12 @@ report_readers() { # which installed CLIs actually pick up what we linked
   else
     warn "$(tilde "$(pi_agent_dir)") -> pi is not on PATH"
   fi
+
+  if command -v agy >/dev/null 2>&1; then
+    ok "$(tilde "$ANTIGRAVITY_SKILLS_MANIFEST") $DIM->$RST agy"
+  else
+    warn "$(tilde "$ANTIGRAVITY_SKILLS_MANIFEST") -> agy is not on PATH"
+  fi
 }
 
 main() {
@@ -241,6 +272,7 @@ main() {
   install_opencode
   install_pi
   install_mods
+  install_antigravity
   install_context
 
   section 'summary'
@@ -253,6 +285,8 @@ main() {
     "$B" "$n_pi" "$RST" "$B" "$n_pi_agents" "$RST" "$DIM" "$RST" "$(tilde "$(pi_agent_dir)")"
   printf '  %s%s Claude Code mods%s %s->%s %s\n' \
     "$B" "$n_mods" "$RST" "$DIM" "$RST" "$(tilde "$CLAUDE_SETTINGS")"
+  printf '  %sAntigravity skills%s %s->%s %s\n' \
+    "$B" "$RST" "$DIM" "$RST" "$(tilde "$ANTIGRAVITY_SKILLS_MANIFEST")"
   printf '  %sAGENTS.md%s %s->%s %s targets\n' \
     "$B" "$RST" "$DIM" "$RST" "${#CONTEXT_TARGETS[@]}"
   printf '  %slinked %s · updated %s · removed %s · skipped %s%s\n' \

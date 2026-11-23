@@ -15,7 +15,8 @@
 # pi's user settings and pi's model catalogs are refreshed, DeepSeek Harness is
 # installed with bun and Command Code with npm — each of those upgraded in
 # place when already there — OpenCode likewise with its v2 installer
-# script, and every provider whose key resolves is registered in the global
+# script, Antigravity CLI with its installer script when it is missing (it
+# updates itself), and every provider whose key resolves is registered in the global
 # config of every agent CLI — one generator each, listed in $GLOBAL_GENERATORS.
 # Then the OpenCode plugins in $OPENCODE_PLUGINS are installed or upgraded
 # with `opencode plugin add`. Last, bin/serve.sh is (re)started as a background
@@ -448,6 +449,39 @@ install_opencode_cli() {
   fi
 }
 
+# Antigravity CLI ships as one binary, ~/.local/bin/agy. Its installer script
+# checks the download against a checksum and does nothing once agy is there,
+# because agy keeps itself up to date in the background.
+AGY_INSTALL_URL='https://antigravity.google/cli/install.sh'
+
+install_agy_cli() {
+  local version
+  section 'installing Antigravity CLI'
+  if command -v agy >/dev/null 2>&1; then
+    ok "agy $(agy --version 2>/dev/null | head -n 1) is already installed — it updates itself"
+    return 0
+  fi
+  if ! command -v curl >/dev/null 2>&1; then
+    warn "skipped — 'curl' is not on your PATH. Install it, then re-run."
+    return 0
+  fi
+  if ! curl -fsSL "$AGY_INSTALL_URL" | bash >/dev/null 2>&1; then
+    warn "failed — run 'curl -fsSL $AGY_INSTALL_URL | bash' by hand"
+    return 0
+  fi
+  hash -r
+  if ! command -v agy >/dev/null 2>&1; then
+    warn "installed into $(tilde "$HOME/.local/bin"), which is not on your PATH"
+    return 0
+  fi
+  version=$(agy --version 2>/dev/null | head -n 1 || true)
+  if [ -z "$version" ]; then
+    warn "installed, but 'agy --version' failed"
+  else
+    ok "agy $version installed"
+  fi
+}
+
 install_npm_cli() { # <command> <package> <display name> <Node.js requirement>
   local command=$1 package=$2 name=$3 node=$4 version before=
   section "installing $name"
@@ -651,6 +685,7 @@ main() {
   install_opencode_cli
   install_dsh_cli
   install_npm_cli cmd "$COMMAND_CODE_PACKAGE" 'Command Code' '>=22'
+  install_agy_cli
   install_serve_nginx
 
   for generator in $GLOBAL_GENERATORS; do

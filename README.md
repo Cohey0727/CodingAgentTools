@@ -61,7 +61,7 @@ bin/skills-common.sh             # where skills, subagents, AGENTS.md and the Op
 bin/skills-setup.sh              # links them there (`make setup-skills`)
 bin/removed-skills.txt           # skills no longer shipped; setup deletes their old links
 bin/skills-list.sh               # their install status (part of `make list`)
-bin/skills-uninstall.sh          # removes only the symlinks pointing back here and the claude/mods entry (part of `make uninstall`)
+bin/skills-uninstall.sh          # removes only the symlinks pointing back here, the claude/mods entry and Antigravity's skills manifest entry (part of `make uninstall`)
 bin/tokeneconomizer.sh           # turns TokenEconomizer on in Claude Code, pi and OpenCode (`make setup-tokeneconomizer`), or off (`make uninstall`)
 bin/impeccable.sh                # turns Impeccable on in every agent CLI (`make setup-impeccable`), or off (`make uninstall`)
 bin/egm.sh                       # installs the Elephant-Goldfish Model plugin in Claude Code (`make setup-egm`), or removes it (`make uninstall`)
@@ -87,8 +87,9 @@ Adding a provider is a new entry in `configs.jsonc` plus its key in `.env`; addi
   curl -fsSL https://pi.dev/install.sh | sh
   ```
   (the older `@mariozechner/pi-coding-agent` package is deprecated and resolves environment references differently)
-- [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) — one of the two CLIs `make setup` installs itself, with `bun install -g @deepseek-ai/dsh@next`, upgrading a `dsh` already on your PATH. That needs `bun` and Node.js `^22.19.0 || >=24.0.0`. It is a developer preview: read its [safety notice](https://github.com/deepseek-ai/deepseek-harness/blob/main/SAFETY.md) first
-- [Command Code](https://commandcode.ai) (`cmd`) — the other one, installed with `npm install -g command-code@latest`, upgrading a `cmd` already there. That needs `npm` and Node.js `>=22`. It gets no generated config, only the [skills and `AGENTS.md`](#skills-and-global-instructions), and it updates itself in the background (`cmd update` does it on demand)
+- [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) — one of the CLIs `make setup` installs itself, with `bun install -g @deepseek-ai/dsh@next`, upgrading a `dsh` already on your PATH. That needs `bun` and Node.js `^22.19.0 || >=24.0.0`. It is a developer preview: read its [safety notice](https://github.com/deepseek-ai/deepseek-harness/blob/main/SAFETY.md) first
+- [Command Code](https://commandcode.ai) (`cmd`) — another, installed with `npm install -g command-code@latest`, upgrading a `cmd` already there. That needs `npm` and Node.js `>=22`. It gets no generated config, only the [skills and `AGENTS.md`](#skills-and-global-instructions), and it updates itself in the background (`cmd update` does it on demand)
+- [Antigravity CLI](https://antigravity.google/docs/cli/install) (`agy`) — installed by `make setup` with Google's installer script, `curl -fsSL https://antigravity.google/cli/install.sh | bash`, into `~/.local/bin`. A `agy` already on your PATH is left alone, since it updates itself in the background (`agy update` does it on demand). Like Command Code it gets no generated config, only the [skills and `AGENTS.md`](#skills-and-global-instructions)
 - [nginx](https://nginx.org) (`nginx`) — only for [`dsh web` through a Cloudflare Tunnel](#dsh-web-through-a-cloudflare-tunnel), and `make setup` installs or upgrades it with `brew install nginx` — or `sudo apt-get install nginx` where there is no Homebrew — once `SERVE_HOST` is set. `bin/serve.sh` installs it the same way when it is missing
 
 Every one of these is optional. A generator writes its config whether or not the
@@ -107,11 +108,11 @@ One interactive wizard does everything:
 1. Check the providers whose token you want to set or change (arrows + Space, Enter to confirm). Providers that already have a token show ✅ and start unchecked, so Enter alone leaves every token as it is. The last row, `dsh web`, is not a provider: checking it asks for the hostname [`bin/serve.sh`](#dsh-web-through-a-cloudflare-tunnel) serves it under
 2. Paste the API token of each checked provider — an empty answer keeps the existing token
 3. `configs.jsonc` is validated before anything is written; `.env` is created from `.env.example` if missing (`chmod 600`), gets any variables added to `.env.example` since, and picks up keys still sitting in the old `providers/<name>/.env` files
-4. pi itself is updated, the [pi packages](#pi-packages) that add `/loop`, `/goal`, MCP and subagents are installed into pi's user settings (`~/.pi/agent/settings.json`), and pi's model catalogs are refreshed, and DeepSeek Harness is installed with `bun install -g <package>@next` and Command Code with `npm install -g <package>@latest` — and nginx with `brew install nginx`, or `sudo apt-get install nginx` without Homebrew, once `SERVE_HOST` is set, for [`bin/serve.sh`](#dsh-web-through-a-cloudflare-tunnel). Anything of these already installed is upgraded to the newest release, so re-running `make setup` is also how you update them
+4. pi itself is updated, the [pi packages](#pi-packages) that add `/loop`, `/goal`, MCP and subagents are installed into pi's user settings (`~/.pi/agent/settings.json`), and pi's model catalogs are refreshed, and DeepSeek Harness is installed with `bun install -g <package>@next` and Command Code with `npm install -g <package>@latest`, and Antigravity CLI with its installer script when `agy` is missing — and nginx with `brew install nginx`, or `sudo apt-get install nginx` without Homebrew, once `SERVE_HOST` is set, for [`bin/serve.sh`](#dsh-web-through-a-cloudflare-tunnel). Anything of these already installed is upgraded to the newest release, so re-running `make setup` is also how you update them
 5. Every provider whose key resolves is registered in the global config of every CLI — [one generator each](#generated-configs) — with every model in `configs.jsonc`, not just the tagged ones, and all of them starting on [the default provider](#default-provider). pi also gets the keys OpenCode's `/connect` holds, for [Zen and Go](#usage). OpenCode itself is installed or upgraded with its v2 installer, and the [OpenCode plugins](#opencode-plugins-from-npm) with `opencode plugin add`
 6. [`dsh web`](#dsh-web-through-a-cloudflare-tunnel) is (re)started in the background as a service of your user's, while dsh is set up or `SERVE_HOST` is set — and the service is removed once neither is
 7. You get a warning if any of the CLIs those configs are for is missing from your PATH
-8. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, and OpenCode gets this repo's slash commands and plugins — [`/loop`](#loops-in-opencode) and [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode`, and pi gets its [dashboard](#pi-dashboard) in `~/.pi/agent/extensions` ([details below](#skills-and-global-instructions))
+8. Every skill, every subagent and `AGENTS.md` are symlinked into the places each CLI reads them from, Antigravity is pointed at `~/.agents/skills` through its skills manifest, and OpenCode gets this repo's slash commands and plugins — [`/loop`](#loops-in-opencode) and [`/goal`](#goals-in-opencode) among them — in `~/.config/opencode`, and pi gets its [dashboard](#pi-dashboard) in `~/.pi/agent/extensions` ([details below](#skills-and-global-instructions))
 9. [TokenEconomizer](#tokeneconomizer) is turned on in Claude Code, pi and OpenCode, [Impeccable](#impeccable) in every agent CLI, and the [Elephant-Goldfish Model](#elephant-goldfish-model) in Claude Code, and [Open Code Review](#open-code-review)'s CLI and skills are installed, and [Superpowers](#superpowers) is installed in Claude Code and Codex
 
 To rotate a token, pick up new settings or add a provider later, just re-run `make setup`. `make setup-providers`, `make setup-skills`, `make setup-tokeneconomizer`, `make setup-impeccable`, `make setup-egm`, `make setup-ocr` and `make setup-superpowers` each run one part on its own; only the provider half prompts.
@@ -144,8 +145,8 @@ and [2026-11-02 — opencode web を削除](docs/migrations/2026-11-02-drop-open
 | Target | What it does |
 |--------|--------------|
 | `make setup` | Both halves: the provider wizard, then the skill, `AGENTS.md`, OpenCode extension, pi extension and Claude Code mod install, then TokenEconomizer, Impeccable, the Elephant-Goldfish Model, Open Code Review and Superpowers |
-| `make setup-providers` | The wizard above only: tokens, `.env` upkeep, pi packages, DeepSeek Harness, Command Code, OpenCode plugins, and every global config |
-| `make setup-skills` | The shared assets only: `skills/`, `agents/`, `AGENTS.md`, `opencode/` and `pi/` into every agent CLI, and `claude/mods/` into Claude Code's `CLAUDE_CODE_PLUGIN_DIRS` |
+| `make setup-providers` | The wizard above only: tokens, `.env` upkeep, pi packages, DeepSeek Harness, Command Code, Antigravity CLI, OpenCode plugins, and every global config |
+| `make setup-skills` | The shared assets only: `skills/`, `agents/`, `AGENTS.md`, `opencode/` and `pi/` into every agent CLI, `claude/mods/` into Claude Code's `CLAUDE_CODE_PLUGIN_DIRS`, and `~/.agents/skills` into Antigravity's skills manifest |
 | `make setup-tokeneconomizer` | [TokenEconomizer](#tokeneconomizer) only: turn it on in Claude Code, pi and OpenCode |
 | `make setup-impeccable` | [Impeccable](#impeccable) only: turn it on in every agent CLI |
 | `make setup-egm` | [Elephant-Goldfish Model](#elephant-goldfish-model) only: install the plugin in Claude Code |
@@ -158,7 +159,7 @@ and [2026-11-02 — opencode web を削除](docs/migrations/2026-11-02-drop-open
 | `make pi-global` | Re-generate pi's global `~/.pi/agent/models.json` from `configs.jsonc`, set the startup model in `~/.pi/agent/settings.json`, and link the keys OpenCode's `/connect` holds into `~/.pi/agent/auth.json` — run it after changing a model or endpoint, or connecting a provider in OpenCode |
 | `make opencode-global` | Re-generate OpenCode's global config from `configs.jsonc` — run it after editing it |
 | `make dsh-global` | Re-generate DeepSeek Harness's home patch `~/.dsh/cordis.patch.yml`, and the keys it reads from `~/.dsh/.env` |
-| `make uninstall` | Remove the [background service](#dsh-web-through-a-cloudflare-tunnel) running `dsh web`, [TokenEconomizer](#tokeneconomizer), [Impeccable](#impeccable), the [Elephant-Goldfish Model](#elephant-goldfish-model), the [Open Code Review](#open-code-review) skills, [Superpowers](#superpowers), the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, the `claude/mods` entry in Claude Code's `CLAUDE_CODE_PLUGIN_DIRS`, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
+| `make uninstall` | Remove the [background service](#dsh-web-through-a-cloudflare-tunnel) running `dsh web`, [TokenEconomizer](#tokeneconomizer), [Impeccable](#impeccable), the [Elephant-Goldfish Model](#elephant-goldfish-model), the [Open Code Review](#open-code-review) skills, [Superpowers](#superpowers), the packages each agent lists, every global config this repo generated and the token files beside them, the symlinks pointing back into this repo (pi extensions included), the plugin shims generated from it, the `claude/mods` entry in Claude Code's `CLAUDE_CODE_PLUGIN_DIRS`, the `~/.agents/skills` entry in Antigravity's skills manifest, and the entries in pi's `auth.json` that read OpenCode's keys. The `.env` is left alone |
 | `make help` | The target list above, on the terminal |
 
 ## Usage
@@ -1006,6 +1007,7 @@ One file is the source of truth; each CLI gets it under the name it expects:
 | `~/.codex/AGENTS.md` | Codex |
 | `~/.dsh/AGENTS.md` | DeepSeek Harness |
 | `~/.commandcode/AGENTS.md` | Command Code |
+| `~/.gemini/AGENTS.md` | Antigravity CLI |
 
 Per-project files need no such trick: pi reads a directory's `AGENTS.md` or its
 `CLAUDE.md`, whichever is there. OpenCode takes global instructions from the
@@ -1023,11 +1025,15 @@ roots:
 | `~/.claude/agents/` | Claude Code |
 | `~/.agents/skills/` | Codex, Command Code, DeepSeek Harness, opencode, pi |
 | `~/.agents/agents/` | nothing yet — kept as a mirror |
+| `~/.gemini/config/skills.json` | Antigravity CLI — an entry naming `~/.agents/skills` |
 
 `~/.agents` is the vendor-neutral root: pi reads it alongside
 `~/.pi/agent/skills`, opencode alongside `~/.claude/skills`, DeepSeek Harness
 alongside `~/.dsh/skills`, Command Code alongside `~/.commandcode/skills`, and
-Codex uses it as its skills root. Subagents have no such convention — every CLI keeps its own
+Codex uses it as its skills root. Antigravity reads only its own folders, so
+`~/.gemini/config/skills.json` names `~/.agents/skills` as one more skills
+folder — which also brings in the skills other tools installed there, such as
+Impeccable's and Open Code Review's. Subagents have no such convention — every CLI keeps its own
 place (`~/.codex/agents/*.toml`, `~/.config/opencode/agent/*.md`, pi's subagent
 extension) — so `~/.agents/agents` is a mirror nothing reads today.
 

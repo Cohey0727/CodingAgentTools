@@ -48,6 +48,7 @@ CONTEXT_TARGETS=(
   "$HOME/.codex/AGENTS.md"
   "$(dsh_home)/AGENTS.md"
   "$(command_code_home)/AGENTS.md"
+  "$(antigravity_home)/AGENTS.md"
 )
 
 context_reader() { # <target> -> the CLI that reads it
@@ -57,8 +58,15 @@ context_reader() { # <target> -> the CLI that reads it
     "$HOME/.codex/AGENTS.md") echo codex ;;
     "$(dsh_home)/AGENTS.md") echo dsh ;;
     "$(command_code_home)/AGENTS.md") echo cmd ;;
+    "$(antigravity_home)/AGENTS.md") echo agy ;;
   esac
 }
+
+# Antigravity reads skills from its own folders, never from ~/.agents/skills. A
+# personal skills manifest can name another folder, so it names that one. The
+# manifest does not expand `~`, so the entry is the absolute path.
+ANTIGRAVITY_SKILLS_MANIFEST="$(antigravity_home)/config/skills.json"
+SHARED_SKILLS_DIR="$HOME/.agents/skills"
 
 skill_readers() { # <root> -> CLIs that discover skills there
   # opencode reads both roots; pi reads ~/.pi/agent/skills and
@@ -172,6 +180,63 @@ with open(tmp, "w") as f:
     json.dump(data, f, indent=2, ensure_ascii=False)
     f.write("\n")
 os.replace(tmp, path)
+print(status)
+EOF
+}
+
+antigravity_skills_manifest() { # add|remove|status -> added | present | removed | absent
+  # Puts SHARED_SKILLS_DIR into the entries of Antigravity's personal skills
+  # manifest, or takes it out. The file is the user's as much as ours, so it is
+  # merged, never rewritten: every other entry and key stays, and it is deleted
+  # only when removing the entry leaves it empty.
+  "$PYTHON" - "$1" "$ANTIGRAVITY_SKILLS_MANIFEST" "$SHARED_SKILLS_DIR" <<'EOF'
+import json, os, sys
+action, path, folder = sys.argv[1:4]
+try:
+    with open(path) as f:
+        data = json.load(f)
+except FileNotFoundError:
+    data = {}
+except ValueError as exc:
+    print(f"  {path} is not valid JSON ({exc}) — left as it is", file=sys.stderr)
+    sys.exit(1)
+
+def names(entry):
+    return isinstance(entry, dict) and entry.get("path") == folder
+
+entries = data.get("entries", [])
+named = any(names(e) for e in entries)
+if action == "status":
+    print("present" if named else "absent")
+    sys.exit(0)
+if action == "add":
+    if named:
+        print("present")
+        sys.exit(0)
+    entries.append({"path": folder})
+    status = "added"
+else:
+    if not named:
+        print("absent")
+        sys.exit(0)
+    entries = [e for e in entries if not names(e)]
+    status = "removed"
+
+if entries:
+    data["entries"] = entries
+else:
+    data.pop("entries", None)
+
+path = os.path.realpath(path)
+if not data:
+    os.remove(path)
+else:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    os.replace(tmp, path)
 print(status)
 EOF
 }
