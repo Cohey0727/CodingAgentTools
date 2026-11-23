@@ -20,6 +20,14 @@
       "notes": "--agent plan で read-only"
     },
     {
+      "name": "minimax-m3.1-flash-go",
+      "label": "MiniMax M3.1 Flash (OpenCode Go)",
+      "enabled": true,
+      "schema": "stdin",
+      "command": "opencode run --model opencode-go/minimax-m3.1-flash --agent plan",
+      "notes": "--agent plan で read-only"
+    },
+    {
       "name": "qwen-max-go",
       "label": "Qwen3.8-Max (OpenCode Go)",
       "enabled": false,
@@ -30,7 +38,7 @@
     {
       "name": "glm-flash-go",
       "label": "Zhipu AI GLM-5.3 Flash (OpenCode Go)",
-      "enabled": false,
+      "enabled": true,
       "schema": "stdin",
       "command": "opencode run --model opencode-go/glm-5.3-flash --agent plan",
       "notes": "--agent plan で read-only"
@@ -46,7 +54,7 @@
     {
       "name": "mimo-pro-go",
       "label": "MiMo-V2.6-Pro (OpenCode Go)",
-      "enabled": false,
+      "enabled": true,
       "schema": "stdin",
       "command": "opencode run --model opencode-go/mimo-v2.6-pro --agent plan",
       "notes": "--agent plan で read-only"
@@ -70,7 +78,7 @@
     {
       "name": "minimax-m3.1-flash-commandcode",
       "label": "MiniMax M3.1 Flash (Command Code)",
-      "enabled": true,
+      "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model commandcode-openai/minimax/minimax-m3.1-flash --agent plan",
       "notes": "--agent plan で read-only"
@@ -78,7 +86,7 @@
     {
       "name": "glm-flash-commandcode",
       "label": "Zhipu AI GLM-5.3 Flash (Command Code)",
-      "enabled": true,
+      "enabled": false,
       "schema": "stdin",
       "command": "opencode run --model commandcode-openai/z-ai/glm-5.3-flash --agent plan",
       "notes": "--agent plan で read-only"
@@ -86,7 +94,7 @@
     {
       "name": "mimo-pro-commandcode",
       "label": "MiMo-V2.6-Pro (Command Code)",
-      "enabled": true,
+      "enabled": false,
       "schema": "stdin",
       "command": "pi -p --model commandcode/xiaomi/mimo-v2.6-pro --tools read,grep,find,ls --no-mcp",
       "notes": "--tools read,grep,find,ls と --no-mcp で read-only"
