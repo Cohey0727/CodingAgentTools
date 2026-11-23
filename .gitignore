@@ -23,3 +23,6 @@ bin/__pycache__/
 # What Claude Code lays beside a mod each time it loads one from here
 claude/mods/*/.claude-plugin/types/
 claude/mods/*/tsconfig.json
+
+# macOS が各フォルダに作る Finder の表示状態
+.DS_Store
